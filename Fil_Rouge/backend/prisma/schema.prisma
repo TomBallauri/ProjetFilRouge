@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  isAdmin   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  bio       String?
+  avatar    String?
+  banner    String?
+  topics    Topic[]
+  posts     Post[]   @relation("UserPosts") // <--- relation nommée
+  likes     Like[]   // <-- Ajoute cette ligne
+}
+
+model Topic {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String
+  game      String
+  category  String
+  tags      String?
+  createdAt DateTime @default(now())
+  createdBy Int
+  user      User     @relation(fields: [createdBy], references: [id])
+  posts     Post[]   @relation("TopicPosts")
+  likes     Int      @default(0)
+  likedBy   Like[]   // <-- Ajoute cette ligne
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  content   String
+  topicId   Int
+  createdBy Int
+  createdAt DateTime @default(now())
+  user      User     @relation("UserPosts", fields: [createdBy], references: [id]) // <--- relation nommée
+  topic     Topic    @relation("TopicPosts", fields: [topicId], references: [id], onDelete: Cascade) // <--- relation nommée
+}
+
+model Like {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  topicId  Int
+  user     User   @relation(fields: [userId], references: [id])
+  topic    Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  @@unique([userId, topicId])
+}
