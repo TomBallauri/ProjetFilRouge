@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(node prisma/seed.js)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

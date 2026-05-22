@@ -439,7 +439,7 @@ app.get('/api/discussions', async (req, res) => {
   try {
     const topics = await prisma.topic.findMany({
       include: {
-        user: true,
+        user: { include: { cosmetics: { where: { equipped: true }, include: { cosmetic: true } } } },
         _count: { select: { posts: true } }
       },
       orderBy: { createdAt: 'desc' }
@@ -475,7 +475,7 @@ app.get('/api/topics/:topicId/messages', async (req, res) => {
   try {
     const messages = await prisma.post.findMany({
       where: { topicId: Number(topicId) },
-      include: { user: true },
+      include: { user: { include: { cosmetics: { where: { equipped: true }, include: { cosmetic: true } } } } },
       orderBy: { createdAt: 'asc' }
     });
     res.json(messages);
@@ -538,4 +538,281 @@ app.get('/api/users/:id/topics', async (req, res) => {
   const userId = req.params.id;
   const topics = await prisma.topic.findMany({ where: { createdBy: Number(userId) } });
   res.json(topics);
+});
+
+// ─── DÉFIS ───────────────────────────────────────────────────────────────────
+
+app.get('/api/challenges', async (req, res) => {
+  try {
+    const { category, difficulty, search } = req.query;
+    const where = {};
+    if (category) where.category = category;
+    if (difficulty) where.difficulty = difficulty;
+    if (search) where.title = { contains: search };
+    const challenges = await prisma.challenge.findMany({
+      where,
+      include: {
+        creator: { select: { id: true, username: true, avatar: true } },
+        _count: { select: { participants: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(challenges);
+  } catch (error) {
+    res.status(500).json({ error: "Erreur lors de la récupération des défis" });
+  }
+});
+
+app.get('/api/challenges/:id', async (req, res) => {
+  try {
+    const challenge = await prisma.challenge.findUnique({
+      where: { id: Number(req.params.id) },
+      include: {
+        creator: { select: { id: true, username: true, avatar: true } },
+        _count: { select: { participants: true } }
+      }
+    });
+    if (!challenge) return res.status(404).json({ error: "Défi non trouvé" });
+    res.json(challenge);
+  } catch (error) {
+    res.status(400).json({ error: "Erreur lors de la récupération du défi" });
+  }
+});
+
+app.post('/api/challenges', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const { title, description, difficulty, category } = req.body;
+    if (!title || !description || !difficulty || !category) {
+      return res.status(400).json({ error: "Champs requis manquants" });
+    }
+    const rewards = { EASY: { coins: 50, xp: 100 }, MEDIUM: { coins: 150, xp: 300 }, HARD: { coins: 350, xp: 700 }, EXPERT: { coins: 700, xp: 1500 } };
+    const r = rewards[difficulty] || rewards.EASY;
+    const challenge = await prisma.challenge.create({
+      data: { title, description, difficulty, category, coinReward: r.coins, xpReward: r.xp, createdBy: decoded.userId }
+    });
+    res.json(challenge);
+  } catch (error) {
+    res.status(400).json({ error: "Erreur lors de la création du défi" });
+  }
+});
+
+app.post('/api/challenges/:id/start', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const challengeId = Number(req.params.id);
+    const existing = await prisma.userChallenge.findUnique({
+      where: { userId_challengeId: { userId: decoded.userId, challengeId } }
+    });
+    if (existing) return res.status(400).json({ error: "Défi déjà commencé" });
+    const uc = await prisma.userChallenge.create({
+      data: { userId: decoded.userId, challengeId, status: 'IN_PROGRESS' }
+    });
+    res.json(uc);
+  } catch (error) {
+    res.status(400).json({ error: "Erreur lors du démarrage du défi" });
+  }
+});
+
+app.post('/api/challenges/:id/complete', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const challengeId = Number(req.params.id);
+    const uc = await prisma.userChallenge.findUnique({
+      where: { userId_challengeId: { userId: decoded.userId, challengeId } }
+    });
+    if (!uc) return res.status(404).json({ error: "Défi non commencé" });
+    if (uc.status === 'COMPLETED') return res.status(400).json({ error: "Défi déjà complété" });
+    const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } });
+    await prisma.userChallenge.update({
+      where: { id: uc.id },
+      data: { status: 'COMPLETED', completedAt: new Date() }
+    });
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    const newXp = user.xp + challenge.xpReward;
+    const newLevel = Math.floor(newXp / 1000) + 1;
+    const updatedUser = await prisma.user.update({
+      where: { id: decoded.userId },
+      data: { coins: { increment: challenge.coinReward }, xp: newXp, level: newLevel }
+    });
+    res.json({ message: "Défi complété !", coinsEarned: challenge.coinReward, xpEarned: challenge.xpReward, user: updatedUser });
+  } catch (error) {
+    res.status(400).json({ error: "Erreur lors de la complétion du défi" });
+  }
+});
+
+app.get('/api/users/me/challenges', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const challenges = await prisma.userChallenge.findMany({
+      where: { userId: decoded.userId },
+      include: { challenge: true },
+      orderBy: { startedAt: 'desc' }
+    });
+    res.json(challenges);
+  } catch (error) {
+    res.status(401).json({ error: 'Token invalide' });
+  }
+});
+
+// ─── BOUTIQUE / COSMÉTIQUES ──────────────────────────────────────────────────
+
+app.get('/api/cosmetics', async (req, res) => {
+  try {
+    const cosmetics = await prisma.cosmetic.findMany({ orderBy: { price: 'asc' } });
+    res.json(cosmetics);
+  } catch (error) {
+    res.status(500).json({ error: "Erreur lors de la récupération des cosmétiques" });
+  }
+});
+
+app.post('/api/cosmetics/:id/buy', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const cosmeticId = Number(req.params.id);
+    const cosmetic = await prisma.cosmetic.findUnique({ where: { id: cosmeticId } });
+    if (!cosmetic) return res.status(404).json({ error: "Cosmétique non trouvé" });
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    if (user.coins < cosmetic.price) return res.status(400).json({ error: "Pas assez de coins" });
+    const existing = await prisma.userCosmetic.findUnique({
+      where: { userId_cosmeticId: { userId: decoded.userId, cosmeticId } }
+    });
+    if (existing) return res.status(400).json({ error: "Cosmétique déjà acheté" });
+    await prisma.userCosmetic.create({ data: { userId: decoded.userId, cosmeticId } });
+    const updatedUser = await prisma.user.update({
+      where: { id: decoded.userId },
+      data: { coins: { decrement: cosmetic.price } }
+    });
+    res.json({ message: "Cosmétique acheté !", user: updatedUser });
+  } catch (error) {
+    res.status(400).json({ error: "Erreur lors de l'achat" });
+  }
+});
+
+app.get('/api/users/me/cosmetics', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const cosmetics = await prisma.userCosmetic.findMany({
+      where: { userId: decoded.userId },
+      include: { cosmetic: true }
+    });
+    res.json(cosmetics);
+  } catch (error) {
+    res.status(401).json({ error: 'Token invalide' });
+  }
+});
+
+// ─── PROFIL PUBLIC ────────────────────────────────────────────────────────────
+
+app.get('/api/users/:id/profile', async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, username: true, avatar: true, banner: true, bio: true,
+        xp: true, level: true, createdAt: true,
+        cosmetics: { where: { equipped: true }, include: { cosmetic: true } },
+        _count: { select: { challenges: true } }
+      }
+    });
+    if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── ÉQUIPEMENT COSMÉTIQUES ───────────────────────────────────────────────────
+
+app.post('/api/users/me/cosmetics/:id/equip', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const cosmeticId = Number(req.params.id);
+    const userCosmetic = await prisma.userCosmetic.findUnique({
+      where: { userId_cosmeticId: { userId: decoded.userId, cosmeticId } },
+      include: { cosmetic: true }
+    });
+    if (!userCosmetic) return res.status(403).json({ error: "Vous ne possédez pas ce cosmétique" });
+    // Trouver tous les IDs de cosmétiques du même type
+    const sameTypeCosmetics = await prisma.cosmetic.findMany({
+      where: { type: userCosmetic.cosmetic.type },
+      select: { id: true }
+    });
+    const sameTypeIds = sameTypeCosmetics.map(c => c.id);
+    // Déséquiper tous les cosmétiques du même type possédés par l'utilisateur
+    await prisma.userCosmetic.updateMany({
+      where: { userId: decoded.userId, cosmeticId: { in: sameTypeIds } },
+      data: { equipped: false }
+    });
+    // Équiper le cosmétique demandé
+    await prisma.userCosmetic.update({
+      where: { userId_cosmeticId: { userId: decoded.userId, cosmeticId } },
+      data: { equipped: true }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[equip]', error);
+    res.status(400).json({ error: String(error?.message ?? "Erreur lors de l'équipement") });
+  }
+});
+
+app.post('/api/users/me/cosmetics/:id/unequip', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const cosmeticId = Number(req.params.id);
+    await prisma.userCosmetic.update({
+      where: { userId_cosmeticId: { userId: decoded.userId, cosmeticId } },
+      data: { equipped: false }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ error: "Erreur lors du déséquipement" });
+  }
+});
+
+// ─── CLASSEMENT ───────────────────────────────────────────────────────────────
+
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true, username: true, avatar: true, coins: true, xp: true, level: true,
+        _count: { select: { challenges: true } },
+        cosmetics: {
+          where: { equipped: true },
+          select: { cosmeticId: true, equipped: true, cosmetic: { select: { id: true, name: true, type: true, rarity: true, imageUrl: true } } }
+        }
+      },
+      orderBy: { xp: 'desc' },
+      take: 50
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: "Erreur lors de la récupération du classement" });
+  }
 });

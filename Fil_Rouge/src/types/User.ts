@@ -7,6 +7,9 @@ export interface User {
   banner?: string;
   isAdmin?: boolean;
   createdAt: string;
+  coins: number;
+  xp: number;
+  level: number;
   gamesPlayed?: number;
   tournamentsWon?: number;
   discussionsStarted?: number;

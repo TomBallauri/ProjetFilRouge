@@ -1,29 +1,49 @@
+import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import AdminDashboard from './pages/AdminDashboard';
 import GameForum from './pages/GameForum';
 import TasksPage from './pages/TasksPage';
 import TrendsPage from './pages/TrendsPage';
-import GamesPage from './pages/GamePage';
-import GamePresVal from './pages/GamePageDir/GamePresVal';
-import GamePresLoL from './pages/GamePageDir/GamePresLoL';
-import GamePresAL from './pages/GamePageDir/GamePresAL';
-import GamePresCS2 from './pages/GamePageDir/GamePresCS2';
-import GamePresFor from './pages/GamePageDir/GamePresFor';
-import GamePresOW2 from './pages/GamePageDir/GamePresOW2';
-
 import CompetitionPage from './pages/CompetitionPage';
 import CompetitionPres from './pages/CompetitionPres';
 import ProfilePage from './pages/ProfilePage';
 import EditProfile from './pages/EditProfile';
 import DiscussionsPage from './pages/DiscussionsPage';
 import AuthPage from './pages/AuthPage';
-import TeamsPage from './pages/TeamsPage';
 import ForumTchat from './pages/ForumTchat';
+import ChallengePage from './pages/ChallengePage';
+import CreateChallenge from './pages/CreateChallenge';
+import ShopPage from './pages/ShopPage';
+import LeaderboardPage from './pages/LeaderboardPage';
+import UserProfilePage from './pages/UserProfilePage';
 import { useStore } from './lib/store';
 
 function App() {
-  const { darkMode } = useStore();
+  const { darkMode, setUser } = useStore();
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    fetch('/api/users/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 401) {
+            localStorage.removeItem('token');
+            setUser(null);
+          }
+          return;
+        }
+        const data = await res.json();
+        if (data?.user) setUser(data.user);
+      })
+      .catch(() => {
+        // Ignore network errors and keep persisted state until API is reachable.
+      });
+  }, [setUser]);
 
   return (
     <div className={darkMode ? 'dark' : ''}>
@@ -33,23 +53,18 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<GameForum />} />
-          <Route path="tasks" element={<TasksPage />} />
-          <Route path="trends" element={<TrendsPage />} />
-          <Route path="games" element={<GamesPage />} />
-          <Route path="gamepresval" element={<GamePresVal />} />
-          <Route path="gamepreslol" element={<GamePresLoL />} />
-          <Route path="gamepresal" element={<GamePresAL />} />
-          <Route path="gameprescs2" element={<GamePresCS2 />} />
-          <Route path="gamepresfor" element={<GamePresFor />} />
-          <Route path="gamepresow2" element={<GamePresOW2 />} />
           <Route path="discussions" element={<DiscussionsPage />} />
           <Route path="/tchat/:id" element={<ForumTchat />} />
-          <Route path="competition" element={<CompetitionPage />} />
-          <Route path="prescomp" element={<CompetitionPres />} />
-          <Route path="teams" element={<TeamsPage/>} />
+          <Route path="tasks" element={<TasksPage />} />
+          <Route path="trends" element={<TrendsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="edit" element={<EditProfile />} />
           <Route path="settings" element={<div className="p-4">Settings (Coming Soon)</div>} />
+          <Route path="challenges" element={<ChallengePage />} />
+          <Route path="challenges/create" element={<CreateChallenge />} />
+          <Route path="shop" element={<ShopPage />} />
+          <Route path="leaderboard" element={<LeaderboardPage />} />
+          <Route path="user/:id" element={<UserProfilePage />} />
         </Route>
       </Routes>
     </div>

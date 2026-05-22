@@ -1,8 +1,43 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
-import { Mail, Calendar, Edit, Save, X } from 'lucide-react';
+import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag } from 'lucide-react';
 import type { User } from '../types/User';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
+import type { EquippedCosmetic } from '../lib/cosmetics';
+
+type OwnedCosmetic = EquippedCosmetic & { id: number; purchasedAt: string };
+
+const TYPE_LABELS: Record<string, string> = {
+  AVATAR_FRAME: "Cadre d'avatar", BANNER: 'Bannière', BADGE: 'Badge', TITLE: 'Titre',
+};
+const TYPE_EMOJIS: Record<string, string> = {
+  AVATAR_FRAME: '🖼️', BANNER: '🏳️', BADGE: '🏅', TITLE: '📛',
+};
+const RARITY_LABELS: Record<string, string> = {
+  COMMON: 'Commun', RARE: 'Rare', EPIC: 'Épique', LEGENDARY: 'Légendaire',
+};
+
+type UserChallenge = {
+  id: number;
+  challengeId: number;
+  status: string;
+  startedAt: string;
+  completedAt?: string;
+  challenge: {
+    title: string;
+    category: string;
+    difficulty: string;
+    coinReward: number;
+    xpReward: number;
+  };
+};
+
+const fmt = (n: number): string => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.floor(n / 1_000)}K`;
+  return n.toLocaleString();
+};
 
 const MAX_SIZE_MB = 5;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -58,6 +93,72 @@ const EditProfile: React.FC = () => {
   };
 
   const [recentActivities, setRecentActivities] = useState<{ id: number; title: string; content: string; date: string }[]>([]);
+  const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
+  const [ownedCosmetics, setOwnedCosmetics] = useState<OwnedCosmetic[]>([]);
+  const [cosmeticLoading, setCosmeticLoading] = useState<number | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || !user) return;
+    fetch('/api/users/me/challenges', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => setUserChallenges(Array.isArray(data) ? data : []))
+      .catch(() => {});
+    fetch('/api/users/me/cosmetics', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => setOwnedCosmetics(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [user]);
+
+  const refreshCosmetics = async (token: string) => {
+    const data = await fetch('/api/users/me/cosmetics', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+    setOwnedCosmetics(Array.isArray(data) ? data : []);
+    globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
+  };
+
+  const handleEquip = async (cosmeticId: number) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setCosmeticLoading(cosmeticId);
+    try {
+      const res = await fetch(`/api/users/me/cosmetics/${cosmeticId}/equip`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert((err as { error?: string }).error ?? "Erreur lors de l'équipement");
+        return;
+      }
+      await refreshCosmetics(token);
+    } catch {
+      alert('Erreur réseau lors de l\'équipement');
+    } finally {
+      setCosmeticLoading(null);
+    }
+  };
+
+  const handleUnequip = async (cosmeticId: number) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setCosmeticLoading(cosmeticId);
+    try {
+      const res = await fetch(`/api/users/me/cosmetics/${cosmeticId}/unequip`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert((err as { error?: string }).error ?? 'Erreur lors du déséquipement');
+        return;
+      }
+      await refreshCosmetics(token);
+    } catch {
+      alert('Erreur réseau lors du déséquipement');
+    } finally {
+      setCosmeticLoading(null);
+    }
+  };
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -226,6 +327,15 @@ const EditProfile: React.FC = () => {
     }
   };
 
+  const equippedFrame  = getEquipped(ownedCosmetics, 'AVATAR_FRAME');
+  const equippedTitle  = getEquipped(ownedCosmetics, 'TITLE');
+  const equippedBadge  = getEquipped(ownedCosmetics, 'BADGE');
+  const equippedBanner = getEquipped(ownedCosmetics, 'BANNER');
+  const frameClass  = equippedFrame  ? (FRAME_CLASSES[equippedFrame.cosmetic.rarity]   ?? '') : '';
+  const titleClass  = equippedTitle  ? (TITLE_CLASSES[equippedTitle.cosmetic.rarity]   ?? '') : '';
+  const bannerClass = equippedBanner ? (BANNER_CLASSES[equippedBanner.cosmetic.rarity] ?? '') : '';
+  const hasBannerImage = !!(bannerPreview || formData.banner || user?.banner);
+
   if (!user) {
     return (
       <div className="text-center py-10">
@@ -245,14 +355,10 @@ const EditProfile: React.FC = () => {
     <div className={`p-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
       <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-lg overflow-hidden`}>
         <div
-          className="h-48 bg-cover bg-center relative group cursor-pointer"
-          style={{
-            backgroundImage: `url(${
-              bannerPreview ||
-              getFullImageUrl(formData.banner) ||
-              getFullImageUrl(user.banner)
-            })`
-          }}
+          className={`h-48 bg-cover bg-center relative group cursor-pointer ${!hasBannerImage ? bannerClass : ''}`}
+          style={hasBannerImage ? {
+            backgroundImage: `url(${bannerPreview || getFullImageUrl(formData.banner) || getFullImageUrl(user.banner)})`
+          } : {}}
           onClick={() => isEditing && bannerInputRef.current?.click()}
         >
           {isEditing && (
@@ -276,7 +382,7 @@ const EditProfile: React.FC = () => {
           <div className="flex items-center -mt-12">
             <div className="relative group">
               <div
-                className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-800 overflow-hidden bg-gray-100 cursor-pointer"
+                className={`w-24 h-24 rounded-full border-4 border-white dark:border-gray-800 overflow-hidden bg-gray-100 cursor-pointer ${equippedFrame?.cosmetic.imageUrl ? '' : frameClass}`}
                 onClick={() => isEditing && avatarInputRef.current?.click()}
               >
                 <img
@@ -294,6 +400,14 @@ const EditProfile: React.FC = () => {
                   </div>
                 )}
               </div>
+              {equippedFrame?.cosmetic.imageUrl && (
+                <img
+                  src={equippedFrame.cosmetic.imageUrl}
+                  alt=""
+                  className="absolute pointer-events-none select-none z-10"
+                  style={{ inset: '-14px', width: 'calc(100% + 28px)', height: 'calc(100% + 28px)' }}
+                />
+              )}
               {isEditing && (
                 <input
                   ref={avatarInputRef}
@@ -314,9 +428,14 @@ const EditProfile: React.FC = () => {
                   className="text-2xl font-bold bg-transparent border-b border-blue-500 focus:outline-none"
                 />
               ) : (
-                <h1 className="text-2xl font-bold">{user.username}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl font-bold">{user.username}</h1>
+                  {equippedBadge && <span className="text-lg" title={equippedBadge.cosmetic.name}>🏅</span>}
+                </div>
               )}
-              <p className="text-gray-600 dark:text-gray-400 flex items-center"></p>
+              {equippedTitle && (
+                <p className={`text-xs font-semibold mt-0.5 ${titleClass}`}>{equippedTitle.cosmetic.name}</p>
+              )}
             </div>
           </div>
           
@@ -354,6 +473,104 @@ const EditProfile: React.FC = () => {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Gamification stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 mt-6">
+          <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-50 text-purple-700'}`}>
+            <div className="text-2xl font-bold">{user.level ?? 1}</div>
+            <div className="text-xs font-semibold mt-0.5 flex items-center justify-center gap-1">
+              <Zap size={12} /> Niveau
+            </div>
+            <div className={`text-xs mt-1 ${darkMode ? 'text-purple-400' : 'text-purple-500'}`}>
+              {fmt(user.xp ?? 0)} XP
+            </div>
+          </div>
+          <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-50 text-yellow-700'}`}>
+            <div className="text-2xl font-bold truncate">{fmt(user.coins ?? 0)}</div>
+            <div className="text-xs font-semibold mt-0.5">🪙 Coins</div>
+            <div className={`text-xs mt-1 ${darkMode ? 'text-yellow-400' : 'text-yellow-500'}`}>
+              Monnaie virtuelle
+            </div>
+          </div>
+          <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-50 text-green-700'}`}>
+            <div className="text-2xl font-bold flex items-center justify-center gap-1">
+              <CheckCircle size={20} />
+              {userChallenges.filter(c => c.status === 'COMPLETED').length}
+            </div>
+            <div className="text-xs font-semibold mt-0.5">Défis complétés</div>
+            <div className={`text-xs mt-1 ${darkMode ? 'text-green-400' : 'text-green-500'}`}>
+              {userChallenges.length} au total
+            </div>
+          </div>
+          <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
+            <div className="text-2xl font-bold flex items-center justify-center gap-1">
+              <Clock size={20} />
+              {userChallenges.filter(c => c.status === 'IN_PROGRESS').length}
+            </div>
+            <div className="text-xs font-semibold mt-0.5">En cours</div>
+            <div className={`text-xs mt-1 ${darkMode ? 'text-blue-400' : 'text-blue-500'}`}>
+              Défis actifs
+            </div>
+          </div>
+        </div>
+
+        {/* XP progress bar */}
+        <div className="px-6 mt-4">
+          <div className="flex justify-between text-xs font-semibold mb-1">
+            <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Progression vers le niveau {(user.level ?? 1) + 1}</span>
+            <span className={darkMode ? 'text-purple-400' : 'text-purple-600'}>{(user.xp ?? 0) % 1000} / 1000 XP</span>
+          </div>
+          <div className={`w-full h-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+            <div
+              className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all"
+              style={{ width: `${((user.xp ?? 0) % 1000) / 10}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Cosmétiques */}
+        <div className="px-6 mt-6 mb-2">
+          <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+            <ShoppingBag size={20} className="text-pink-500" /> Mes cosmétiques
+          </h2>
+          {ownedCosmetics.length === 0 ? (
+            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              Aucun cosmétique possédé.{' '}
+              <Link to="/shop" className="text-pink-500 hover:underline">Visiter la boutique</Link>
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {ownedCosmetics.map(uc => {
+                const rarityColor = TITLE_CLASSES[uc.cosmetic.rarity] ?? 'text-gray-400';
+                const isLoading = cosmeticLoading === uc.cosmeticId;
+                const equippedBorder = uc.equipped
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white';
+                return (
+                  <div key={uc.id} className={`rounded-xl border-2 p-3 flex flex-col gap-2 ${equippedBorder}`}>
+                    <div className="text-center">
+                      <span className="text-2xl">{TYPE_EMOJIS[uc.cosmetic.type] ?? '🎁'}</span>
+                      <p className="font-bold text-xs mt-1 truncate">{uc.cosmetic.name}</p>
+                      <p className={`text-xs ${rarityColor}`}>{RARITY_LABELS[uc.cosmetic.rarity]}</p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{TYPE_LABELS[uc.cosmetic.type]}</p>
+                    </div>
+                    {uc.equipped ? (
+                      <button onClick={() => handleUnequip(uc.cosmeticId)} disabled={isLoading}
+                        className="w-full py-1 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-60">
+                        {isLoading ? '...' : 'Déséquiper'}
+                      </button>
+                    ) : (
+                      <button onClick={() => handleEquip(uc.cosmeticId)} disabled={isLoading}
+                        className="w-full py-1 rounded-lg text-xs font-bold bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-60">
+                        {isLoading ? '...' : 'Équiper'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 ml-6 mr-6 mb-6 ">
@@ -447,6 +664,36 @@ const EditProfile: React.FC = () => {
                   >
                     Enregistrer le mot de passe
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Challenges history */}
+            {userChallenges.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Trophy size={20} className="text-yellow-500" /> Vos défis
+                </h2>
+                <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg divide-y ${darkMode ? 'divide-gray-600' : 'divide-gray-200'}`}>
+                  {userChallenges.slice(0, 5).map(uc => (
+                    <div key={uc.id} className="p-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{uc.challenge.title}</p>
+                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          🪙 {uc.challenge.coinReward} · ⚡ {uc.challenge.xpReward} XP
+                        </p>
+                      </div>
+                      {uc.status === 'COMPLETED' ? (
+                        <span className="flex items-center gap-1 text-xs font-bold text-green-600 dark:text-green-400 flex-shrink-0">
+                          <CheckCircle size={14} /> Complété
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">
+                          <Clock size={14} /> En cours
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

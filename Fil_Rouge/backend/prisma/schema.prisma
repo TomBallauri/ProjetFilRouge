@@ -11,18 +11,24 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  email     String   @unique
-  password  String
-  isAdmin   Boolean  @default(false)
-  createdAt DateTime @default(now())
-  bio       String?
-  avatar    String?
-  banner    String?
-  topics    Topic[]
-  posts     Post[]   @relation("UserPosts") // <--- relation nommée
-  likes     Like[]   // <-- Ajoute cette ligne
+  id         Int      @id @default(autoincrement())
+  username   String   @unique
+  email      String   @unique
+  password   String
+  isAdmin    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  bio        String?
+  avatar     String?
+  banner     String?
+  coins      Int      @default(0)
+  xp         Int      @default(0)
+  level      Int      @default(1)
+  topics     Topic[]
+  posts      Post[]          @relation("UserPosts")
+  likes      Like[]
+  challenges        UserChallenge[]
+  cosmetics         UserCosmetic[]
+  createdChallenges Challenge[]
 }
 
 model Topic {
@@ -37,7 +43,7 @@ model Topic {
   user      User     @relation(fields: [createdBy], references: [id])
   posts     Post[]   @relation("TopicPosts")
   likes     Int      @default(0)
-  likedBy   Like[]   // <-- Ajoute cette ligne
+  likedBy   Like[]
 }
 
 model Post {
@@ -46,15 +52,64 @@ model Post {
   topicId   Int
   createdBy Int
   createdAt DateTime @default(now())
-  user      User     @relation("UserPosts", fields: [createdBy], references: [id]) // <--- relation nommée
-  topic     Topic    @relation("TopicPosts", fields: [topicId], references: [id], onDelete: Cascade) // <--- relation nommée
+  user      User     @relation("UserPosts", fields: [createdBy], references: [id])
+  topic     Topic    @relation("TopicPosts", fields: [topicId], references: [id], onDelete: Cascade)
 }
 
 model Like {
-  id       Int    @id @default(autoincrement())
-  userId   Int
-  topicId  Int
-  user     User   @relation(fields: [userId], references: [id])
-  topic    Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  id      Int   @id @default(autoincrement())
+  userId  Int
+  topicId Int
+  user    User  @relation(fields: [userId], references: [id])
+  topic   Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
   @@unique([userId, topicId])
+}
+
+model Challenge {
+  id           Int             @id @default(autoincrement())
+  title        String
+  description  String
+  difficulty   String          // EASY, MEDIUM, HARD, EXPERT
+  category     String          // GAMING, SPORT, CUISINE, FITNESS, CREATIVITY, KNOWLEDGE, SOCIAL
+  coinReward   Int
+  xpReward     Int
+  isDefault    Boolean         @default(false)
+  createdBy    Int?
+  createdAt    DateTime        @default(now())
+  creator      User?           @relation(fields: [createdBy], references: [id])
+  participants UserChallenge[]
+}
+
+model UserChallenge {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  challengeId Int
+  status      String    @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, ABANDONED
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  user        User      @relation(fields: [userId], references: [id])
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  @@unique([userId, challengeId])
+}
+
+model Cosmetic {
+  id          Int          @id @default(autoincrement())
+  name        String
+  description String
+  type        String       // AVATAR_FRAME, BANNER, BADGE, TITLE
+  imageUrl    String?
+  price       Int
+  rarity      String       // COMMON, RARE, EPIC, LEGENDARY
+  owners      UserCosmetic[]
+}
+
+model UserCosmetic {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  cosmeticId  Int
+  purchasedAt DateTime @default(now())
+  equipped    Boolean  @default(false)
+  user        User     @relation(fields: [userId], references: [id])
+  cosmetic    Cosmetic @relation(fields: [cosmeticId], references: [id])
+  @@unique([userId, cosmeticId])
 }

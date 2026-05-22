@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { MessageSquare, Search, Plus, X, Filter, ThumbsUp, Clock, Tag as TagIcon, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getEquipped, TITLE_CLASSES } from '../lib/cosmetics';
+import type { EquippedCosmetic } from '../lib/cosmetics';
+import UserAvatar from '../components/UserAvatar';
 
 interface Tag {
   id: string;
@@ -16,6 +19,7 @@ interface Discussion {
   author: {
     name: string;
     avatar: string;
+    cosmetics: EquippedCosmetic[];
   };
   game: string;
   category: string;
@@ -172,12 +176,10 @@ const DiscussionsPage: React.FC = () => {
           author: d.user
             ? {
                 name: d.user.username || d.user.name || "Anonyme",
-                avatar: d.user.avatar || "https://thispersondoesnotexist.com/"
+                avatar: d.user.avatar || "",
+                cosmetics: d.user.cosmetics || []
               }
-            : {
-                name: "Anonyme",
-                avatar: "https://thispersondoesnotexist.com/"
-              },
+            : { name: "Anonyme", avatar: "", cosmetics: [] },
           tags: Array.isArray(d.tags)
             ? d.tags
             : typeof d.tags === "string"
@@ -503,18 +505,16 @@ const DiscussionsPage: React.FC = () => {
             }}
           >
             <div className="flex items-start space-x-4">
-              <img
-                src={discussion.author?.avatar || "https://thispersondoesnotexist.com/"}
-                alt={discussion.author?.name || "Anonyme"}
-                className="w-10 h-10 rounded-full"
-              />
+              <UserAvatar avatar={discussion.author?.avatar} username={discussion.author?.name || 'A'} cosmetics={discussion.author?.cosmetics ?? []} size="md" />
               <div className="flex-grow">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-semibold mb-1">{discussion.title}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      by {discussion.author.name} • {formatDate(discussion.createdAt)}
-                    </p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">by {discussion.author.name}</p>
+                      {(() => { const t = getEquipped(discussion.author.cosmetics ?? [], 'TITLE'); return t ? <span className={`text-xs font-semibold ${TITLE_CLASSES[t.cosmetic.rarity] ?? ''}`}>{t.cosmetic.name.replace(/^Titre\s*:\s*/i, '')}</span> : null; })()}
+                      <p className="text-sm text-gray-600 dark:text-gray-400">• {formatDate(discussion.createdAt)}</p>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2 mr-2">
                     <span className={`px-2 py-1 rounded-full text-sm ${
