@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
-import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, MessageSquare, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut } from 'lucide-react';
+import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, MessageSquare, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut, ChevronLeft } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
+import PageLoader from '../components/PageLoader';
 
 type OwnedCosmetic = EquippedCosmetic & { id: number; purchasedAt: string };
 
@@ -95,6 +96,7 @@ const EditProfile: React.FC = () => {
   const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
   const [ownedCosmetics, setOwnedCosmetics] = useState<OwnedCosmetic[]>([]);
   const [cosmeticLoading, setCosmeticLoading] = useState<number | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
   const [openSection, setOpenSection] = useState<string | null>('appearance');
   const [notifToggles, setNotifToggles] = useState({ defis: true, messages: true, updates: false });
@@ -108,15 +110,14 @@ const EditProfile: React.FC = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token || !user) return;
-    fetch('/api/users/me/challenges', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(data => setUserChallenges(Array.isArray(data) ? data : []))
-      .catch(() => {});
-    fetch('/api/users/me/cosmetics', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(data => setOwnedCosmetics(Array.isArray(data) ? data : []))
-      .catch(() => {});
+    if (!token || !user) { setPageLoading(false); return; }
+    setPageLoading(true);
+    Promise.all([
+      fetch('/api/users/me/challenges', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(data => setUserChallenges(Array.isArray(data) ? data : [])).catch(() => {}),
+      fetch('/api/users/me/cosmetics', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(data => setOwnedCosmetics(Array.isArray(data) ? data : [])).catch(() => {}),
+    ]).finally(() => setPageLoading(false));
   }, [user]);
 
   const refreshCosmetics = async (token: string) => {
@@ -353,6 +354,8 @@ const EditProfile: React.FC = () => {
   const bannerClass = equippedBanner ? (BANNER_CLASSES[equippedBanner.cosmetic.rarity] ?? '') : '';
   const hasBannerImage = !!(bannerPreview || formData.banner || user?.banner);
 
+  if (pageLoading) return <PageLoader message="Chargement du profil..." />;
+
   if (!user) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -412,6 +415,16 @@ const EditProfile: React.FC = () => {
         {/* Decorative orbs */}
         <div style={{ position: 'absolute', right: -40, top: 20, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', left: -30, bottom: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
+        {/* Back button */}
+        {!isEditing && (
+          <button onClick={() => navigate(-1)} className="q-press"
+            style={{ position: 'absolute', top: 54, left: 18, width: 40, height: 40, borderRadius: 20,
+              background: 'rgba(255,255,255,0.85)', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backdropFilter: 'blur(10px)', zIndex: 10 }}>
+            <ChevronLeft size={18} color="#1F2030" />
+          </button>
+        )}
         {/* Edit overlay */}
         {isEditing && (
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -422,11 +435,18 @@ const EditProfile: React.FC = () => {
 
       {/* ── Avatar + Identity ── */}
       <div style={{ padding: '0 18px', marginTop: -54, textAlign: 'center' }}>
-        <div style={{ display: 'inline-block', position: 'relative' }}>
+        <div
+          style={{ display: 'inline-block', position: 'relative', width: 104, height: 104, cursor: isEditing ? 'pointer' : 'default' }}
+          onClick={() => isEditing && avatarInputRef.current?.click()}
+        >
+          {/* Avatar shrinks inward when a frame image is equipped — no overflow needed */}
           <div
-            className={`relative ${equippedFrame?.cosmetic.imageUrl ? '' : frameClass}`}
-            style={{ width: 104, height: 104, borderRadius: '50%', overflow: 'hidden', border: '5px solid var(--q-bg-flat)', boxShadow: '0 8px 24px rgba(251,146,60,0.35)', cursor: isEditing ? 'pointer' : 'default' }}
-            onClick={() => isEditing && avatarInputRef.current?.click()}
+            className={`absolute rounded-full overflow-hidden ${equippedFrame?.cosmetic.imageUrl ? '' : frameClass}`}
+            style={{
+              inset: equippedFrame?.cosmetic.imageUrl ? '6px' : '0',
+              border: '5px solid var(--q-bg-flat)',
+              boxShadow: '0 8px 24px rgba(251,146,60,0.35)',
+            }}
           >
             <img
               src={avatarPreview || getFullImageUrl(formData.avatar) || getFullImageUrl(user.avatar)}
@@ -439,9 +459,14 @@ const EditProfile: React.FC = () => {
               </div>
             )}
           </div>
+          {/* Frame fills the full 104×104 container — no negative insets, no clipping */}
           {equippedFrame?.cosmetic.imageUrl && (
-            <img src={equippedFrame.cosmetic.imageUrl} alt="" className="absolute pointer-events-none select-none z-10"
-              style={{ inset: '-14px', width: 'calc(100% + 28px)', height: 'calc(100% + 28px)' }} />
+            <img
+              src={getFullImageUrl(equippedFrame.cosmetic.imageUrl)}
+              alt=""
+              className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
+              style={{ objectFit: 'fill' }}
+            />
           )}
           {isEditing && (
             <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp"

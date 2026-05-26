@@ -110,12 +110,10 @@ const UserProfilePage: React.FC = () => {
 
       {/* ── Avatar + Identity ── */}
       <div style={{ padding: '0 18px', marginTop: -54, textAlign: 'center' }}>
-        <div style={{ display: 'inline-block', position: 'relative' }}>
-          <div style={{ width: 104, height: 104, borderRadius: '50%', overflow: 'hidden',
-            border: '5px solid var(--q-bg-flat)',
-            boxShadow: '0 8px 24px rgba(167,139,250,0.35)' }}>
-            <UserAvatar avatar={profile.avatar} username={profile.username} cosmetics={profile.cosmetics} size="lg" />
-          </div>
+        <div style={{ display: 'inline-block', position: 'relative',
+          border: '5px solid var(--q-bg-flat)', borderRadius: '50%',
+          boxShadow: '0 8px 24px rgba(167,139,250,0.35)' }}>
+          <UserAvatar avatar={profile.avatar} username={profile.username} cosmetics={profile.cosmetics} size="lg" />
         </div>
         <div style={{ marginTop: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>

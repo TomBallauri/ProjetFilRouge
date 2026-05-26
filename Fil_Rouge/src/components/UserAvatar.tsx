@@ -4,7 +4,6 @@ import type { EquippedCosmetic } from '../lib/cosmetics';
 
 const BACKEND_URL = 'http://localhost:3001';
 
-// Compact rings (no ring-offset to avoid white gap on dark backgrounds)
 const FRAME_RINGS: Record<string, string> = {
   COMMON:    'ring-2 ring-gray-400',
   RARE:      'ring-2 ring-blue-400',
@@ -18,20 +17,22 @@ export const RANK_FRAME_CLASSES: Record<number, string> = {
   3: 'ring-2 ring-orange-400',
 };
 
-function resolveUrl(avatar?: string): string {
-  if (!avatar) return '';
-  if (avatar.startsWith('http')) return avatar;
-  if (avatar.startsWith('/uploads/')) return `${BACKEND_URL}${avatar}`;
-  return avatar;
+function resolveUrl(url?: string): string {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/uploads/')) return `${BACKEND_URL}${url}`;
+  return url;
 }
 
 type Size = 'sm' | 'md' | 'xl' | 'lg';
 
-const SIZE_MAP: Record<Size, { box: string; text: string; offset: number }> = {
-  sm: { box: 'w-8 h-8',   text: 'text-xs', offset: 8  },
-  md: { box: 'w-10 h-10', text: 'text-sm', offset: 10 },
-  xl: { box: 'w-14 h-14', text: 'text-lg', offset: 12 },
-  lg: { box: 'w-16 h-16', text: 'text-xl', offset: 14 },
+// frameInset: how many px the avatar shrinks inward to leave room for the frame image.
+// The frame fills the full outer div — no negative insets, no overflow issues.
+const SIZE_MAP: Record<Size, { box: string; text: string; frameInset: number }> = {
+  sm: { box: 'w-8 h-8',   text: 'text-xs', frameInset: 3 },
+  md: { box: 'w-10 h-10', text: 'text-sm', frameInset: 3 },
+  xl: { box: 'w-14 h-14', text: 'text-lg', frameInset: 4 },
+  lg: { box: 'w-16 h-16', text: 'text-xl', frameInset: 5 },
 };
 
 type Props = {
@@ -47,29 +48,39 @@ const UserAvatar: React.FC<Props> = ({
   avatar, username, cosmetics = [], size = 'md', rankFrame = '', className = ''
 }) => {
   const equippedFrame = getEquipped(cosmetics, 'AVATAR_FRAME');
-  const hasImageFrame  = !!equippedFrame?.cosmetic.imageUrl;
-  // Ring class: equipped CSS frame > rank default. Image frame = no ring needed.
+  const hasImageFrame = !!equippedFrame?.cosmetic.imageUrl;
+
   let ringClass = rankFrame;
   if (equippedFrame && !hasImageFrame) ringClass = FRAME_RINGS[equippedFrame.cosmetic.rarity] ?? '';
   if (hasImageFrame) ringClass = '';
+
   const avatarUrl = resolveUrl(avatar);
-  const { box, text, offset } = SIZE_MAP[size];
+  const { box, text, frameInset } = SIZE_MAP[size];
+
+  // When a frame image is equipped, shrink the avatar inward so the frame
+  // fits entirely within the outer div — no overflow, no cropping.
+  const avatarInset = hasImageFrame ? frameInset : 0;
 
   return (
-    // Ring is on the OUTER div with rounded-full — NOT clipped by overflow-hidden
     <div className={`relative flex-shrink-0 ${box} rounded-full ${ringClass} ${className}`}>
-      <div className="w-full h-full rounded-full overflow-hidden bg-gray-300">
+      <div
+        className="absolute rounded-full overflow-hidden bg-gray-300"
+        style={{ inset: `${avatarInset}px` }}
+      >
         {avatarUrl
           ? <img src={avatarUrl} alt={username} className="w-full h-full object-cover" />
-          : <div className={`w-full h-full flex items-center justify-center font-bold ${text} text-gray-600`}>{username[0]?.toUpperCase()}</div>
+          : <div className={`w-full h-full flex items-center justify-center font-bold ${text} text-gray-600`}>
+              {username[0]?.toUpperCase()}
+            </div>
         }
       </div>
+
       {hasImageFrame && equippedFrame?.cosmetic.imageUrl && (
         <img
           src={resolveUrl(equippedFrame.cosmetic.imageUrl)}
           alt=""
-          className="absolute pointer-events-none select-none z-10"
-          style={{ inset: `-${offset}px`, width: `calc(100% + ${offset * 2}px)`, height: `calc(100% + ${offset * 2}px)`, objectFit: 'fill' }}
+          className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
+          style={{ objectFit: 'fill' }}
         />
       )}
     </div>

@@ -23,7 +23,7 @@ const Layout: React.FC = () => {
       <div className="flex flex-1 min-h-0">
         <Sidebar />
         <main className="flex-1 min-w-0 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-3 md:px-6 pt-4 md:pt-6 pb-28 md:pb-6">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 pt-4 md:pt-6 pb-28 md:pb-6">
             <Outlet />
           </div>
         </main>

@@ -67,7 +67,7 @@ const LeaderboardPage: React.FC = () => {
     <div style={{ background: 'var(--q-bg)', minHeight: '100%', paddingBottom: 100, fontFamily: 'var(--q-font)' }}>
 
       {/* ── Header ── */}
-      <div style={{ padding: '24px 18px 6px' }}>
+      <div style={{ padding: '24px 0 6px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <BackButton />
           <div style={{ flex: 1 }}>
@@ -92,7 +92,7 @@ const LeaderboardPage: React.FC = () => {
       </div>
 
       {/* ── Scope tabs ── */}
-      <div style={{ padding: '14px 18px 6px' }}>
+      <div style={{ padding: '14px 0 6px' }}>
         <div style={{ background: 'var(--q-chrome)', borderRadius: 18, padding: 4, display: 'flex',
           boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
           {(['amis', 'guilde', 'monde'] as const).map(id => {
@@ -128,12 +128,12 @@ const LeaderboardPage: React.FC = () => {
         <>
           {/* ── Podium ── */}
           {top3.length >= 3 && (
-            <div style={{ padding: '14px 14px 0' }}>
+            <div style={{ padding: '14px 0 0' }}>
               <div style={{
                 background: 'var(--q-vibrant-gold)',
                 borderRadius: 26, padding: '22px 16px 16px',
                 position: 'relative', overflow: 'hidden',
-                border: '1px solid rgba(255,255,255,0.25)',
+
                 boxShadow: '0 1px 0 rgba(255,255,255,0.35) inset, 0 14px 32px -10px rgba(250,204,21,0.55)',
                 display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 10,
               }}>
@@ -190,7 +190,7 @@ const LeaderboardPage: React.FC = () => {
 
           {/* ── Rest of list ── */}
           {rest.length > 0 && (
-            <div style={{ padding: '14px 18px 0' }}>
+            <div style={{ padding: '14px 0 0' }}>
               <div style={{ borderRadius: 22, overflow: 'hidden',
                 background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
                 {rest.map((u, i) => {
@@ -228,7 +228,7 @@ const LeaderboardPage: React.FC = () => {
           )}
 
           {/* ── Guild card ── */}
-          <div style={{ padding: '18px 18px 0' }}>
+          <div style={{ padding: '18px 0 0' }}>
             <div style={{ padding: 16, borderRadius: 22,
               background: 'linear-gradient(135deg,#EC4899,#A78BFA)',
               position: 'relative', overflow: 'hidden',

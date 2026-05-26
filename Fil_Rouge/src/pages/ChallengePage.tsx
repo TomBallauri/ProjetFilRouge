@@ -46,8 +46,7 @@ const DIFFICULTIES = Object.keys(DIFF_GRAD);
 function VibrantChip({ grad, glow, children }: Readonly<{ grad: string; glow: string; children: React.ReactNode }>) {
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold text-white"
-      style={{ background: grad, boxShadow: `0 3px 10px -2px ${glow}`,
-        border: '1px solid rgba(255,255,255,0.25)' }}>
+      style={{ background: grad, boxShadow: `0 3px 10px -2px ${glow}` }}>
       {children}
     </span>
   );
@@ -59,8 +58,7 @@ function IconTile({ cat }: Readonly<{ cat: string }>) {
   const CatIcon = cfg.Icon;
   return (
     <div className="w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center relative overflow-hidden"
-      style={{ background: cfg.grad, boxShadow: `0 6px 14px -4px ${cfg.glow}`,
-        border: '1px solid rgba(255,255,255,0.25)' }}>
+      style={{ background: cfg.grad, boxShadow: `0 6px 14px -4px ${cfg.glow}` }}>
       <div className="absolute right-[-8px] top-[-8px] w-7 h-7 rounded-full"
         style={{ background: 'rgba(255,255,255,0.20)' }} />
       <div className="relative z-10 text-white"><CatIcon size={22} /></div>
@@ -270,7 +268,7 @@ const ChallengePage: React.FC = () => {
   const activeFilters = [selectedCategory, selectedDifficulty].filter(Boolean).length;
 
   return (
-    <div className="px-3 py-4 md:p-6 min-h-screen" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
+    <div className="py-4 md:p-6 min-h-screen" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
 
       {/* Notification toast */}
       {notification && (
@@ -362,7 +360,7 @@ const ChallengePage: React.FC = () => {
                   <button key={c} onClick={() => setSelectedCategory(c === selectedCategory ? '' : c)}
                     className="q-press inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
                     style={active
-                      ? { background: cfg.grad, color: '#fff', boxShadow: `0 4px 12px ${cfg.glow}`, border: '1px solid rgba(255,255,255,0.25)' }
+                      ? { background: cfg.grad, color: '#fff', boxShadow: `0 4px 12px ${cfg.glow}` }
                       : { background: 'var(--q-accent-soft)', color: 'var(--q-text2)' }}>
                     <CfgIcon size={11} /> {cfg.label}
                   </button>
@@ -387,7 +385,7 @@ const ChallengePage: React.FC = () => {
                   <button key={d} onClick={() => setSelectedDifficulty(d === selectedDifficulty ? '' : d)}
                     className="q-press px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
                     style={active
-                      ? { background: cfg.grad, color: '#fff', boxShadow: `0 4px 12px ${cfg.glow}`, border: '1px solid rgba(255,255,255,0.25)' }
+                      ? { background: cfg.grad, color: '#fff', boxShadow: `0 4px 12px ${cfg.glow}` }
                       : { background: 'var(--q-accent-soft)', color: 'var(--q-text2)' }}>
                     {cfg.label}
                   </button>

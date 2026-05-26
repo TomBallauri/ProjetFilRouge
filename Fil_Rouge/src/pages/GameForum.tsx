@@ -116,7 +116,6 @@ const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
       background: meta.grad, color: '#fff',
       position: 'relative', overflow: 'hidden',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      border: '1px solid rgba(255,255,255,0.25)',
       boxShadow: `0 6px 14px -4px ${meta.glow}`,
       flexShrink: 0,
     }}>
@@ -180,7 +179,7 @@ const GameForum: React.FC = () => {
         <div className="rounded-3xl p-6 md:p-10 mb-5 relative overflow-hidden"
           style={{ background: 'var(--q-vibrant-hero)',
             boxShadow: '0 14px 32px -10px rgba(124,58,237,0.45)',
-            border: '1px solid rgba(255,255,255,0.25)' }}>
+            }}>
           <div className="absolute right-[-40px] top-[-40px] w-56 h-56 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
           <div className="absolute left-[-20px] bottom-[-30px] w-36 h-36 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
           <div className="relative z-10">
@@ -276,7 +275,7 @@ const GameForum: React.FC = () => {
       <div className="rounded-3xl p-5 mb-5 relative overflow-hidden"
         style={{ background: 'var(--q-vibrant-hero)',
           boxShadow: '0 14px 32px -10px rgba(124,58,237,0.45)',
-          border: '1px solid rgba(255,255,255,0.25)' }}>
+          }}>
         <div className="absolute right-[-30px] top-[-30px] w-36 h-36 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
         <div className="flex items-start justify-between relative z-10">
           <div className="flex-1 pr-3">
@@ -341,8 +340,7 @@ const GameForum: React.FC = () => {
                     {/* Chips row */}
                     <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
                       <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white px-2.5 py-0.5 rounded-full uppercase tracking-wide"
-                        style={{ background: meta.grad, border: '1px solid rgba(255,255,255,0.25)',
-                          boxShadow: `0 3px 10px -2px ${meta.glow}` }}>
+                        style={{ background: meta.grad, boxShadow: `0 3px 10px -2px ${meta.glow}` }}>
                         <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff',
                           boxShadow: '0 0 4px rgba(255,255,255,0.7)', flexShrink: 0, display: 'inline-block' }} />
                         {meta.label}
@@ -430,7 +428,7 @@ const GameForum: React.FC = () => {
       <div className="rounded-3xl p-4 mb-5 flex gap-3 items-center relative overflow-hidden"
         style={{ background: 'var(--q-vibrant-lavender)',
           boxShadow: '0 14px 32px -10px rgba(167,139,250,0.55)',
-          border: '1px solid rgba(255,255,255,0.25)' }}>
+          }}>
         <div className="absolute right-[-28px] bottom-[-30px] w-32 h-32 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }} />
         <div className="absolute right-8 top-[-20px] w-16 h-16 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
         <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 relative z-10"
