@@ -7,7 +7,7 @@ import Sidebar from './Sidebar';
 const Footer: React.FC = () => {
   const { darkMode } = useStore();
   return (
-    <footer className={`w-full text-center py-3 text-xs border-t ${darkMode ? 'border-white/5 text-[--q-text3]' : 'border-black/5 text-[--q-text3]'}`}
+    <footer className={`w-full text-center pt-3 pb-24 md:py-3 text-xs border-t ${darkMode ? 'border-white/5 text-[--q-text3]' : 'border-black/5 text-[--q-text3]'}`}
       style={{ background: 'var(--q-chrome)' }}>
       © {new Date().getFullYear()} ChallengeHub — Tous droits réservés.
     </footer>

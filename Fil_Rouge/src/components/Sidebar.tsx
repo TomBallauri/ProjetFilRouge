@@ -49,7 +49,7 @@ const Sidebar: React.FC = () => {
                 ${isActive ? 'bg-blue-600 text-white shadow-sm' : inactiveClass}`
               }
             >
-              {item.icon}
+              <span aria-hidden="true">{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           ))}
@@ -88,7 +88,7 @@ const Sidebar: React.FC = () => {
                   textDecoration: 'none',
                 }}
               >
-                {tab.icon}
+                <span aria-hidden="true">{tab.icon}</span>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.2 }}>{tab.label}</span>
               </NavLink>
             );

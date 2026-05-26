@@ -20,7 +20,7 @@ const BackButton: React.FC<{ className?: string }> = ({ className = '' }) => {
       }}
       aria-label="Retour"
     >
-      <ChevronLeft size={18} />
+      <ChevronLeft size={18} aria-hidden="true" />
     </button>
   );
 };

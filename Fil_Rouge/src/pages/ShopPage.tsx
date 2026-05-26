@@ -3,6 +3,7 @@ import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, CheckCircle, SlidersHorizontal, Search, X } from 'lucide-react';
 import BackButton from '../components/BackButton';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES } from '../lib/cosmetics';
 
 type Cosmetic = {
@@ -34,6 +35,14 @@ const TYPE: Record<string, { label: string; emoji: string }> = {
 const RARITIES = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY'];
 const TYPES    = ['AVATAR_FRAME', 'BANNER', 'BADGE', 'TITLE'];
 
+const BACKEND_URL = 'http://localhost:3001';
+function resolveUrl(url?: string): string {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/uploads/')) return `${BACKEND_URL}${url}`;
+  return url;
+}
+
 function applyFilters(cosmetics: Cosmetic[], search: string, type: string, rarity: string): Cosmetic[] {
   const q = search.toLowerCase();
   return cosmetics.filter(c => {
@@ -50,13 +59,16 @@ const CosmeticPreview: React.FC<{ cosmetic: Cosmetic }> = ({ cosmetic }) => {
   if (cosmetic.type === 'AVATAR_FRAME') {
     const frameClass = FRAME_CLASSES[cosmetic.rarity] ?? '';
     if (cosmetic.imageUrl) {
+      const frameInset = 5;
       return (
         <div className="relative w-16 h-16 mx-auto my-2">
-          <div className="w-full h-full rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white text-xl font-bold overflow-hidden">
+          <div className="absolute rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white text-xl font-bold"
+            style={{ inset: frameInset }}>
             A
           </div>
-          <img src={cosmetic.imageUrl} alt="" className="absolute pointer-events-none select-none"
-            style={{ inset: '-12px', width: 'calc(100% + 24px)', height: 'calc(100% + 24px)' }} />
+          <img src={resolveUrl(cosmetic.imageUrl)} alt="" aria-hidden="true"
+            className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
+            style={{ objectFit: 'fill' }} />
         </div>
       );
     }
@@ -122,7 +134,7 @@ const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, can
   const actionZone = () => {
     if (alreadyOwned) return (
       <div className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs font-bold">
-        <CheckCircle size={13} /> Possédé
+        <CheckCircle size={13} aria-hidden="true" /> Possédé
       </div>
     );
     if (!user) return (
@@ -164,6 +176,7 @@ const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, can
 };
 
 const ShopPage: React.FC = () => {
+  usePageTitle('Boutique');
   const { user, setUser, darkMode } = useStore();
   const navigate = useNavigate();
   const [cosmetics, setCosmetics] = useState<Cosmetic[]>([]);
@@ -235,7 +248,7 @@ const ShopPage: React.FC = () => {
           <BackButton />
           <div>
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-              <ShoppingBag className="text-pink-500" size={26} />
+              <ShoppingBag className="text-pink-500" size={26} aria-hidden="true" />
               Boutique
             </h1>
             <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -253,16 +266,17 @@ const ShopPage: React.FC = () => {
       {/* Barre recherche + filtres */}
       <div className={`${card} border rounded-xl p-3 mb-3 flex gap-2`}>
         <div className="flex items-center gap-2 flex-1">
-          <Search size={16} className="text-gray-400 flex-shrink-0" />
+          <Search size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Rechercher un article..."
+            aria-label="Rechercher un article"
             className={`flex-1 bg-transparent text-sm outline-none min-w-0 ${darkMode ? 'placeholder-gray-500' : 'placeholder-gray-400'}`}
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-gray-400 hover:text-gray-600">
-              <X size={14} />
+            <button onClick={() => setSearch('')} aria-label="Effacer la recherche" className="text-gray-400 hover:text-gray-600">
+              <X size={14} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -270,7 +284,7 @@ const ShopPage: React.FC = () => {
           onClick={() => setFiltersOpen(o => !o)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold flex-shrink-0 transition-colors ${filterBtnClass}`}
         >
-          <SlidersHorizontal size={14} />
+          <SlidersHorizontal size={14} aria-hidden="true" />
           Filtres{activeFilters > 0 && ` (${activeFilters})`}
         </button>
       </div>
@@ -320,7 +334,7 @@ const ShopPage: React.FC = () => {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          <ShoppingBag size={44} className="mx-auto mb-3 opacity-30" />
+          <ShoppingBag size={44} className="mx-auto mb-3 opacity-30" aria-hidden="true" />
           <p>Aucun article disponible.</p>
         </div>
       ) : (

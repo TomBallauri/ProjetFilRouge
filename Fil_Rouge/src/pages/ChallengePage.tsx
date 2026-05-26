@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { Trophy, Star, Zap, Search, Plus, CheckCircle, Clock, Flame, SlidersHorizontal, X, ChevronDown, ChevronUp, Gamepad2, Activity, UtensilsCrossed, Dumbbell, Palette, BookOpen, Users } from 'lucide-react';
@@ -181,6 +182,7 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, label, count, grad,
 };
 
 const ChallengePage: React.FC = () => {
+  usePageTitle('Défis');
   const { user, setUser } = useStore();
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<Challenge[]>([]);

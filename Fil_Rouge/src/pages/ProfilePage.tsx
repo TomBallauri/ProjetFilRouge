@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, MessageSquare, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut, ChevronLeft } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
@@ -44,6 +45,7 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const BACKEND_URL = "http://localhost:3001";
 
 const EditProfile: React.FC = () => {
+  usePageTitle('Profil');
   const { user, setUser, darkMode, toggleDarkMode } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const navigate = useNavigate();
@@ -900,7 +902,8 @@ const EditProfile: React.FC = () => {
                   {darkMode ? <Moon size={16} style={{ color: 'var(--q-accent)' }} /> : <Sun size={16} style={{ color: 'var(--q-text2)' }} />}
                   <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>Mode sombre</span>
                 </div>
-                <button onClick={toggleDarkMode} className="q-press relative flex-shrink-0"
+                <button onClick={toggleDarkMode} role="switch" aria-checked={darkMode} aria-label="Mode sombre"
+                  className="q-press relative flex-shrink-0"
                   style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
                     background: darkMode ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
                   <span style={{ position: 'absolute', top: 3, left: darkMode ? 21 : 3, width: 20, height: 20,
@@ -941,6 +944,7 @@ const EditProfile: React.FC = () => {
                 <div key={key} className="flex items-center justify-between">
                   <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{label}</span>
                   <button onClick={() => setNotifToggles(prev => ({ ...prev, [key]: !prev[key] }))}
+                    role="switch" aria-checked={notifToggles[key]} aria-label={label}
                     className="q-press relative flex-shrink-0"
                     style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
                       background: notifToggles[key] ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
@@ -983,7 +987,8 @@ const EditProfile: React.FC = () => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>Réduire les animations</span>
-                <button onClick={() => setReduceMotion(r => !r)} className="q-press relative flex-shrink-0"
+                <button onClick={() => setReduceMotion(r => !r)} role="switch" aria-checked={reduceMotion} aria-label="Réduire les animations"
+                  className="q-press relative flex-shrink-0"
                   style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
                     background: reduceMotion ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
                   <span style={{ position: 'absolute', top: 3, left: reduceMotion ? 21 : 3, width: 20, height: 20,

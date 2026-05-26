@@ -59,7 +59,7 @@ const Navbar: React.FC = () => {
         {/* Logo */}
         <Link to="/" className="text-lg md:text-xl font-bold flex items-center gap-1.5 ml-12 md:ml-0 shrink-0"
           style={{ fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
-          <Joystick size={22} className="shrink-0 text-violet-500" />
+          <Joystick size={22} className="shrink-0 text-violet-500" aria-hidden="true" />
           <span className="hidden sm:inline" style={{ color: 'var(--q-accent)' }}>Game</span>
           <span className="hidden sm:inline">Forum</span>
         </Link>
@@ -74,7 +74,7 @@ const Navbar: React.FC = () => {
                 className="q-press flex items-center gap-1 px-2.5 py-1.5 rounded-full font-bold text-xs transition-opacity hover:opacity-80"
                 style={{ background: 'linear-gradient(135deg, #FACC15, #FB923C)', color: '#fff',
                   boxShadow: '0 4px 12px -2px rgba(251,146,60,0.45)' }}>
-                <ShoppingBag size={12} className="hidden sm:block shrink-0" />
+                <ShoppingBag size={12} className="hidden sm:block shrink-0" aria-hidden="true" />
                 🪙 <span>{fmt(user.coins ?? 0)}</span>
               </Link>
 
@@ -85,7 +85,7 @@ const Navbar: React.FC = () => {
                 style={{ background: 'var(--q-vibrant-hero)', color: '#fff',
                   boxShadow: '0 4px 12px -2px rgba(124,58,237,0.45)' }}>
                 <span className="flex items-center gap-1 leading-none relative z-10">
-                  <Zap size={11} />
+                  <Zap size={11} aria-hidden="true" />
                   Niv.{user.level ?? 1}
                 </span>
                 <div className="w-full h-1 rounded-full relative z-10" style={{ background: 'rgba(255,255,255,0.30)' }}>
@@ -102,7 +102,7 @@ const Navbar: React.FC = () => {
             style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', color: darkMode ? '#FACC15' : '#A78BFA',
               border: '1px solid var(--q-line)' }}
             aria-label="Changer le thème">
-            {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            {darkMode ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
           </button>
 
           {/* Avatar / menu profil */}
@@ -114,7 +114,7 @@ const Navbar: React.FC = () => {
               ) : (
                 <div className="w-8 h-8 rounded-full flex items-center justify-center"
                   style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
-                  <User size={16} />
+                  <User size={16} aria-hidden="true" />
                 </div>
               )}
             </button>
@@ -142,23 +142,23 @@ const Navbar: React.FC = () => {
                     <Link to="/challenges" onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-80"
                       style={{ color: 'var(--q-text)' }}>
-                      <Trophy size={15} className="text-yellow-500" /> Mes défis
+                      <Trophy size={15} className="text-yellow-500" aria-hidden="true" /> Mes défis
                     </Link>
                     <Link to="/shop" onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-80"
                       style={{ color: 'var(--q-text)' }}>
-                      <ShoppingBag size={15} className="text-pink-500" /> Boutique
+                      <ShoppingBag size={15} className="text-pink-500" aria-hidden="true" /> Boutique
                     </Link>
                     <Link to="/profile" onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-80"
                       style={{ color: 'var(--q-text)' }}>
-                      <User size={15} className="text-violet-500" /> Profil
+                      <User size={15} className="text-violet-500" aria-hidden="true" /> Profil
                     </Link>
                     <div className="mx-3 my-1 h-px" style={{ background: 'var(--q-line)' }} />
                     <button
                       onClick={() => { setUser(null); localStorage.removeItem('token'); setDropdownOpen(false); globalThis.location.reload(); }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                      <LogOut size={15} /> Déconnexion
+                      <LogOut size={15} aria-hidden="true" /> Déconnexion
                     </button>
                   </>
                 ) : (

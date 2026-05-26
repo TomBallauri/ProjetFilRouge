@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Flame, Zap, ChevronRight, Sparkles, Trophy, ShoppingBag,
@@ -92,7 +93,7 @@ const XpRing: React.FC<XpRingProps> = ({ value, size, stroke, color, trackColor,
   const off = C * (1 - Math.max(0, Math.min(1, value)));
   return (
     <div style={{ width: size, height: size, position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }} aria-hidden="true" focusable="false">
         <circle cx={size / 2} cy={size / 2} r={r} stroke={trackColor} strokeWidth={stroke} fill="none" />
         <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none"
           strokeDasharray={C} strokeDashoffset={off} strokeLinecap="round"
@@ -121,7 +122,7 @@ const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
     }}>
       <div style={{ position: 'absolute', right: -8, top: -8, width: size * 0.55, height: size * 0.55,
         borderRadius: '50%', background: 'rgba(255,255,255,0.20)' }} />
-      <div style={{ position: 'relative' }}>{meta.icon}</div>
+      <div style={{ position: 'relative' }} aria-hidden="true">{meta.icon}</div>
     </div>
   );
 };
@@ -129,7 +130,8 @@ const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const GameForum: React.FC = () => {
-  const { user } = useStore();
+  usePageTitle('Accueil');
+  const { user, darkMode } = useStore();
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<UserChallenge[]>([]);
   const [recentTopics, setRecentTopics] = useState<Topic[]>([]);
@@ -209,9 +211,9 @@ const GameForum: React.FC = () => {
         {/* Feature cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} />, title: 'Défis variés', desc: 'Gaming, sport, musique, science — des centaines de défis pour tous les goûts.' },
-            { grad: GRAD.butter,   glow: GLOW.butter,   icon: <Zap size={20} />,    title: 'Montez de niveau', desc: 'Progressez, gagnez de l\'XP et débloquez des cosmétiques exclusifs.' },
-            { grad: GRAD.mint,     glow: GLOW.mint,     icon: <ShoppingBag size={20} />, title: 'Boutique', desc: 'Dépensez vos coins pour personnaliser votre profil avec des cadres et titres rares.' },
+            { grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} aria-hidden="true" />, title: 'Défis variés', desc: 'Gaming, sport, musique, science — des centaines de défis pour tous les goûts.' },
+            { grad: GRAD.butter,   glow: GLOW.butter,   icon: <Zap size={20} aria-hidden="true" />,    title: 'Montez de niveau', desc: 'Progressez, gagnez de l\'XP et débloquez des cosmétiques exclusifs.' },
+            { grad: GRAD.mint,     glow: GLOW.mint,     icon: <ShoppingBag size={20} aria-hidden="true" />, title: 'Boutique', desc: 'Dépensez vos coins pour personnaliser votre profil avec des cadres et titres rares.' },
           ].map(({ grad, glow, icon, title, desc }) => (
             <div key={title} className="rounded-3xl p-5 relative overflow-hidden"
               style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
@@ -253,12 +255,13 @@ const GameForum: React.FC = () => {
         {/* Right: coins pill + bell */}
         <div className="flex items-center gap-2">
           <Link to="/shop" style={{ display: 'flex', alignItems: 'center', gap: 6,
-            background: '#FFF1B8', color: '#5C3E10',
+            background: darkMode ? '#765c13' : '#fff1b8',
+            color: darkMode ? '#fef3c7' : '#5c3e10',
             padding: '7px 12px', borderRadius: 999, fontWeight: 700, fontSize: 13,
             fontVariantNumeric: 'tabular-nums', textDecoration: 'none' }}>
-            <CircleDollarSign size={14} /> {fmt(user.coins ?? 0)}
+            <CircleDollarSign size={14} aria-hidden="true" /> {fmt(user.coins ?? 0)}
           </Link>
-          <button className="q-press" style={{
+          <button className="q-press" aria-label="Notifications" style={{
             width: 40, height: 40, borderRadius: 20, flexShrink: 0,
             border: '1px solid rgba(250,204,21,0.35)',
             background: 'var(--q-chrome)', color: '#CA8A04',
@@ -266,7 +269,7 @@ const GameForum: React.FC = () => {
             boxShadow: '0 4px 12px -2px rgba(250,204,21,0.35)',
             cursor: 'pointer',
           }}>
-            <Bell size={18} color="#CA8A04" />
+            <Bell size={18} color="#CA8A04" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -302,11 +305,11 @@ const GameForum: React.FC = () => {
         {/* Stats row */}
         <div className="flex gap-5 mt-3 text-xs font-medium relative z-10" style={{ color: 'rgba(255,255,255,0.85)' }}>
           <span className="flex items-center gap-1.5">
-            <Flame size={13} style={{ color: '#FFE57C' }} />
+            <Flame size={13} style={{ color: '#FFE57C' }} aria-hidden="true" />
             <b className="text-white">{inProgress.length}</b> défi{inProgress.length === 1 ? '' : 's'} en cours
           </span>
           <span className="flex items-center gap-1.5">
-            <Zap size={13} style={{ color: '#FFE57C' }} />
+            <Zap size={13} style={{ color: '#FFE57C' }} aria-hidden="true" />
             <b className="text-white">{xpInLevel}</b> XP ce niveau
           </span>
         </div>
@@ -347,7 +350,7 @@ const GameForum: React.FC = () => {
                       </span>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
                         style={{ background: '#FFDDC2', color: '#D46B0F', border: '1px solid #FFDDC2' }}>
-                        <Flame size={10} style={{ color: '#D46B0F' }} /> {day}j
+                        <Flame size={10} style={{ color: '#D46B0F' }} aria-hidden="true" /> {day}j
                       </span>
                     </div>
                     {/* Title */}
@@ -365,7 +368,7 @@ const GameForum: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+                  <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
                 </button>
               );
             })}
@@ -378,9 +381,9 @@ const GameForum: React.FC = () => {
       {inProgress.length > 0 ? (
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
-            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={18} />, label: 'Défis' },
-            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={18} />, label: 'Classement' },
-            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={18} />, label: 'Boutique' },
+            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={18} aria-hidden="true" />, label: 'Défis' },
+            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={18} aria-hidden="true" />, label: 'Classement' },
+            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={18} aria-hidden="true" />, label: 'Boutique' },
           ].map(({ to, grad, glow, icon, label }) => (
             <Link key={to} to={to}
               className="q-press rounded-2xl p-3 flex flex-col items-center gap-1.5 transition-opacity hover:opacity-90"
@@ -396,9 +399,9 @@ const GameForum: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
           {[
-            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} />, label: 'Découvrir les défis', sub: 'Relever un nouveau challenge' },
-            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={20} />, label: 'Classement', sub: 'Voir les meilleurs joueurs' },
-            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={20} />, label: 'Boutique', sub: 'Dépenser tes coins' },
+            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} aria-hidden="true" />, label: 'Découvrir les défis', sub: 'Relever un nouveau challenge' },
+            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={20} aria-hidden="true" />, label: 'Classement', sub: 'Voir les meilleurs joueurs' },
+            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={20} aria-hidden="true" />, label: 'Boutique', sub: 'Dépenser tes coins' },
           ].map(({ to, grad, glow, icon, label, sub }) => (
             <Link key={to} to={to}
               className="q-press rounded-3xl p-4 flex items-center gap-3 transition-opacity hover:opacity-90"
@@ -411,7 +414,7 @@ const GameForum: React.FC = () => {
                 <div className="font-bold text-sm truncate" style={{ color: 'var(--q-text)' }}>{label}</div>
                 <div className="text-xs truncate" style={{ color: 'var(--q-text2)' }}>{sub}</div>
               </div>
-              <ChevronRight size={15} style={{ color: 'var(--q-text3)', flexShrink: 0, marginLeft: 'auto' }} />
+              <ChevronRight size={15} style={{ color: 'var(--q-text3)', flexShrink: 0, marginLeft: 'auto' }} aria-hidden="true" />
             </Link>
           ))}
         </div>
@@ -433,7 +436,7 @@ const GameForum: React.FC = () => {
         <div className="absolute right-8 top-[-20px] w-16 h-16 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
         <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 relative z-10"
           style={{ background: 'rgba(255,255,255,0.95)', boxShadow: '0 2px 8px rgba(124,58,237,0.25)' }}>
-          <Sparkles size={22} style={{ color: '#7C3AED' }} />
+          <Sparkles size={22} style={{ color: '#7C3AED' }} aria-hidden="true" />
         </div>
         <div className="flex-1 relative z-10">
           <div className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.9)' }}>
@@ -465,7 +468,7 @@ const GameForum: React.FC = () => {
                 style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none', background: 'transparent' }}>
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
-                  <MessageSquare size={15} />
+                  <MessageSquare size={15} aria-hidden="true" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate" style={{ color: 'var(--q-text)' }}>{topic.title}</p>
@@ -476,7 +479,7 @@ const GameForum: React.FC = () => {
                     {topic.category ? ` · ${topic.category}` : ''}
                   </p>
                 </div>
-                <ChevronRight size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+                <ChevronRight size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
               </button>
             ))}
           </div>

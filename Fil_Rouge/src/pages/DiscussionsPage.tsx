@@ -3,6 +3,7 @@ import { useStore } from '../lib/store';
 import { MessageSquare, Search, Plus, X, ThumbsUp, Clock, Tag as TagIcon, Send, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import BackButton from '../components/BackButton';
 import PageLoader from '../components/PageLoader';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useNavigate, Link } from 'react-router-dom';
 import { getEquipped, TITLE_CLASSES } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
@@ -51,6 +52,7 @@ function formatDate(dateString: string) {
 }
 
 const DiscussionsPage: React.FC = () => {
+  usePageTitle('Discussions');
   const { user } = useStore();
   const navigate = useNavigate();
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { Flame, Users, ChevronRight, Trophy } from 'lucide-react';
@@ -40,6 +41,7 @@ const PODIUM_SLOTS = [
 const BAR_H: Record<number, number> = { 1: 100, 2: 76, 3: 60 };
 
 const LeaderboardPage: React.FC = () => {
+  usePageTitle('Classement');
   const { user } = useStore();
   const navigate = useNavigate();
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
