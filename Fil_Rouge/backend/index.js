@@ -755,17 +755,28 @@ app.post('/api/users/me/cosmetics/:id/equip', async (req, res) => {
       include: { cosmetic: true }
     });
     if (!userCosmetic) return res.status(403).json({ error: "Vous ne possédez pas ce cosmétique" });
-    // Trouver tous les IDs de cosmétiques du même type
-    const sameTypeCosmetics = await prisma.cosmetic.findMany({
-      where: { type: userCosmetic.cosmetic.type },
-      select: { id: true }
-    });
-    const sameTypeIds = sameTypeCosmetics.map(c => c.id);
-    // Déséquiper tous les cosmétiques du même type possédés par l'utilisateur
-    await prisma.userCosmetic.updateMany({
-      where: { userId: decoded.userId, cosmeticId: { in: sameTypeIds } },
-      data: { equipped: false }
-    });
+
+    if (userCosmetic.cosmetic.type === 'BADGE') {
+      // Les badges supportent jusqu'à 3 équipés simultanément
+      const equippedBadgeCount = await prisma.userCosmetic.count({
+        where: { userId: decoded.userId, equipped: true, cosmetic: { type: 'BADGE' } },
+      });
+      if (equippedBadgeCount >= 3) {
+        return res.status(400).json({ error: 'Maximum 3 badges équipés. Déséquipez un badge d\'abord.' });
+      }
+    } else {
+      // Pour les autres types : déséquiper tous les cosmétiques du même type
+      const sameTypeCosmetics = await prisma.cosmetic.findMany({
+        where: { type: userCosmetic.cosmetic.type },
+        select: { id: true }
+      });
+      const sameTypeIds = sameTypeCosmetics.map(c => c.id);
+      await prisma.userCosmetic.updateMany({
+        where: { userId: decoded.userId, cosmeticId: { in: sameTypeIds } },
+        data: { equipped: false }
+      });
+    }
+
     // Équiper le cosmétique demandé
     await prisma.userCosmetic.update({
       where: { userId_cosmeticId: { userId: decoded.userId, cosmeticId } },

@@ -52,120 +52,125 @@ const Navbar: React.FC = () => {
   const xpToNext = 1000 - xpInLevel;
 
   return (
-    <nav className={`sticky top-0 z-10 shadow-md ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
-      <div className="flex justify-between items-center px-3 py-2.5 md:px-6">
+    <nav className="hidden md:block sticky top-0 z-10 shadow-sm border-b"
+      style={{ background: 'var(--q-chrome)', borderColor: 'var(--q-line)', fontFamily: 'var(--q-font)' }}>
+      <div className="flex justify-between items-center px-3 py-2 md:px-6">
 
-        {/* Logo — ml-12 sur mobile pour dégager le bouton hamburger (fixed left-3) */}
-        <Link to="/" className="text-lg md:text-xl font-bold flex items-center gap-1 ml-12 md:ml-0 shrink-0">
-          <Joystick size={22} className="shrink-0" />
-          <span className="text-blue-500 hidden sm:inline">Game</span>
+        {/* Logo */}
+        <Link to="/" className="text-lg md:text-xl font-bold flex items-center gap-1.5 ml-12 md:ml-0 shrink-0"
+          style={{ fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
+          <Joystick size={22} className="shrink-0 text-violet-500" />
+          <span className="hidden sm:inline" style={{ color: 'var(--q-accent)' }}>Game</span>
           <span className="hidden sm:inline">Forum</span>
         </Link>
 
         {/* Droite */}
-        <div className="flex items-center gap-1.5 md:gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
 
-          {/* Coins + Niveau — visible partout, taille adaptée */}
           {user && (
-            <div className="flex items-stretch gap-1.5">
-              {/* Coins */}
-              <Link
-                to="/shop"
-                className={`flex items-center justify-center gap-1 px-2 md:px-2.5 py-1 rounded-lg text-xs md:text-sm font-bold ${darkMode ? 'bg-yellow-900/40 text-yellow-300 hover:bg-yellow-900/60' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'} transition-colors`}
-              >
-                <ShoppingBag size={13} className="hidden sm:block shrink-0" />
+            <div className="flex items-center gap-2">
+              {/* Coins pill */}
+              <Link to="/shop" title="Boutique"
+                className="q-press flex items-center gap-1 px-2.5 py-1.5 rounded-full font-bold text-xs transition-opacity hover:opacity-80"
+                style={{ background: 'linear-gradient(135deg, #FACC15, #FB923C)', color: '#fff',
+                  boxShadow: '0 4px 12px -2px rgba(251,146,60,0.45)' }}>
+                <ShoppingBag size={12} className="hidden sm:block shrink-0" />
                 🪙 <span>{fmt(user.coins ?? 0)}</span>
               </Link>
 
-              {/* Niveau + barre XP */}
-              <Link
-                to="/leaderboard"
+              {/* Niveau + XP — mini vibrant hero card */}
+              <Link to="/leaderboard"
                 title={`${xpInLevel} / 1000 XP — encore ${xpToNext} XP pour le niveau ${(user.level ?? 1) + 1}`}
-                className={`flex flex-col justify-center gap-0.5 px-2 md:px-2.5 py-1 rounded-lg text-xs md:text-sm font-bold min-w-[52px] md:min-w-[60px] ${darkMode ? 'bg-purple-900/40 text-purple-300 hover:bg-purple-900/60' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'} transition-colors`}
-              >
-                <span className="flex items-center gap-1 leading-none">
-                  <Zap size={12} />
+                className="q-press flex flex-col justify-center gap-0.5 px-2.5 py-1.5 rounded-xl font-bold text-xs transition-opacity hover:opacity-80 min-w-[58px] relative overflow-hidden"
+                style={{ background: 'var(--q-vibrant-hero)', color: '#fff',
+                  boxShadow: '0 4px 12px -2px rgba(124,58,237,0.45)' }}>
+                <span className="flex items-center gap-1 leading-none relative z-10">
+                  <Zap size={11} />
                   Niv.{user.level ?? 1}
                 </span>
-                <div className={`w-full h-1 rounded-full ${darkMode ? 'bg-purple-900' : 'bg-purple-200'}`}>
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-purple-500 to-blue-400 transition-all duration-500"
-                    style={{ width: `${xpPercent}%` }}
-                  />
+                <div className="w-full h-1 rounded-full relative z-10" style={{ background: 'rgba(255,255,255,0.30)' }}>
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${xpPercent}%`, background: 'rgba(255,255,255,0.90)' }} />
                 </div>
               </Link>
             </div>
           )}
 
-          {/* Dark mode */}
-          <button
-            onClick={toggleDarkMode}
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            aria-label="Changer le thème"
-          >
-            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+          {/* Dark mode toggle — white pill with colored icon */}
+          <button onClick={toggleDarkMode}
+            className="q-press flex items-center justify-center w-8 h-8 rounded-full transition-opacity hover:opacity-80"
+            style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', color: darkMode ? '#FACC15' : '#A78BFA',
+              border: '1px solid var(--q-line)' }}
+            aria-label="Changer le thème">
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
           {/* Avatar / menu profil */}
           <div className="relative" ref={dropdownRef}>
-            <button
-              className="flex items-center justify-center rounded-full transition-all"
-              onClick={() => setDropdownOpen(o => !o)}
-              aria-label="Profil"
-            >
+            <button className="q-press flex items-center justify-center rounded-full transition-opacity hover:opacity-80"
+              onClick={() => setDropdownOpen(o => !o)} aria-label="Profil">
               {user ? (
                 <UserAvatar avatar={user.avatar} username={user.username ?? ''} cosmetics={navCosmetics} size="sm" />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-center">
-                  <User size={18} />
+                <div className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
+                  <User size={16} />
                 </div>
               )}
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-52 rounded-xl shadow-xl border py-1 z-30 overflow-hidden
-                bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700">
+              <div className="absolute right-0 mt-2 w-52 rounded-2xl shadow-2xl py-1 z-30 overflow-hidden"
+                style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
 
                 {user ? (
                   <>
-                    {/* Infos utilisateur en haut du menu */}
-                    <div className={`px-4 py-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <p className="font-bold text-sm truncate">{user.username}</p>
-                      <p className={`text-xs truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{user.email}</p>
-                      <div className="flex gap-3 mt-1.5 text-xs font-semibold">
-                        <span className="text-yellow-600 dark:text-yellow-400">🪙 {(user.coins ?? 0).toLocaleString()}</span>
-                        <span className="text-purple-600 dark:text-purple-400">Niv. {user.level ?? 1}</span>
+                    {/* Hero mini-card at top */}
+                    <div className="mx-2 mb-1 rounded-xl px-3 py-2.5 relative overflow-hidden"
+                      style={{ background: 'var(--q-vibrant-hero)' }}>
+                      <div className="absolute right-0 top-0 w-16 h-16 rounded-full translate-x-4 -translate-y-4"
+                        style={{ background: 'rgba(255,255,255,0.18)' }} />
+                      <p className="font-bold text-sm text-white truncate relative z-10">{user.username}</p>
+                      <p className="text-xs text-white/70 truncate relative z-10">{user.email}</p>
+                      <div className="flex gap-2 mt-1 text-xs font-bold text-white/90 relative z-10">
+                        <span>🪙 {(user.coins ?? 0).toLocaleString()}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.7)' }}>·</span>
+                        <span>Niv. {user.level ?? 1}</span>
                       </div>
                     </div>
 
                     <Link to="/challenges" onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-80"
+                      style={{ color: 'var(--q-text)' }}>
                       <Trophy size={15} className="text-yellow-500" /> Mes défis
                     </Link>
                     <Link to="/shop" onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-80"
+                      style={{ color: 'var(--q-text)' }}>
                       <ShoppingBag size={15} className="text-pink-500" /> Boutique
                     </Link>
                     <Link to="/profile" onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                      <User size={15} className="text-blue-500" /> Profil
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-80"
+                      style={{ color: 'var(--q-text)' }}>
+                      <User size={15} className="text-violet-500" /> Profil
                     </Link>
-                    <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-100'} mt-1`} />
+                    <div className="mx-3 my-1 h-px" style={{ background: 'var(--q-line)' }} />
                     <button
                       onClick={() => { setUser(null); localStorage.removeItem('token'); setDropdownOpen(false); globalThis.location.reload(); }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                    >
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                       <LogOut size={15} /> Déconnexion
                     </button>
                   </>
                 ) : (
                   <>
                     <Link to="/login" onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm font-medium">
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors hover:opacity-80"
+                      style={{ color: 'var(--q-accent)' }}>
                       Se connecter
                     </Link>
                     <Link to="/register" onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm font-medium">
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors hover:opacity-80"
+                      style={{ color: 'var(--q-accent)' }}>
                       S'inscrire
                     </Link>
                   </>

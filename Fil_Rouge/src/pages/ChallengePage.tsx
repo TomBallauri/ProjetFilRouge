@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, Star, Zap, Search, Plus, CheckCircle, Clock, Flame, SlidersHorizontal, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trophy, Star, Zap, Search, Plus, CheckCircle, Clock, Flame, SlidersHorizontal, X, ChevronDown, ChevronUp, Gamepad2, Activity, UtensilsCrossed, Dumbbell, Palette, BookOpen, Users } from 'lucide-react';
+import BackButton from '../components/BackButton';
 
 type Challenge = {
   id: number;
@@ -19,94 +20,128 @@ type Challenge = {
 
 type UserChallenge = { id: number; challengeId: number; status: string };
 
-const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  EASY:   { label: 'Facile',    color: 'text-green-600 dark:text-green-400',   bg: 'bg-green-100 dark:bg-green-900/30',   icon: <Star size={12} /> },
-  MEDIUM: { label: 'Moyen',    color: 'text-yellow-600 dark:text-yellow-400',  bg: 'bg-yellow-100 dark:bg-yellow-900/30', icon: <Zap size={12} /> },
-  HARD:   { label: 'Difficile', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30', icon: <Flame size={12} /> },
-  EXPERT: { label: 'Expert',   color: 'text-red-600 dark:text-red-400',        bg: 'bg-red-100 dark:bg-red-900/30',       icon: <Trophy size={12} /> },
+// Category → vibrant gradient + glow
+const CATEGORY_GRAD: Record<string, { grad: string; glow: string; Icon: React.FC<{ size?: number }>; label: string }> = {
+  GAMING:     { grad: 'linear-gradient(135deg,#A78BFA,#EC4899)', glow: 'rgba(167,139,250,0.5)', Icon: Gamepad2,        label: 'Gaming' },
+  SPORT:      { grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.5)',  Icon: Activity,        label: 'Sport' },
+  CUISINE:    { grad: 'linear-gradient(135deg,#FACC15,#FB923C,#EC4899)', glow: 'rgba(251,146,60,0.5)', Icon: UtensilsCrossed, label: 'Cuisine' },
+  FITNESS:    { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.5)',  Icon: Dumbbell,        label: 'Fitness' },
+  CREATIVITY: { grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.5)',  Icon: Palette,         label: 'Créativité' },
+  KNOWLEDGE:  { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.5)',  Icon: BookOpen,        label: 'Connaissance' },
+  SOCIAL:     { grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(250,204,21,0.5)',  Icon: Users,           label: 'Social' },
 };
 
-const CATEGORY_CONFIG: Record<string, { label: string; emoji: string }> = {
-  GAMING:     { label: 'Gaming',       emoji: '🎮' },
-  SPORT:      { label: 'Sport',        emoji: '⚽' },
-  CUISINE:    { label: 'Cuisine',      emoji: '🍳' },
-  FITNESS:    { label: 'Fitness',      emoji: '💪' },
-  CREATIVITY: { label: 'Créativité',   emoji: '🎨' },
-  KNOWLEDGE:  { label: 'Connaissance', emoji: '📚' },
-  SOCIAL:     { label: 'Social',       emoji: '🤝' },
+// Difficulty → label + gradient
+const DIFF_GRAD: Record<string, { label: string; grad: string; glow: string; icon: React.ReactNode }> = {
+  EASY:   { label: 'Facile',    grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.45)',  icon: <Star size={11} /> },
+  MEDIUM: { label: 'Moyen',    grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(251,146,60,0.45)',  icon: <Zap size={11} /> },
+  HARD:   { label: 'Difficile', grad: 'linear-gradient(135deg,#FB923C,#EC4899)', glow: 'rgba(251,146,60,0.45)', icon: <Flame size={11} /> },
+  EXPERT: { label: 'Expert',   grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.45)', icon: <Trophy size={11} /> },
 };
 
-const CATEGORIES  = Object.keys(CATEGORY_CONFIG);
-const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD', 'EXPERT'];
+const CATEGORIES   = Object.keys(CATEGORY_GRAD);
+const DIFFICULTIES = Object.keys(DIFF_GRAD);
+
+// Vibrant chip — white text, gradient background
+function VibrantChip({ grad, glow, children }: Readonly<{ grad: string; glow: string; children: React.ReactNode }>) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold text-white"
+      style={{ background: grad, boxShadow: `0 3px 10px -2px ${glow}`,
+        border: '1px solid rgba(255,255,255,0.25)' }}>
+      {children}
+    </span>
+  );
+}
+
+// Vibrant icon tile (matches QIconTile from design)
+function IconTile({ cat }: Readonly<{ cat: string }>) {
+  const cfg = CATEGORY_GRAD[cat] ?? CATEGORY_GRAD.GAMING;
+  const CatIcon = cfg.Icon;
+  return (
+    <div className="w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center relative overflow-hidden"
+      style={{ background: cfg.grad, boxShadow: `0 6px 14px -4px ${cfg.glow}`,
+        border: '1px solid rgba(255,255,255,0.25)' }}>
+      <div className="absolute right-[-8px] top-[-8px] w-7 h-7 rounded-full"
+        style={{ background: 'rgba(255,255,255,0.20)' }} />
+      <div className="relative z-10 text-white"><CatIcon size={22} /></div>
+    </div>
+  );
+}
 
 type ChallengeCardProps = {
   challenge: Challenge;
   status: string | null;
   isLoading: boolean;
   user: ReturnType<typeof useStore>['user'];
-  darkMode: boolean;
-  card: string;
   onStart: (id: number) => void;
   onComplete: (id: number) => void;
   onLogin: () => void;
 };
 
-const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoading, user, darkMode, card, onStart, onComplete, onLogin }) => {
-  const diff = DIFFICULTY_CONFIG[challenge.difficulty] ?? DIFFICULTY_CONFIG.EASY;
-  const cat  = CATEGORY_CONFIG[challenge.category]    ?? { label: challenge.category, emoji: '🏆' };
+const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoading, user, onStart, onComplete, onLogin }) => {
+  const diff = DIFF_GRAD[challenge.difficulty] ?? DIFF_GRAD.EASY;
+  const cat  = CATEGORY_GRAD[challenge.category] ?? CATEGORY_GRAD.GAMING;
+  const CatIcon = cat.Icon;
 
   const actionButton = () => {
     if (!user) return (
-      <button onClick={onLogin} className="w-full py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors text-sm">
+      <button onClick={onLogin}
+        className="q-press w-full py-2.5 rounded-full text-white font-bold text-sm transition-opacity hover:opacity-85"
+        style={{ background: 'var(--q-accent)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
         Se connecter pour participer
       </button>
     );
     if (status === 'COMPLETED') return (
-      <div className="w-full py-2.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold text-center text-sm">
+      <div className="w-full py-2.5 rounded-full text-center font-bold text-sm"
+        style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff',
+          boxShadow: '0 4px 12px rgba(52,211,153,0.40)' }}>
         ✅ Défi complété !
       </div>
     );
     if (status === 'IN_PROGRESS') return (
       <button onClick={() => onComplete(challenge.id)} disabled={isLoading}
-        className="w-full py-2.5 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors text-sm disabled:opacity-60 active:scale-95">
+        className="q-press w-full py-2.5 rounded-full text-white font-bold text-sm disabled:opacity-60"
+        style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', boxShadow: '0 4px 12px rgba(52,211,153,0.40)' }}>
         {isLoading ? '...' : '✅ Marquer comme complété'}
       </button>
     );
     return (
       <button onClick={() => onStart(challenge.id)} disabled={isLoading}
-        className="w-full py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors text-sm disabled:opacity-60 active:scale-95">
+        className="q-press w-full py-2.5 rounded-full text-white font-bold text-sm disabled:opacity-60"
+        style={{ background: 'var(--q-vibrant-lavender)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
         {isLoading ? '...' : '🚀 Commencer le défi'}
       </button>
     );
   };
 
   return (
-    <div className={`${card} border rounded-xl p-4 flex flex-col gap-3 hover:shadow-md transition-shadow`}>
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex gap-1.5 flex-wrap">
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${diff.bg} ${diff.color}`}>
-            {diff.icon}{diff.label}
-          </span>
-          <span className={`px-2 py-0.5 rounded-full text-xs ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-            {cat.emoji} {cat.label}
-          </span>
+    <div className="flex flex-col gap-3 p-4 rounded-2xl transition-transform hover:-translate-y-0.5"
+      style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
+
+      <div className="flex items-center gap-3">
+        <IconTile cat={challenge.category} />
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap gap-1.5 mb-1">
+            <VibrantChip grad={diff.grad} glow={diff.glow}>{diff.icon}{diff.label}</VibrantChip>
+            <VibrantChip grad={cat.grad} glow={cat.glow}><CatIcon size={11} /> {cat.label}</VibrantChip>
+          </div>
+          {status === 'COMPLETED'   && <CheckCircle size={16} className="text-emerald-400 float-right mt-0.5" />}
+          {status === 'IN_PROGRESS' && <Clock size={16} className="text-sky-400 float-right mt-0.5" />}
         </div>
-        {status === 'COMPLETED'   && <CheckCircle size={18} className="text-green-500 flex-shrink-0" />}
-        {status === 'IN_PROGRESS' && <Clock size={18} className="text-blue-500 flex-shrink-0" />}
       </div>
 
       <div className="flex-1">
-        <h3 className="font-bold text-base leading-snug">{challenge.title}</h3>
-        <p className={`mt-1 text-sm line-clamp-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{challenge.description}</p>
+        <h3 className="font-bold text-sm leading-snug" style={{ color: 'var(--q-text)' }}>{challenge.title}</h3>
+        <p className="mt-1 text-xs line-clamp-2" style={{ color: 'var(--q-text2)' }}>{challenge.description}</p>
       </div>
 
-      <div className="flex items-center gap-3 text-sm">
-        <span className="font-bold text-yellow-600 dark:text-yellow-400">🪙 {challenge.coinReward}</span>
-        <span className={`font-bold ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>
-          <Zap size={13} className="inline mr-0.5" />{challenge.xpReward} XP
+      <div className="flex items-center gap-3 text-xs">
+        <span className="font-bold" style={{ color: '#FB923C' }}>🪙 {challenge.coinReward}</span>
+        <span className="font-bold" style={{ color: '#A78BFA' }}>
+          <Zap size={11} className="inline mr-0.5" />{challenge.xpReward} XP
         </span>
         {challenge._count && (
-          <span className={`ml-auto text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+          <span className="ml-auto font-semibold" style={{ color: 'var(--q-text3)' }}>
             {challenge._count.participants} participant{challenge._count.participants > 1 ? 's' : ''}
           </span>
         )}
@@ -118,20 +153,21 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
 };
 
 type SectionHeaderProps = {
-  icon: React.ReactNode; label: string; count: number; color: string; darkMode: boolean;
+  icon: React.ReactNode; label: string; count: number; grad: string;
   onClick?: () => void; isOpen?: boolean;
 };
-const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, label, count, color, darkMode, onClick, isOpen }) => {
+const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, label, count, grad, onClick, isOpen }) => {
   const badge = (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>{count}</span>
+    <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white ml-1"
+      style={{ background: grad }}>{count}</span>
   );
   if (onClick) {
     return (
       <button onClick={onClick} className="flex items-center gap-2 mb-3 w-full group">
-        <span className={color}>{icon}</span>
-        <h2 className="font-bold text-base">{label}</h2>
+        <span>{icon}</span>
+        <h2 className="font-bold text-base" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>{label}</h2>
         {badge}
-        <span className={`ml-auto ${darkMode ? 'text-gray-500 group-hover:text-gray-300' : 'text-gray-400 group-hover:text-gray-600'} transition-colors`}>
+        <span className="ml-auto" style={{ color: 'var(--q-text3)' }}>
           {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </span>
       </button>
@@ -139,15 +175,15 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, label, count, color
   }
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className={color}>{icon}</span>
-      <h2 className="font-bold text-base">{label}</h2>
+      <span>{icon}</span>
+      <h2 className="font-bold text-base" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>{label}</h2>
       {badge}
     </div>
   );
 };
 
 const ChallengePage: React.FC = () => {
-  const { user, setUser, darkMode } = useStore();
+  const { user, setUser } = useStore();
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
@@ -232,110 +268,127 @@ const ChallengePage: React.FC = () => {
   const available  = filtered.filter(c => getUserStatus(c.id) === null);
 
   const activeFilters = [selectedCategory, selectedDifficulty].filter(Boolean).length;
-  const card = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
 
   return (
-    <div className={`px-3 py-4 md:p-6 min-h-screen ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+    <div className="px-3 py-4 md:p-6 min-h-screen" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
 
       {/* Notification toast */}
       {notification && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold text-sm ${notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-50 px-5 py-3 rounded-2xl shadow-lg text-white font-bold text-sm ${notification.type === 'success' ? '' : 'bg-red-500'}`}
+          style={notification.type === 'success' ? { background: 'linear-gradient(135deg,#34D399,#38BDF8)', boxShadow: '0 8px 24px rgba(52,211,153,0.45)' } : {}}>
           {notification.msg}
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <Trophy className="text-yellow-500" size={26} />
-            Défis
-          </h1>
-          <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            Relève des défis et gagne des récompenses
-          </p>
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
+              <Trophy className="text-yellow-400" size={26} />
+              Défis
+            </h1>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--q-text2)' }}>Relève des défis et gagne des récompenses</p>
+          </div>
         </div>
-        <button
-          onClick={() => navigate('/challenges/create')}
-          className="flex items-center gap-1.5 px-3 py-2 md:px-4 md:py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold text-sm shadow-sm"
-        >
-          <Plus size={16} />
+        <button onClick={() => navigate('/challenges/create')}
+          className="q-press flex items-center gap-1.5 px-4 py-2 rounded-full text-white font-bold text-sm transition-opacity hover:opacity-85"
+          style={{ background: 'var(--q-vibrant-lavender)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
+          <Plus size={15} />
           <span className="hidden sm:inline">Créer</span>
         </button>
       </div>
 
-      {/* Stats utilisateur */}
+      {/* Stats utilisateur — vibrant pills */}
       {user && (
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          <div className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${darkMode ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-50 text-yellow-700'}`}>
+        <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
+          <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
+            style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)', boxShadow: '0 4px 12px rgba(251,146,60,0.40)' }}>
             🪙 {(user.coins ?? 0).toLocaleString()} coins
-          </div>
-          <div className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${darkMode ? 'bg-purple-900/40 text-purple-300' : 'bg-purple-50 text-purple-700'}`}>
-            <Zap size={12} /> Niv. {user.level ?? 1}
-          </div>
-          <div className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${darkMode ? 'bg-green-900/40 text-green-300' : 'bg-green-50 text-green-700'}`}>
-            <CheckCircle size={12} /> {userChallenges.filter(c => c.status === 'COMPLETED').length} complétés
-          </div>
+          </span>
+          <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
+            style={{ background: 'var(--q-vibrant-hero)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
+            <Zap size={11} /> Niv. {user.level ?? 1}
+          </span>
+          <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
+            style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', boxShadow: '0 4px 12px rgba(52,211,153,0.40)' }}>
+            <CheckCircle size={11} /> {userChallenges.filter(c => c.status === 'COMPLETED').length} complétés
+          </span>
         </div>
       )}
 
-      {/* Barre de recherche + filtre mobile */}
-      <div className={`${card} border rounded-xl p-3 mb-3 flex gap-2`}>
+      {/* Recherche + filtres */}
+      <div className="rounded-2xl p-3 mb-3 flex gap-2" style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
         <div className="flex items-center gap-2 flex-1">
-          <Search size={16} className="text-gray-400 flex-shrink-0" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher un défi..."
-            className={`flex-1 bg-transparent text-sm outline-none min-w-0 ${darkMode ? 'placeholder-gray-500' : 'placeholder-gray-400'}`}
-          />
+          <Search size={15} style={{ color: 'var(--q-text3)' }} className="flex-shrink-0" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un défi..."
+            className="flex-1 bg-transparent text-sm outline-none min-w-0"
+            style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }} />
           {search && (
-            <button onClick={() => setSearch('')} className="text-gray-400 hover:text-gray-600">
+            <button onClick={() => setSearch('')} style={{ color: 'var(--q-text3)' }}>
               <X size={14} />
             </button>
           )}
         </div>
-        <button
-          onClick={() => setFiltersOpen(o => !o)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold flex-shrink-0 transition-colors ${filtersOpen || activeFilters > 0 ? 'bg-blue-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}
-        >
-          <SlidersHorizontal size={14} />
+        <button onClick={() => setFiltersOpen(o => !o)}
+          className="q-press flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold flex-shrink-0 transition-opacity"
+          style={filtersOpen || activeFilters > 0
+            ? { background: 'var(--q-accent)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }
+            : { background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
+          <SlidersHorizontal size={13} />
           Filtres{activeFilters > 0 && ` (${activeFilters})`}
         </button>
       </div>
 
       {/* Filtres dépliables */}
       {filtersOpen && (
-        <div className={`${card} border rounded-xl p-3 mb-3 space-y-3`}>
-          {/* Catégories */}
+        <div className="rounded-2xl p-4 mb-3 space-y-4" style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">Catégorie</p>
+            <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: 'var(--q-text3)' }}>Catégorie</p>
             <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => setSelectedCategory('')}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!selectedCategory ? 'bg-blue-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >Tous</button>
-              {CATEGORIES.map(c => (
-                <button key={c} onClick={() => setSelectedCategory(c === selectedCategory ? '' : c)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${selectedCategory === c ? 'bg-blue-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                  {CATEGORY_CONFIG[c].emoji} {CATEGORY_CONFIG[c].label}
-                </button>
-              ))}
+              <button onClick={() => setSelectedCategory('')}
+                className="q-press px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
+                style={selectedCategory
+                  ? { background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }
+                  : { background: 'var(--q-accent)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
+                Tous
+              </button>
+              {CATEGORIES.map(c => {
+                const cfg = CATEGORY_GRAD[c];
+                const CfgIcon = cfg.Icon;
+                const active = selectedCategory === c;
+                return (
+                  <button key={c} onClick={() => setSelectedCategory(c === selectedCategory ? '' : c)}
+                    className="q-press inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
+                    style={active
+                      ? { background: cfg.grad, color: '#fff', boxShadow: `0 4px 12px ${cfg.glow}`, border: '1px solid rgba(255,255,255,0.25)' }
+                      : { background: 'var(--q-accent-soft)', color: 'var(--q-text2)' }}>
+                    <CfgIcon size={11} /> {cfg.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-          {/* Difficulté */}
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">Difficulté</p>
+            <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: 'var(--q-text3)' }}>Difficulté</p>
             <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => setSelectedDifficulty('')}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!selectedDifficulty ? 'bg-blue-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >Tous</button>
+              <button onClick={() => setSelectedDifficulty('')}
+                className="q-press px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
+                style={selectedDifficulty
+                  ? { background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }
+                  : { background: 'var(--q-accent)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
+                Tous
+              </button>
               {DIFFICULTIES.map(d => {
-                const cfg = DIFFICULTY_CONFIG[d];
+                const cfg = DIFF_GRAD[d];
+                const active = selectedDifficulty === d;
                 return (
                   <button key={d} onClick={() => setSelectedDifficulty(d === selectedDifficulty ? '' : d)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${selectedDifficulty === d ? `${cfg.bg} ${cfg.color}` : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    className="q-press px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
+                    style={active
+                      ? { background: cfg.grad, color: '#fff', boxShadow: `0 4px 12px ${cfg.glow}`, border: '1px solid rgba(255,255,255,0.25)' }
+                      : { background: 'var(--q-accent-soft)', color: 'var(--q-text2)' }}>
                     {cfg.label}
                   </button>
                 );
@@ -345,46 +398,50 @@ const ChallengePage: React.FC = () => {
         </div>
       )}
 
-      {loading ? (
+      {loading && (
         <div className="flex justify-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
+          <div className="w-10 h-10 rounded-full border-2 border-transparent animate-spin"
+            style={{ borderTopColor: 'var(--q-accent)', borderRightColor: 'var(--q-accent)' }} />
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
+      )}
+      {!loading && filtered.length === 0 && (
+        <div className="text-center py-16" style={{ color: 'var(--q-text3)' }}>
           <Trophy size={44} className="mx-auto mb-3 opacity-30" />
           <p>Aucun défi trouvé.</p>
           <button onClick={() => { setSearch(''); setSelectedCategory(''); setSelectedDifficulty(''); }}
-            className="mt-3 text-sm text-blue-500 hover:underline">Réinitialiser les filtres</button>
+            className="mt-3 text-sm font-semibold hover:opacity-70 transition-opacity" style={{ color: 'var(--q-accent)' }}>
+            Réinitialiser les filtres
+          </button>
         </div>
-      ) : (
-        <div className="space-y-6">
+      )}
+      {!loading && filtered.length > 0 && (
+        <div className="space-y-7">
 
-          {/* En cours */}
           {inProgress.length > 0 && (
             <section>
-              <SectionHeader icon={<Clock size={16} />} label="En cours" count={inProgress.length} color="text-blue-500" darkMode={darkMode} onClick={() => setInProgressOpen(o => !o)} isOpen={inProgressOpen} />
+              <SectionHeader icon={<Clock size={16} style={{ color: '#38BDF8' }} />} label="En cours" count={inProgress.length}
+                grad="linear-gradient(135deg,#38BDF8,#A78BFA)" onClick={() => setInProgressOpen(o => !o)} isOpen={inProgressOpen} />
               {inProgressOpen && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {inProgress.map(c => <ChallengeCard key={c.id} challenge={c} status="IN_PROGRESS" isLoading={actionLoading === c.id} user={user} darkMode={darkMode} card={card} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')} />)}
+                  {inProgress.map(c => <ChallengeCard key={c.id} challenge={c} status="IN_PROGRESS" isLoading={actionLoading === c.id} user={user} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')} />)}
                 </div>
               )}
             </section>
           )}
 
-          {/* Disponibles */}
           {available.length > 0 && (
             <section>
-              <SectionHeader icon={<Trophy size={16} />} label="Disponibles" count={available.length} color="text-yellow-500" darkMode={darkMode} onClick={() => setAvailableOpen(o => !o)} isOpen={availableOpen} />
+              <SectionHeader icon={<Trophy size={16} style={{ color: '#FACC15' }} />} label="Disponibles" count={available.length}
+                grad="linear-gradient(135deg,#FACC15,#FB923C)" onClick={() => setAvailableOpen(o => !o)} isOpen={availableOpen} />
               {availableOpen && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {available.slice(0, visibleAvailable).map(c => <ChallengeCard key={c.id} challenge={c} status={null} isLoading={actionLoading === c.id} user={user} darkMode={darkMode} card={card} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')} />)}
+                    {available.slice(0, visibleAvailable).map(c => <ChallengeCard key={c.id} challenge={c} status={null} isLoading={actionLoading === c.id} user={user} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')} />)}
                   </div>
                   {available.length > visibleAvailable && (
-                    <button
-                      onClick={() => setVisibleAvailable(v => v + 9)}
-                      className={`mt-4 w-full py-2.5 rounded-xl border-2 border-dashed text-sm font-semibold transition-colors ${darkMode ? 'border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-300' : 'border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700'}`}
-                    >
+                    <button onClick={() => setVisibleAvailable(v => v + 9)}
+                      className="q-press mt-4 w-full py-2.5 rounded-2xl border-2 border-dashed text-sm font-bold transition-opacity hover:opacity-70"
+                      style={{ borderColor: 'var(--q-accent)', color: 'var(--q-accent)' }}>
                       Charger plus ({available.length - visibleAvailable} restants)
                     </button>
                   )}
@@ -393,21 +450,13 @@ const ChallengePage: React.FC = () => {
             </section>
           )}
 
-          {/* Terminés — replié par défaut */}
           {completed.length > 0 && (
             <section>
-              <SectionHeader
-                icon={<CheckCircle size={16} />}
-                label="Terminés"
-                count={completed.length}
-                color="text-green-500"
-                darkMode={darkMode}
-                onClick={() => setCompletedOpen(o => !o)}
-                isOpen={completedOpen}
-              />
+              <SectionHeader icon={<CheckCircle size={16} style={{ color: '#34D399' }} />} label="Terminés" count={completed.length}
+                grad="linear-gradient(135deg,#34D399,#38BDF8)" onClick={() => setCompletedOpen(o => !o)} isOpen={completedOpen} />
               {completedOpen && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 opacity-75">
-                  {completed.map(c => <ChallengeCard key={c.id} challenge={c} status="COMPLETED" isLoading={false} user={user} darkMode={darkMode} card={card} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')} />)}
+                  {completed.map(c => <ChallengeCard key={c.id} challenge={c} status="COMPLETED" isLoading={false} user={user} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')} />)}
                 </div>
               )}
             </section>

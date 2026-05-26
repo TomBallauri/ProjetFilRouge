@@ -66,10 +66,10 @@ const UserAvatar: React.FC<Props> = ({
       </div>
       {hasImageFrame && equippedFrame?.cosmetic.imageUrl && (
         <img
-          src={equippedFrame.cosmetic.imageUrl}
+          src={resolveUrl(equippedFrame.cosmetic.imageUrl)}
           alt=""
           className="absolute pointer-events-none select-none z-10"
-          style={{ inset: `-${offset}px`, width: `calc(100% + ${offset * 2}px)`, height: `calc(100% + ${offset * 2}px)` }}
+          style={{ inset: `-${offset}px`, width: `calc(100% + ${offset * 2}px)`, height: `calc(100% + ${offset * 2}px)`, objectFit: 'fill' }}
         />
       )}
     </div>

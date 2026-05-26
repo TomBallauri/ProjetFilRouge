@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
-import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag } from 'lucide-react';
-import type { User } from '../types/User';
+import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, MessageSquare, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
@@ -11,8 +10,8 @@ type OwnedCosmetic = EquippedCosmetic & { id: number; purchasedAt: string };
 const TYPE_LABELS: Record<string, string> = {
   AVATAR_FRAME: "Cadre d'avatar", BANNER: 'Bannière', BADGE: 'Badge', TITLE: 'Titre',
 };
-const TYPE_EMOJIS: Record<string, string> = {
-  AVATAR_FRAME: '🖼️', BANNER: '🏳️', BADGE: '🏅', TITLE: '📛',
+const TYPE_ICONS: Record<string, React.FC<{ size?: number; color?: string }>> = {
+  AVATAR_FRAME: Frame, BANNER: PanelTop, BADGE: Award, TITLE: Tag,
 };
 const RARITY_LABELS: Record<string, string> = {
   COMMON: 'Commun', RARE: 'Rare', EPIC: 'Épique', LEGENDARY: 'Légendaire',
@@ -44,7 +43,7 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const BACKEND_URL = "http://localhost:3001";
 
 const EditProfile: React.FC = () => {
-  const { user, darkMode, setUser } = useStore() as { user: User | null; darkMode: boolean; setUser: (u: User) => void };
+  const { user, setUser, darkMode, toggleDarkMode } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const navigate = useNavigate();
 
@@ -97,6 +96,16 @@ const EditProfile: React.FC = () => {
   const [ownedCosmetics, setOwnedCosmetics] = useState<OwnedCosmetic[]>([]);
   const [cosmeticLoading, setCosmeticLoading] = useState<number | null>(null);
 
+  const [openSection, setOpenSection] = useState<string | null>('appearance');
+  const [notifToggles, setNotifToggles] = useState({ defis: true, messages: true, updates: false });
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [language, setLanguage] = useState('Français');
+  const [openProfileSections, setOpenProfileSections] = useState({
+    cosmetics: true, info: true, defis: true, topics: true,
+  });
+  const toggleProfileSection = (key: keyof typeof openProfileSections) =>
+    setOpenProfileSections(prev => ({ ...prev, [key]: !prev[key] }));
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token || !user) return;
@@ -119,6 +128,14 @@ const EditProfile: React.FC = () => {
   const handleEquip = async (cosmeticId: number) => {
     const token = localStorage.getItem('token');
     if (!token) return;
+    const cosmetic = ownedCosmetics.find(uc => uc.cosmeticId === cosmeticId);
+    if (cosmetic?.cosmetic.type === 'BADGE') {
+      const equippedBadges = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped).length;
+      if (equippedBadges >= 3) {
+        alert('Maximum 3 badges équipés. Déséquipez un badge d\'abord.');
+        return;
+      }
+    }
     setCosmeticLoading(cosmeticId);
     try {
       const res = await fetch(`/api/users/me/cosmetics/${cosmeticId}/equip`, {
@@ -338,417 +355,633 @@ const EditProfile: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="text-center py-10">
-        <h1 className="text-2xl font-bold mb-4">Profil non disponible</h1>
-        <p className="mb-6">Veuillez vous connecter pour voir votre profil.</p>
-        <a 
-          href="/login" 
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-        >
-          Connexion
-        </a>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '60vh', textAlign: 'center', padding: '40px 24px', fontFamily: 'var(--q-font)' }}>
+        <div style={{ width: 64, height: 64, borderRadius: 20, marginBottom: 20,
+          background: 'var(--q-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Mail size={28} style={{ color: 'var(--q-accent-deep)' }} />
+        </div>
+        <h1 style={{ margin: '0 0 8px', fontSize: 22, fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
+          Profil non disponible
+        </h1>
+        <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--q-text2)', maxWidth: 280 }}>
+          Connecte-toi pour accéder à ton profil et tes statistiques.
+        </p>
+        <Link to="/login" className="q-press"
+          style={{ display: 'inline-flex', alignItems: 'center', height: 44, padding: '0 24px',
+            borderRadius: 14, border: 'none', cursor: 'pointer', textDecoration: 'none',
+            background: 'linear-gradient(135deg, #00DDFF 0%, #067DBA 35%, #2B1FD0 65%, #B71AEB 100%)',
+            color: '#fff', fontSize: 14, fontWeight: 700,
+            boxShadow: '0 4px 16px rgba(167,139,250,0.40)' }}>
+          Se connecter
+        </Link>
       </div>
     );
   }
 
-  return (
-    <div className={`p-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-lg overflow-hidden`}>
-        <div
-          className={`h-48 bg-cover bg-center relative group cursor-pointer ${!hasBannerImage ? bannerClass : ''}`}
-          style={hasBannerImage ? {
-            backgroundImage: `url(${bannerPreview || getFullImageUrl(formData.banner) || getFullImageUrl(user.banner)})`
-          } : {}}
-          onClick={() => isEditing && bannerInputRef.current?.click()}
-        >
-          {isEditing && (
-            <input
-              ref={bannerInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              style={{ display: 'none' }}
-              onChange={e => handleFileChange(e, 'banner')}
-            />
-          )}
-          {isEditing && (
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer">
-              <Edit size={32} className="text-white" />
-            </div>
-          )}
-          <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-black/50 to-transparent"></div>
-        </div>
+  const cosmeticSuffix = ownedCosmetics.length > 1 ? 's' : '';
+  const cosmeticsLabel = ownedCosmetics.length === 0
+    ? 'Aucun cosmétique possédé'
+    : `${ownedCosmetics.length} cosmétique${cosmeticSuffix} possédé${cosmeticSuffix}`;
+  const topicSuffix = recentActivities.length > 1 ? 's' : '';
+  const topicsLabel = recentActivities.length === 0
+    ? 'Aucun topic créé'
+    : `${recentActivities.length} topic${topicSuffix} créé${topicSuffix}`;
 
-        <div className="relative px-6 pb-6">
-          <div className="flex items-center -mt-12">
-            <div className="relative group">
-              <div
-                className={`w-24 h-24 rounded-full border-4 border-white dark:border-gray-800 overflow-hidden bg-gray-100 cursor-pointer ${equippedFrame?.cosmetic.imageUrl ? '' : frameClass}`}
-                onClick={() => isEditing && avatarInputRef.current?.click()}
-              >
-                <img
-                  src={
-                    avatarPreview ||
-                    getFullImageUrl(formData.avatar) ||
-                    getFullImageUrl(user.avatar)
-                  }
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
-                {isEditing && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center cursor-pointer">
-                    <Edit size={28} className="text-white" />
-                  </div>
-                )}
-              </div>
-              {equippedFrame?.cosmetic.imageUrl && (
-                <img
-                  src={equippedFrame.cosmetic.imageUrl}
-                  alt=""
-                  className="absolute pointer-events-none select-none z-10"
-                  style={{ inset: '-14px', width: 'calc(100% + 28px)', height: 'calc(100% + 28px)' }}
-                />
-              )}
-              {isEditing && (
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  style={{ display: 'none' }}
-                  onChange={e => handleFileChange(e, 'avatar')}
-                />
-              )}
-            </div>
-            <div className="ml-4 pt-12">
-              {isEditing ? (
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleInputChange}
-                  className="text-2xl font-bold bg-transparent border-b border-blue-500 focus:outline-none"
-                />
-              ) : (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-2xl font-bold">{user.username}</h1>
-                  {equippedBadge && <span className="text-lg" title={equippedBadge.cosmetic.name}>🏅</span>}
-                </div>
-              )}
-              {equippedTitle && (
-                <p className={`text-xs font-semibold mt-0.5 ${titleClass}`}>{equippedTitle.cosmetic.name}</p>
-              )}
-            </div>
+  return (
+    <div style={{ paddingBottom: 100, color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
+
+      {/* ── Banner ── */}
+      <div
+        className={`-mx-3 md:-mx-6 -mt-4 md:-mt-6 ${!hasBannerImage ? bannerClass : ''}`}
+        style={{
+          height: 190,
+          position: 'relative',
+          overflow: 'hidden',
+          cursor: isEditing ? 'pointer' : 'default',
+          ...(hasBannerImage
+            ? { backgroundImage: `url(${bannerPreview || getFullImageUrl(formData.banner) || getFullImageUrl(user.banner)})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+            : { background: 'var(--q-vibrant-hero)' }),
+        }}
+        onClick={() => isEditing && bannerInputRef.current?.click()}
+      >
+        {isEditing && (
+          <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+            style={{ display: 'none' }} onChange={e => handleFileChange(e, 'banner')} />
+        )}
+        {/* Decorative orbs */}
+        <div style={{ position: 'absolute', right: -40, top: 20, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', left: -30, bottom: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
+        {/* Edit overlay */}
+        {isEditing && (
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <Edit size={32} color="#fff" />
           </div>
-          
-          <div className="pt-6">
-            {isEditing ? (
-              <div className="flex space-x-2">
-                <button 
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg flex items-center hover:bg-green-700 transition-colors"
-                >
-                  <Save size={16} className="mr-2" />
-                  Enregistrer
-                </button>
-                <button 
-                  onClick={() => {
-                    setIsEditing(false);
-                    setAvatarPreview(null);
-                    setBannerPreview(null);
-                    setAvatarFile(null);
-                    setBannerFile(null);
-                  }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg flex items-center hover:bg-red-700 transition-colors"
-                >
-                  <X size={16} className="mr-2" />
-                  Annuler
-                </button>
+        )}
+      </div>
+
+      {/* ── Avatar + Identity ── */}
+      <div style={{ padding: '0 18px', marginTop: -54, textAlign: 'center' }}>
+        <div style={{ display: 'inline-block', position: 'relative' }}>
+          <div
+            className={`relative ${equippedFrame?.cosmetic.imageUrl ? '' : frameClass}`}
+            style={{ width: 104, height: 104, borderRadius: '50%', overflow: 'hidden', border: '5px solid var(--q-bg-flat)', boxShadow: '0 8px 24px rgba(251,146,60,0.35)', cursor: isEditing ? 'pointer' : 'default' }}
+            onClick={() => isEditing && avatarInputRef.current?.click()}
+          >
+            <img
+              src={avatarPreview || getFullImageUrl(formData.avatar) || getFullImageUrl(user.avatar)}
+              alt="Profile"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            {isEditing && (
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.40)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Edit size={28} color="#fff" />
               </div>
-            ) : (
-              <button 
-                onClick={() => setIsEditing(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center hover:bg-blue-700 transition-colors"
-              >
-                <Edit size={16} className="mr-2" />
-                Modifier le profil
-              </button>
             )}
           </div>
+          {equippedFrame?.cosmetic.imageUrl && (
+            <img src={equippedFrame.cosmetic.imageUrl} alt="" className="absolute pointer-events-none select-none z-10"
+              style={{ inset: '-14px', width: 'calc(100% + 28px)', height: 'calc(100% + 28px)' }} />
+          )}
+          {isEditing && (
+            <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+              style={{ display: 'none' }} onChange={e => handleFileChange(e, 'avatar')} />
+          )}
         </div>
 
-        {/* Gamification stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 mt-6">
-          <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-50 text-purple-700'}`}>
-            <div className="text-2xl font-bold">{user.level ?? 1}</div>
-            <div className="text-xs font-semibold mt-0.5 flex items-center justify-center gap-1">
-              <Zap size={12} /> Niveau
-            </div>
-            <div className={`text-xs mt-1 ${darkMode ? 'text-purple-400' : 'text-purple-500'}`}>
-              {fmt(user.xp ?? 0)} XP
-            </div>
-          </div>
-          <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-50 text-yellow-700'}`}>
-            <div className="text-2xl font-bold truncate">{fmt(user.coins ?? 0)}</div>
-            <div className="text-xs font-semibold mt-0.5">🪙 Coins</div>
-            <div className={`text-xs mt-1 ${darkMode ? 'text-yellow-400' : 'text-yellow-500'}`}>
-              Monnaie virtuelle
-            </div>
-          </div>
-          <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-50 text-green-700'}`}>
-            <div className="text-2xl font-bold flex items-center justify-center gap-1">
-              <CheckCircle size={20} />
-              {userChallenges.filter(c => c.status === 'COMPLETED').length}
-            </div>
-            <div className="text-xs font-semibold mt-0.5">Défis complétés</div>
-            <div className={`text-xs mt-1 ${darkMode ? 'text-green-400' : 'text-green-500'}`}>
-              {userChallenges.length} au total
-            </div>
-          </div>
-          <div className={`rounded-xl p-4 text-center ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
-            <div className="text-2xl font-bold flex items-center justify-center gap-1">
-              <Clock size={20} />
-              {userChallenges.filter(c => c.status === 'IN_PROGRESS').length}
-            </div>
-            <div className="text-xs font-semibold mt-0.5">En cours</div>
-            <div className={`text-xs mt-1 ${darkMode ? 'text-blue-400' : 'text-blue-500'}`}>
-              Défis actifs
-            </div>
-          </div>
-        </div>
-
-        {/* XP progress bar */}
-        <div className="px-6 mt-4">
-          <div className="flex justify-between text-xs font-semibold mb-1">
-            <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Progression vers le niveau {(user.level ?? 1) + 1}</span>
-            <span className={darkMode ? 'text-purple-400' : 'text-purple-600'}>{(user.xp ?? 0) % 1000} / 1000 XP</span>
-          </div>
-          <div className={`w-full h-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
-            <div
-              className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all"
-              style={{ width: `${((user.xp ?? 0) % 1000) / 10}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Cosmétiques */}
-        <div className="px-6 mt-6 mb-2">
-          <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
-            <ShoppingBag size={20} className="text-pink-500" /> Mes cosmétiques
-          </h2>
-          {ownedCosmetics.length === 0 ? (
-            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              Aucun cosmétique possédé.{' '}
-              <Link to="/shop" className="text-pink-500 hover:underline">Visiter la boutique</Link>
-            </p>
+        <div style={{ marginTop: 10 }}>
+          {isEditing ? (
+            <input type="text" name="username" value={formData.username} onChange={handleInputChange}
+              style={{ fontSize: 22, fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--q-accent)', textAlign: 'center', outline: 'none', width: '100%', maxWidth: 280 }} />
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {ownedCosmetics.map(uc => {
-                const rarityColor = TITLE_CLASSES[uc.cosmetic.rarity] ?? 'text-gray-400';
-                const isLoading = cosmeticLoading === uc.cosmeticId;
-                const equippedBorder = uc.equipped
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white';
+            <div style={{ fontSize: 24, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.3, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              {user.username}
+              {equippedBadge && <Award size={16} style={{ color: '#FACC15', flexShrink: 0 }} title={equippedBadge.cosmetic.name} />}
+            </div>
+          )}
+          {equippedTitle && (
+            <p className={`text-xs font-semibold mt-1 ${titleClass}`}>{equippedTitle.cosmetic.name}</p>
+          )}
+          <div style={{ fontSize: 12, color: 'var(--q-text2)', fontWeight: 500, marginTop: 4 }}>
+            @{user.username} · membre depuis {profileStats.memberSince}
+          </div>
+          <div style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--q-accent-soft)', padding: '6px 14px', borderRadius: 999 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-accent-deep)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              Niveau {user.level ?? 1}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Modifier / Save / Cancel ── */}
+      <div style={{ textAlign: 'center', padding: '16px 18px 0' }}>
+        {isEditing ? (
+          <div style={{ display: 'inline-flex', gap: 8 }}>
+            <button onClick={handleSave} className="q-press"
+              style={{ height: 36, padding: '0 18px', borderRadius: 18, border: 'none', background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Save size={14} /> Enregistrer
+            </button>
+            <button onClick={() => { setIsEditing(false); setAvatarPreview(null); setBannerPreview(null); setAvatarFile(null); setBannerFile(null); }} className="q-press"
+              style={{ height: 36, padding: '0 18px', borderRadius: 18, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#EF4444', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <X size={14} /> Annuler
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setIsEditing(true)} className="q-press"
+            style={{ height: 36, padding: '0 20px', borderRadius: 18, border: 'none', background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            Modifier le profil
+          </button>
+        )}
+      </div>
+
+      {/* ── Stats 3-col (mockup style) ── */}
+      <div style={{ padding: '20px 18px 0', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+        {[
+          { value: userChallenges.filter(c => c.status === 'COMPLETED').length, label: 'Défis réussis' },
+          { value: userChallenges.filter(c => c.status === 'IN_PROGRESS').length, label: 'En cours' },
+          { value: fmt(user.xp ?? 0), label: 'XP totale' },
+        ].map(({ value, label }) => (
+          <div key={label} style={{ borderRadius: 22, padding: 14, textAlign: 'center', background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.4, lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-text2)', marginTop: 5, letterSpacing: 0.3 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── XP bar ── */}
+      <div style={{ padding: '12px 18px 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, marginBottom: 5 }}>
+          <span style={{ color: 'var(--q-text3)' }}>Vers le niveau {(user.level ?? 1) + 1}</span>
+          <span style={{ color: 'var(--q-accent)' }}>{(user.xp ?? 0) % 1000} / 1000 XP</span>
+        </div>
+        <div style={{ height: 6, borderRadius: 999, background: 'var(--q-accent-soft)' }}>
+          <div style={{ height: 6, borderRadius: 999, transition: 'width 0.3s ease', width: `${((user.xp ?? 0) % 1000) / 10}%`, background: 'var(--q-vibrant-hero)' }} />
+        </div>
+      </div>
+
+      {/* ── Badges ── */}
+      {(() => {
+        const equippedBadges = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped);
+        if (equippedBadges.length === 0) return null;
+        const BADGE_GRADS: Record<string, { grad: string; glow: string }> = {
+          COMMON:    { grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.45)' },
+          RARE:      { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.45)' },
+          EPIC:      { grad: 'linear-gradient(135deg,#A78BFA,#EC4899)', glow: 'rgba(167,139,250,0.45)' },
+          LEGENDARY: { grad: 'linear-gradient(135deg,#FACC15,#FB923C 50%,#EC4899)', glow: 'rgba(251,146,60,0.55)' },
+        };
+        return (
+          <>
+            <div style={{ padding: '22px 22px 10px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--q-display)', letterSpacing: -0.2, color: 'var(--q-text)' }}>Badges</h2>
+              <span style={{ fontSize: 12, color: 'var(--q-text2)', fontWeight: 600 }}>{equippedBadges.length} équipé{equippedBadges.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div style={{ padding: '0 18px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+              {equippedBadges.map(uc => {
+                const g = BADGE_GRADS[uc.cosmetic.rarity] ?? BADGE_GRADS.COMMON;
                 return (
-                  <div key={uc.id} className={`rounded-xl border-2 p-3 flex flex-col gap-2 ${equippedBorder}`}>
-                    <div className="text-center">
-                      <span className="text-2xl">{TYPE_EMOJIS[uc.cosmetic.type] ?? '🎁'}</span>
-                      <p className="font-bold text-xs mt-1 truncate">{uc.cosmetic.name}</p>
-                      <p className={`text-xs ${rarityColor}`}>{RARITY_LABELS[uc.cosmetic.rarity]}</p>
-                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{TYPE_LABELS[uc.cosmetic.type]}</p>
+                  <div key={uc.id} style={{ background: g.grad, position: 'relative', overflow: 'hidden',
+                    border: '2px solid rgba(255,255,255,0.45)', borderRadius: 20, padding: '16px 10px 14px', textAlign: 'center',
+                    boxShadow: `0 1px 0 rgba(255,255,255,0.35) inset, 0 10px 24px -10px ${g.glow}` }}>
+                    <div style={{ position: 'absolute', right: -14, top: -14, width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', left: -10, bottom: -16, width: 50, height: 50, borderRadius: '50%', background: 'rgba(255,255,255,0.10)', pointerEvents: 'none' }} />
+                    <div style={{ position: 'relative', width: 44, height: 44, borderRadius: 22, margin: '0 auto',
+                      background: 'rgba(255,255,255,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}>
+                      <Award size={22} style={{ color: '#A78BFA' }} />
                     </div>
-                    {uc.equipped ? (
-                      <button onClick={() => handleUnequip(uc.cosmeticId)} disabled={isLoading}
-                        className="w-full py-1 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-60">
-                        {isLoading ? '...' : 'Déséquiper'}
-                      </button>
-                    ) : (
-                      <button onClick={() => handleEquip(uc.cosmeticId)} disabled={isLoading}
-                        className="w-full py-1 rounded-lg text-xs font-bold bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-60">
-                        {isLoading ? '...' : 'Équiper'}
-                      </button>
-                    )}
+                    <div style={{ position: 'relative', fontSize: 10, fontWeight: 700, color: '#fff', marginTop: 8, lineHeight: 1.2 }}>{uc.cosmetic.name}</div>
                   </div>
                 );
               })}
             </div>
-          )}
-        </div>
+          </>
+        );
+      })()}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 ml-6 mr-6 mb-6 ">
-          <div className="md:col-span-2 space-y-6">
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold mb-4">Informations</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center space-x-3">
-                  <Mail className="text-gray-400" size={20} />
+      {/* ── Informations ── */}
+      <div style={{ padding: '0 18px', marginTop: 16 }}>
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+            <button onClick={() => toggleProfileSection('info')}
+              className="q-press w-full flex items-center gap-3 p-4 text-left"
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)' }}>
+                <Mail size={18} color="#fff" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Mes informations</p>
+                <p className="text-xs truncate" style={{ color: 'var(--q-text2)' }}>{user.email}</p>
+              </div>
+              <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+                transform: openProfileSections.info ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease' }} />
+            </button>
+            {openProfileSections.info && (
+              <div className="px-4 pb-4 space-y-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
+                {user.isAdmin && (
+                  <div className="px-3 py-2 rounded-xl text-xs font-bold w-fit flex items-center gap-1.5"
+                    style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
+                    <Star size={12} /> Administrateur
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Mail size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+                    {isEditing ? (
+                      <div className="flex-1">
+                        <input type="email" name="email" value={formData.email} onChange={handleEmailChange}
+                          className="bg-transparent focus:outline-none w-full text-sm"
+                          style={{ borderBottom: '2px solid var(--q-accent)', color: 'var(--q-text)' }} />
+                        {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
+                      </div>
+                    ) : (
+                      <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{user.email}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+                    <span className="text-sm" style={{ color: 'var(--q-text2)' }}>Membre depuis {profileStats.memberSince}</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold mb-1.5" style={{ color: 'var(--q-text)' }}>Bio</p>
                   {isEditing ? (
-                    <div className="w-full">
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleEmailChange}
-                        className="bg-transparent border-b border-blue-500 focus:outline-none flex-1 w-full"
-                      />
-                      {emailError && <p className="text-red-500 text-sm mt-1">{emailError}</p>}
-                    </div>
+                    <textarea name="bio" value={formData.bio} onChange={handleInputChange}
+                      className="w-full bg-transparent rounded-xl p-2 focus:outline-none text-sm"
+                      style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} rows={3} />
                   ) : (
-                    <span>{user.email}</span>
+                    <p className="text-sm" style={{ color: user.bio ? 'var(--q-text2)' : 'var(--q-text3)' }}>
+                      {user.bio ?? <em>Aucune bio renseignée</em>}
+                    </p>
                   )}
                 </div>
-                <div className="flex items-center space-x-3">
-                  <Calendar className="text-gray-400" size={20} />
-                  <span>Membre depuis {profileStats.memberSince}</span>
-                </div>
-              </div>
-              
-              <div className="mt-4">
-                {user.isAdmin && (
-                  <div className="mb-2 px-3 py-2 rounded bg-purple-100 text-purple-800 font-semibold w-fit">
-                    Ce compte est administrateur
+                {isEditing && (
+                  <div>
+                    <p className="text-sm font-semibold mb-2" style={{ color: 'var(--q-text)' }}>Modifier le mot de passe</p>
+                    <div className="rounded-2xl p-4 space-y-3" style={{ background: 'var(--q-accent-soft)', border: '1px solid var(--q-line)' }}>
+                      {(['currentPassword', 'newPassword', 'confirmPassword'] as const).map((field, i) => (
+                        <div key={field}>
+                          <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--q-text2)' }}>
+                            {['Mot de passe actuel', 'Nouveau mot de passe', 'Confirmer le nouveau mot de passe'][i]}
+                          </label>
+                          <input type="password" name={field} value={passwordData[field]} onChange={handlePasswordChange}
+                            className="w-full px-3 py-2 rounded-xl bg-transparent focus:outline-none text-sm"
+                            style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} />
+                        </div>
+                      ))}
+                      <button onClick={handlePasswordSave}
+                        className="q-press px-4 py-2 rounded-xl text-sm font-bold text-white"
+                        style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)' }}>
+                        Enregistrer le mot de passe
+                      </button>
+                    </div>
                   </div>
                 )}
-                <h3 className="text-lg font-medium mb-2">Bio</h3>
-                {isEditing ? (
-                  <textarea
-                    name="bio"
-                    value={formData.bio}
-                    onChange={handleInputChange}
-                    className="w-full bg-transparent border border-blue-500 rounded-lg p-2 focus:outline-none"
-                    rows={3}
-                  />
-                ) : (
-                  <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    {user.bio}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {isEditing && (
-              <div className="mt-8">
-                <h2 className="text-xl font-semibold mb-4">Modifier le mot de passe</h2>
-                <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4 space-y-4`}>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Mot de passe actuel</label>
-                    <input
-                      type="password"
-                      name="currentPassword"
-                      value={passwordData.currentPassword}
-                      onChange={handlePasswordChange}
-                      className="w-full px-3 py-2 rounded-md bg-transparent border border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Nouveau mot de passe</label>
-                    <input
-                      type="password"
-                      name="newPassword"
-                      value={passwordData.newPassword}
-                      onChange={handlePasswordChange}
-                      className="w-full px-3 py-2 rounded-md bg-transparent border border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Confirmer le nouveau mot de passe</label>
-                    <input
-                      type="password"
-                      name="confirmPassword"
-                      value={passwordData.confirmPassword}
-                      onChange={handlePasswordChange}
-                      className="w-full px-3 py-2 rounded-md bg-transparent border border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <button
-                    onClick={handlePasswordSave}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    Enregistrer le mot de passe
-                  </button>
-                </div>
               </div>
             )}
+          </div>
+        </div>
 
-            {/* Challenges history */}
-            {userChallenges.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <Trophy size={20} className="text-yellow-500" /> Vos défis
-                </h2>
-                <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg divide-y ${darkMode ? 'divide-gray-600' : 'divide-gray-200'}`}>
-                  {userChallenges.slice(0, 5).map(uc => (
-                    <div key={uc.id} className="p-3 flex items-center justify-between gap-3">
+      {/* ── Cosmétiques ── */}
+      <div style={{ padding: '0 18px', marginTop: 8 }}>
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+            <button onClick={() => toggleProfileSection('cosmetics')}
+              className="q-press w-full flex items-center gap-3 p-4 text-left"
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#EC4899,#A78BFA)' }}>
+                <ShoppingBag size={18} color="#fff" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Mes cosmétiques</p>
+                <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{cosmeticsLabel}</p>
+              </div>
+              <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+                transform: openProfileSections.cosmetics ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease' }} />
+            </button>
+            {openProfileSections.cosmetics && (
+              <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
+                {ownedCosmetics.length === 0 ? (
+                  <p className="text-sm" style={{ color: 'var(--q-text3)' }}>
+                    Aucun cosmétique possédé.{' '}
+                    <Link to="/shop" style={{ color: 'var(--q-accent)' }} className="hover:underline">Visiter la boutique</Link>
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {(() => {
+                      const equippedBadgeCount = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped).length;
+                      return ownedCosmetics.map(uc => {
+                        const rarityColor = TITLE_CLASSES[uc.cosmetic.rarity] ?? '';
+                        const isLoading = cosmeticLoading === uc.cosmeticId;
+                        const TypeIcon = TYPE_ICONS[uc.cosmetic.type] ?? Package;
+                        const badgeCapped = !uc.equipped && uc.cosmetic.type === 'BADGE' && equippedBadgeCount >= 3;
+                        return (
+                          <div key={uc.id} className="rounded-2xl p-3 flex flex-col gap-2"
+                            style={{ background: 'var(--q-chrome)',
+                              border: uc.equipped ? '2px solid var(--q-accent)' : '1px solid var(--q-line)',
+                              boxShadow: uc.equipped ? '0 0 0 3px var(--q-accent-soft), var(--q-shadow)' : 'var(--q-shadow)' }}>
+                            <div className="text-center">
+                              <div className="flex justify-center mb-1" style={{ color: 'var(--q-accent)' }}><TypeIcon size={22} /></div>
+                              <p className="font-bold text-xs mt-1 truncate" style={{ color: 'var(--q-text)' }}>{uc.cosmetic.name}</p>
+                              <p className={`text-xs font-semibold ${rarityColor}`}>{RARITY_LABELS[uc.cosmetic.rarity]}</p>
+                              <p className="text-xs" style={{ color: 'var(--q-text3)' }}>{TYPE_LABELS[uc.cosmetic.type]}</p>
+                            </div>
+                            {uc.equipped ? (
+                              <button onClick={() => handleUnequip(uc.cosmeticId)} disabled={isLoading}
+                                className="q-press w-full py-1 rounded-xl text-xs font-bold text-white disabled:opacity-60"
+                                style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)' }}>
+                                {isLoading ? '...' : 'Déséquiper'}
+                              </button>
+                            ) : (
+                              <button onClick={() => handleEquip(uc.cosmeticId)} disabled={isLoading || badgeCapped}
+                                className="q-press w-full py-1 rounded-xl text-xs font-bold disabled:opacity-40"
+                                style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', cursor: badgeCapped ? 'not-allowed' : 'pointer' }}
+                                title={badgeCapped ? 'Maximum 3 badges équipés' : undefined}>
+                                {isLoading ? '...' : badgeCapped ? 'Max 3' : 'Équiper'}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+      {/* ── Défis ── */}
+      {userChallenges.length > 0 && (
+        <div style={{ padding: '0 18px', marginTop: 8 }}>
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+              <button onClick={() => toggleProfileSection('defis')}
+                className="q-press w-full flex items-center gap-3 p-4 text-left"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)' }}>
+                  <Trophy size={18} color="#fff" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Mes défis</p>
+                  <p className="text-xs" style={{ color: 'var(--q-text2)' }}>
+                    {userChallenges.filter(c => c.status === 'COMPLETED').length} complétés · {userChallenges.filter(c => c.status === 'IN_PROGRESS').length} en cours
+                  </p>
+                </div>
+                <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+                  transform: openProfileSections.defis ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease' }} />
+              </button>
+              {openProfileSections.defis && (
+                <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
+                  {userChallenges.slice(0, 5).map((uc, i) => (
+                    <div key={uc.id} className="px-4 py-3 flex items-center justify-between gap-3"
+                      style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none' }}>
                       <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate">{uc.challenge.title}</p>
-                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          🪙 {uc.challenge.coinReward} · ⚡ {uc.challenge.xpReward} XP
-                        </p>
+                        <p className="font-semibold text-sm truncate" style={{ color: 'var(--q-text)' }}>{uc.challenge.title}</p>
+                        <p className="text-xs flex items-center gap-1" style={{ color: 'var(--q-text3)' }}><CircleDollarSign size={10} className="inline flex-shrink-0" /> {uc.challenge.coinReward} · <Zap size={10} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP</p>
                       </div>
                       {uc.status === 'COMPLETED' ? (
-                        <span className="flex items-center gap-1 text-xs font-bold text-green-600 dark:text-green-400 flex-shrink-0">
-                          <CheckCircle size={14} /> Complété
+                        <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded-full"
+                          style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff' }}>
+                          <CheckCircle size={12} /> Complété
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">
-                          <Clock size={14} /> En cours
+                        <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded-full"
+                          style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)', color: '#fff' }}>
+                          <Clock size={12} /> En cours
                         </span>
                       )}
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          </div>
+        )}
 
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Vos topics récents</h2>
-              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg divide-y ${darkMode ? 'divide-gray-600' : 'divide-gray-200'}`}>
+      {/* ── Historique ── */}
+      {userChallenges.length > 0 && (
+        <>
+          <div style={{ padding: '22px 22px 10px' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--q-display)', letterSpacing: -0.2, color: 'var(--q-text)' }}>Historique</h2>
+          </div>
+          <div style={{ padding: '0 18px' }}>
+            <div style={{ borderRadius: 22, overflow: 'hidden', background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+              {userChallenges.slice(0, 5).map((uc, i, a) => {
+                const ok = uc.status === 'COMPLETED';
+                return (
+                  <div key={uc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: i < a.length - 1 ? '1px solid var(--q-line)' : 'none' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, background: ok ? 'rgba(52,211,153,0.18)' : 'rgba(251,146,60,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {ok ? <CheckCircle size={16} style={{ color: '#34D399' }} /> : <Clock size={16} style={{ color: '#FB923C' }} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--q-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{uc.challenge.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--q-text2)', marginTop: 1 }}>
+                        {ok ? `terminé · +${uc.challenge.xpReward} XP` : 'en cours'}
+                      </div>
+                    </div>
+                    <ChevronRight size={14} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Topics ── */}
+      <div style={{ padding: '0 18px', marginTop: 8 }}>
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+            <button onClick={() => toggleProfileSection('topics')}
+              className="q-press w-full flex items-center gap-3 p-4 text-left"
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)' }}>
+                <MessageSquare size={18} color="#fff" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Mes topics récents</p>
+                <p className="text-xs" style={{ color: 'var(--q-text2)' }}>
+                  {topicsLabel}
+                </p>
+              </div>
+              <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+                transform: openProfileSections.topics ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease' }} />
+            </button>
+            {openProfileSections.topics && (
+              <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
                 {recentActivities.length === 0 && (
-                  <div className="p-4 text-gray-400">Aucun topic créé récemment.</div>
+                  <div className="px-4 py-3 text-sm" style={{ color: 'var(--q-text3)' }}>Aucun topic créé récemment.</div>
                 )}
-                {recentActivities.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="p-4 flex justify-between items-center w-full hover:bg-blue-50 dark:hover:bg-gray-600 transition"
-                  >
-                    <button
-                      className="flex-1 text-left"
-                      onClick={() => navigate(`/tchat/${activity.id}`)}
-                      style={{ cursor: "pointer" }}
-                      type="button"
-                    >
-                      <span className="font-semibold">{activity.title}</span>
-                      {activity.content && (
-                        <span className="ml-2 text-gray-500 italic">– {activity.content}</span>
-                      )}
-                      <span className="ml-2 text-sm text-gray-500">{activity.date}</span>
+                {recentActivities.map((activity, i) => (
+                  <div key={activity.id} className="px-4 py-3 flex justify-between items-center gap-2 transition-opacity hover:opacity-80"
+                    style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none' }}>
+                    <button className="flex-1 text-left min-w-0" onClick={() => navigate(`/tchat/${activity.id}`)} type="button">
+                      <p className="font-semibold text-sm truncate" style={{ color: 'var(--q-text)' }}>{activity.title}</p>
+                      {activity.content && <p className="text-xs italic truncate" style={{ color: 'var(--q-text3)' }}>{activity.content}</p>}
+                      <p className="text-xs" style={{ color: 'var(--q-text3)' }}>{activity.date}</p>
                     </button>
-                    <button
-                      className="ml-3 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition w-9 h-9"
-                      onClick={e => {
-                        e.stopPropagation();
-                        navigate(`/tchat/${activity.id}`, { state: { openEdit: true } });
-                      }}
-                      title="Modifier"
-                      type="button"
-                    >
-                      <Edit size={20} />
+                    <button className="q-press flex items-center justify-center rounded-full w-8 h-8 flex-shrink-0"
+                      style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}
+                      onClick={e => { e.stopPropagation(); navigate(`/tchat/${activity.id}`, { state: { openEdit: true } }); }}
+                      title="Modifier" type="button">
+                      <Edit size={14} />
                     </button>
-                    <button
-                      className="ml-2 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition w-9 h-9"
-                      onClick={e => {
-                        e.stopPropagation();
-                        handleDeleteTopic(activity.id);
-                      }}
-                      title="Supprimer"
-                      type="button"
-                    >
-                      <X size={20} />
+                    <button className="q-press flex items-center justify-center rounded-full w-8 h-8 flex-shrink-0"
+                      style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}
+                      onClick={e => { e.stopPropagation(); handleDeleteTopic(activity.id); }}
+                      title="Supprimer" type="button">
+                      <X size={14} />
                     </button>
                   </div>
                 ))}
               </div>
-            </div>
+            )}
           </div>
         </div>
+
+      {/* ── Paramètres ── */}
+      <div style={{ padding: '22px 22px 10px' }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--q-display)', letterSpacing: -0.2, color: 'var(--q-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Settings size={20} style={{ color: 'var(--q-accent)' }} /> Paramètres
+        </h2>
+      </div>
+      <div style={{ padding: '0 18px 40px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+        {/* Apparence */}
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+          <button onClick={() => setOpenSection(openSection === 'appearance' ? null : 'appearance')}
+            className="q-press w-full flex items-center gap-3 p-4 text-left"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--q-accent-soft)' }}>
+              <Palette size={18} style={{ color: 'var(--q-accent-deep)' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Apparence</p>
+              <p className="text-xs" style={{ color: 'var(--q-text2)' }}>Thème, couleurs</p>
+            </div>
+            <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+              transform: openSection === 'appearance' ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease' }} />
+          </button>
+          {openSection === 'appearance' && (
+            <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {darkMode ? <Moon size={16} style={{ color: 'var(--q-accent)' }} /> : <Sun size={16} style={{ color: 'var(--q-text2)' }} />}
+                  <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>Mode sombre</span>
+                </div>
+                <button onClick={toggleDarkMode} className="q-press relative flex-shrink-0"
+                  style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
+                    background: darkMode ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
+                  <span style={{ position: 'absolute', top: 3, left: darkMode ? 21 : 3, width: 20, height: 20,
+                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Notifications */}
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+          <button onClick={() => setOpenSection(openSection === 'notifications' ? null : 'notifications')}
+            className="q-press w-full flex items-center gap-3 p-4 text-left"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)' }}>
+              <Bell size={18} color="#fff" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Notifications</p>
+              <p className="text-xs" style={{ color: 'var(--q-text2)' }}>
+                {Object.values(notifToggles).filter(Boolean).length} active{Object.values(notifToggles).filter(Boolean).length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+              transform: openSection === 'notifications' ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease' }} />
+          </button>
+          {openSection === 'notifications' && (
+            <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
+              {([
+                { key: 'defis', label: 'Rappels de défis' },
+                { key: 'messages', label: 'Nouveaux messages' },
+                { key: 'updates', label: 'Mises à jour & nouveautés' },
+              ] as { key: keyof typeof notifToggles; label: string }[]).map(({ key, label }) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{label}</span>
+                  <button onClick={() => setNotifToggles(prev => ({ ...prev, [key]: !prev[key] }))}
+                    className="q-press relative flex-shrink-0"
+                    style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
+                      background: notifToggles[key] ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
+                    <span style={{ position: 'absolute', top: 3, left: notifToggles[key] ? 21 : 3, width: 20, height: 20,
+                      borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Accessibilité */}
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+          <button onClick={() => setOpenSection(openSection === 'accessibility' ? null : 'accessibility')}
+            className="q-press w-full flex items-center gap-3 p-4 text-left"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg,#34D399,#FACC15)' }}>
+              <SlidersHorizontal size={18} color="#fff" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Accessibilité</p>
+              <p className="text-xs" style={{ color: 'var(--q-text2)' }}>Langue, animations</p>
+            </div>
+            <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+              transform: openSection === 'accessibility' ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease' }} />
+          </button>
+          {openSection === 'accessibility' && (
+            <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>Langue</span>
+                <select value={language} onChange={e => setLanguage(e.target.value)}
+                  className="text-sm rounded-xl px-3 py-1.5 focus:outline-none"
+                  style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)', border: '1px solid var(--q-line)', fontFamily: 'inherit' }}>
+                  {['Français', 'English', 'Español', 'Deutsch'].map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>Réduire les animations</span>
+                <button onClick={() => setReduceMotion(r => !r)} className="q-press relative flex-shrink-0"
+                  style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
+                    background: reduceMotion ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
+                  <span style={{ position: 'absolute', top: 3, left: reduceMotion ? 21 : 3, width: 20, height: 20,
+                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* ── Déconnexion ── */}
+      <div style={{ padding: '8px 18px 40px' }}>
+        <button
+          onClick={() => { setUser(null); localStorage.removeItem('token'); navigate('/'); }}
+          className="q-press w-full flex items-center justify-center gap-2"
+          style={{ height: 48, borderRadius: 18, border: '1px solid rgba(239,68,68,0.25)',
+            background: 'rgba(239,68,68,0.08)', color: '#EF4444',
+            fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          <LogOut size={16} /> Se déconnecter
+        </button>
       </div>
     </div>
   );

@@ -1,162 +1,489 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+  Flame, Zap, ChevronRight, Sparkles, Trophy, ShoppingBag,
+  Gamepad2, Activity, Music, Palette, BookOpen, FlaskConical,
+  UtensilsCrossed, MessageSquare, Bell, CircleDollarSign,
+} from 'lucide-react';
+import UserAvatar from '../components/UserAvatar';
+import type { EquippedCosmetic } from '../lib/cosmetics';
+
+// ── types ──────────────────────────────────────────────────────────────────
+
+type UserChallenge = {
+  id: number;
+  challengeId: number;
+  status: string;
+  startedAt: string;
+  completedAt?: string;
+  challenge: {
+    title: string;
+    category: string;
+    difficulty: string;
+    coinReward: number;
+    xpReward: number;
+  };
+};
+
+type Topic = { id: number; title: string; category?: string; createdAt?: string };
+
+// ── helpers ────────────────────────────────────────────────────────────────
+
+function getLevelTitle(level: number): string {
+  if (level < 3)  return 'Novice';
+  if (level < 7)  return 'Apprenti';
+  if (level < 12) return 'Disciple';
+  if (level < 18) return 'Expert';
+  if (level < 25) return 'Vétéran';
+  return 'Maître';
+}
+
+const fmt = (n: number): string => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.floor(n / 1_000)}K`;
+  return n.toLocaleString();
+};
+
+const daysSince = (dateStr: string): number =>
+  Math.max(1, Math.ceil((Date.now() - new Date(dateStr).getTime()) / 86_400_000));
+
+// ── design tokens (gradients) ───────────────────────────────────────────────
+
+const GRAD: Record<string, string> = {
+  lavender: 'linear-gradient(135deg,#A78BFA,#EC4899)',
+  mint:     'linear-gradient(135deg,#34D399,#38BDF8)',
+  peach:    'linear-gradient(135deg,#FACC15,#FB923C,#EC4899)',
+  sky:      'linear-gradient(135deg,#38BDF8,#A78BFA)',
+  butter:   'linear-gradient(135deg,#FACC15,#FB923C)',
+  rose:     'linear-gradient(135deg,#EC4899,#A78BFA)',
+};
+
+const GLOW: Record<string, string> = {
+  lavender: 'rgba(167,139,250,0.55)', mint:   'rgba(52,211,153,0.55)',
+  peach:    'rgba(251,146,60,0.55)',  sky:    'rgba(56,189,248,0.55)',
+  butter:   'rgba(250,204,21,0.55)',  rose:   'rgba(236,72,153,0.55)',
+};
+
+// ── Category metadata ───────────────────────────────────────────────────────
+
+type CatMeta = { grad: string; glow: string; icon: React.ReactNode; label: string };
+
+const CAT_META: Record<string, CatMeta> = {
+  GAMING:   { grad: GRAD.sky,      glow: GLOW.sky,      icon: <Gamepad2 size={22} />,       label: 'Gaming' },
+  SPORT:    { grad: GRAD.mint,     glow: GLOW.mint,     icon: <Activity size={22} />,        label: 'Sport' },
+  SCIENCE:  { grad: GRAD.lavender, glow: GLOW.lavender, icon: <FlaskConical size={22} />,   label: 'Science' },
+  MUSIC:    { grad: GRAD.rose,     glow: GLOW.rose,     icon: <Music size={22} />,           label: 'Musique' },
+  ART:      { grad: GRAD.peach,    glow: GLOW.peach,    icon: <Palette size={22} />,         label: 'Art' },
+  CUISINE:  { grad: GRAD.peach,    glow: GLOW.peach,    icon: <UtensilsCrossed size={22} />, label: 'Cuisine' },
+  CULTURE:  { grad: GRAD.butter,   glow: GLOW.butter,   icon: <BookOpen size={22} />,        label: 'Culture' },
+};
+const DEFAULT_CAT: CatMeta = { grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={22} />, label: 'Défi' };
+
+// ── Sub-components ─────────────────────────────────────────────────────────
+
+type XpRingProps = Readonly<{
+  value: number; size: number; stroke: number;
+  color: string; trackColor: string; children?: React.ReactNode;
+}>;
+const XpRing: React.FC<XpRingProps> = ({ value, size, stroke, color, trackColor, children }) => {
+  const r = (size - stroke) / 2;
+  const C = 2 * Math.PI * r;
+  const off = C * (1 - Math.max(0, Math.min(1, value)));
+  return (
+    <div style={{ width: size, height: size, position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} stroke={trackColor} strokeWidth={stroke} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none"
+          strokeDasharray={C} strokeDashoffset={off} strokeLinecap="round"
+          style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(.3,1.2,.3,1)' }} />
+      </svg>
+      {children && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
+type IconTileProps = Readonly<{ cat: string; size?: number }>;
+const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
+  const meta = CAT_META[cat] ?? DEFAULT_CAT;
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size * 0.3,
+      background: meta.grad, color: '#fff',
+      position: 'relative', overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      border: '1px solid rgba(255,255,255,0.25)',
+      boxShadow: `0 6px 14px -4px ${meta.glow}`,
+      flexShrink: 0,
+    }}>
+      <div style={{ position: 'absolute', right: -8, top: -8, width: size * 0.55, height: size * 0.55,
+        borderRadius: '50%', background: 'rgba(255,255,255,0.20)' }} />
+      <div style={{ position: 'relative' }}>{meta.icon}</div>
+    </div>
+  );
+};
+
+// ── Main ───────────────────────────────────────────────────────────────────
 
 const GameForum: React.FC = () => {
+  const { user } = useStore();
   const navigate = useNavigate();
-  const { user, darkMode } = useStore();
-  const [loading, setLoading] = useState(true);
-  const [recentTopics, setRecentTopics] = useState<any[]>([]);
+  const [challenges, setChallenges] = useState<UserChallenge[]>([]);
+  const [recentTopics, setRecentTopics] = useState<Topic[]>([]);
+  const [homeCosmetics, setHomeCosmetics] = useState<EquippedCosmetic[]>([]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      fetch('/api/topics?limit=6&sort=desc')
-        .then(res => res.json())
-        .then(data => setRecentTopics(data))
-        .catch(() => setRecentTopics([]));
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetch('/api/users/me/challenges', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json())
+        .then(data => setChallenges(Array.isArray(data) ? data : []))
+        .catch(() => {});
     }
+    fetch('/api/topics?limit=6&sort=desc')
+      .then(r => r.json())
+      .then(data => setRecentTopics(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, [user]);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 bg-[url(./assets/bg-white.)]"></div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!user?.id) { setHomeCosmetics([]); return; }
+    fetch(`/api/users/${user.id}/profile`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.cosmetics) setHomeCosmetics(data.cosmetics); })
+      .catch(() => {});
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const refresh = () => {
+      fetch(`/api/users/${user.id}/profile`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data?.cosmetics) setHomeCosmetics(data.cosmetics); })
+        .catch(() => {});
+    };
+    globalThis.addEventListener('cosmetics-updated', refresh);
+    return () => globalThis.removeEventListener('cosmetics-updated', refresh);
+  }, [user?.id]);
+
+  // ── Not logged in ──────────────────────────────────────────────────────
 
   if (!user) {
     return (
-      <div className="text-center py-10 space-y-6">
-        <div className={`p-4 min-h-[120px] rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'} shadow flex justify-center items-center`}>
-          <h1 className="text-2xl font-bold text-blue-500 text-center w-full">Bienvenue sur GameForum</h1>
-        </div>  
-        <p className="mb-6">Connectez-vous pour rejoindre la communauté.</p>
-        <div className="flex justify-center space-x-4">
-          <a 
-            href="/login" 
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-          >
-            Connexion
-          </a>
-          <a 
-            href="/register" 
-            className="px-4 py-2 border border-blue-600 text-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-          >
-            Inscription
-          </a>
+      <div style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
+        {/* Hero gradient card */}
+        <div className="rounded-3xl p-6 md:p-10 mb-5 relative overflow-hidden"
+          style={{ background: 'var(--q-vibrant-hero)',
+            boxShadow: '0 14px 32px -10px rgba(124,58,237,0.45)',
+            border: '1px solid rgba(255,255,255,0.25)' }}>
+          <div className="absolute right-[-40px] top-[-40px] w-56 h-56 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+          <div className="absolute left-[-20px] bottom-[-30px] w-36 h-36 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
+          <div className="relative z-10">
+            <p className="text-xs font-bold text-white/80 uppercase tracking-widest mb-3">ChallengeHub</p>
+            <h1 className="text-3xl md:text-5xl font-bold text-white mb-4"
+              style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.5, lineHeight: 1.08 }}>
+              Relevez des défis,<br />évoluez ensemble.
+            </h1>
+            <p className="text-white/80 text-sm md:text-base mb-6 max-w-lg leading-relaxed">
+              Rejoignez la communauté, complétez des défis, gagnez des récompenses et grimpez dans le classement.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/register"
+                className="q-press px-6 py-3 rounded-2xl text-sm font-bold"
+                style={{ background: '#fff', color: '#7C3AED' }}>
+                S'inscrire gratuitement
+              </Link>
+              <Link to="/login"
+                className="q-press px-6 py-3 rounded-2xl text-sm font-bold text-white"
+                style={{ background: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.40)' }}>
+                Se connecter
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Feature cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            { grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} />, title: 'Défis variés', desc: 'Gaming, sport, musique, science — des centaines de défis pour tous les goûts.' },
+            { grad: GRAD.butter,   glow: GLOW.butter,   icon: <Zap size={20} />,    title: 'Montez de niveau', desc: 'Progressez, gagnez de l\'XP et débloquez des cosmétiques exclusifs.' },
+            { grad: GRAD.mint,     glow: GLOW.mint,     icon: <ShoppingBag size={20} />, title: 'Boutique', desc: 'Dépensez vos coins pour personnaliser votre profil avec des cadres et titres rares.' },
+          ].map(({ grad, glow, icon, title, desc }) => (
+            <div key={title} className="rounded-3xl p-5 relative overflow-hidden"
+              style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-3 text-white"
+                style={{ background: grad, boxShadow: `0 4px 12px -2px ${glow}` }}>
+                {icon}
+              </div>
+              <h3 className="font-bold text-base mb-1" style={{ color: 'var(--q-text)' }}>{title}</h3>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--q-text2)' }}>{desc}</p>
+            </div>
+          ))}
         </div>
       </div>
     );
   }
 
-  const featuredGames = [
-    'Valorant',
-    'League of Legends',
-    'Fortnite',
-    'Apex Legends'
-  ];
+  // ── Logged in ──────────────────────────────────────────────────────────
+
+  const xpInLevel  = (user.xp ?? 0) % 1000;
+  const xpPercent  = xpInLevel / 1000;
+  const inProgress = challenges.filter(c => c.status === 'IN_PROGRESS');
+  const levelTitle = getLevelTitle(user.level ?? 1);
 
   return (
-    <div className={`p-6 ${darkMode ? 'text-white' : ' text-gray-900'}`}>
-      <div className={`p-4 sm:p-8 mb-8 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'} shadow`} style={{ height: 'auto' }}>
-        <h1 className="text-2xl sm:text-4xl font-bold mb-4 text-blue-500">Bienvenue sur GameForum</h1>
-        <p className="text-lg sm:text-2xl font-bold">Rejoignez la plus grande communauté de gamers francophones. Discutez, partagez et restez informé des dernières actualités gaming.</p>
+    <div style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)', paddingBottom: 32 }}>
+
+      {/* ── Greeting header ── */}
+      <div className="flex items-center justify-between mb-5">
+        {/* Left: avatar + name */}
+        <div className="flex items-center gap-3">
+          <UserAvatar avatar={user.avatar} username={user.username ?? ''} cosmetics={homeCosmetics} size="md" />
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--q-text2)', fontWeight: 500 }}>Bonjour,</div>
+            <div style={{ fontSize: 20, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.2, lineHeight: 1.1 }}>
+              {user.username}
+            </div>
+          </div>
+        </div>
+        {/* Right: coins pill + bell */}
+        <div className="flex items-center gap-2">
+          <Link to="/shop" style={{ display: 'flex', alignItems: 'center', gap: 6,
+            background: '#FFF1B8', color: '#5C3E10',
+            padding: '7px 12px', borderRadius: 999, fontWeight: 700, fontSize: 13,
+            fontVariantNumeric: 'tabular-nums', textDecoration: 'none' }}>
+            <CircleDollarSign size={14} /> {fmt(user.coins ?? 0)}
+          </Link>
+          <button className="q-press" style={{
+            width: 40, height: 40, borderRadius: 20, flexShrink: 0,
+            border: '1px solid rgba(250,204,21,0.35)',
+            background: 'var(--q-chrome)', color: '#CA8A04',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 12px -2px rgba(250,204,21,0.35)',
+            cursor: 'pointer',
+          }}>
+            <Bell size={18} color="#CA8A04" />
+          </button>
+        </div>
       </div>
-      <section className="mb-12">
-        <h2 className="text-3xl font-bold mb-6 inline-block border-b-4 border-gray-300 pb-4">Rejoindre la communauté</h2>
-        <section className="mb-12">
-          <h3 className="text-3xl font-bold mb-6 inline-block border-b-4 border-gray-300 pb-2">Jeux en vedette</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 ">
-            {featuredGames.map((game, index) => {
-              const gameImages: { [key: string]: string } = {
-                'Valorant': 'https://i.pinimg.com/736x/67/c0/7e/67c07ead929b049e453bedda45980b79.jpg',
-                'League of Legends': 'https://i.pinimg.com/736x/d1/b1/1d/d1b11d5e4dbae547ac0d651476cec488.jpg',
-                'Counter-Strike 2': 'https://i.pinimg.com/736x/3c/1e/87/3c1e871625f3c31c9b7d10ed179205e9.jpg',
-                'Fortnite': 'https://i.pinimg.com/736x/4b/ab/34/4bab34086b84ee2a0e1b66b1e82ed0be.jpg',
-                'Apex Legends': 'https://i.pinimg.com/736x/bc/93/1b/bc931b47a7edf6322785f1a6427a3653.jpg',
-                'Overwatch 2': 'https://i.pinimg.com/736x/6a/a2/4c/6aa24c0ce2d5823abd694787b125449c.jpg'
-              };
 
-              let route = `/presgame?game=${encodeURIComponent(game)}`;
-              if (game === 'Valorant') route = '/gamepresval';
-              if (game === 'League of Legends') route = '/gamepreslol';
-              if (game === 'Apex Legends') route = '/gamepresal';
-              if (game === 'Fortnite') route = '/gamepresfor';
+      {/* ── Hero XP card ── */}
+      <div className="rounded-3xl p-5 mb-5 relative overflow-hidden"
+        style={{ background: 'var(--q-vibrant-hero)',
+          boxShadow: '0 14px 32px -10px rgba(124,58,237,0.45)',
+          border: '1px solid rgba(255,255,255,0.25)' }}>
+        <div className="absolute right-[-30px] top-[-30px] w-36 h-36 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+        <div className="flex items-start justify-between relative z-10">
+          <div className="flex-1 pr-3">
+            <div className="text-xs font-bold uppercase tracking-widest opacity-90 mb-1" style={{ color: 'rgba(255,255,255,0.9)' }}>
+              Niveau {user.level ?? 1} · {levelTitle}
+            </div>
+            <div className="text-xl md:text-2xl font-bold text-white"
+              style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, lineHeight: 1.15 }}>
+              Encore {1000 - xpInLevel} XP<br />pour le niveau {(user.level ?? 1) + 1}
+            </div>
+          </div>
+          <XpRing value={xpPercent} size={54} stroke={5} color="#fff" trackColor="rgba(255,255,255,0.25)">
+            <div className="text-xs font-bold text-white">{Math.round(xpPercent * 100)}%</div>
+          </XpRing>
+        </div>
+        {/* Progress bar */}
+        <div className="mt-4 relative z-10">
+          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.25)' }}>
+            <div className="h-full rounded-full transition-all duration-1000"
+              style={{ width: `${xpPercent * 100}%`, background: 'rgba(255,255,255,0.90)',
+               }} />
+          </div>
+        </div>
+        {/* Stats row */}
+        <div className="flex gap-5 mt-3 text-xs font-medium relative z-10" style={{ color: 'rgba(255,255,255,0.85)' }}>
+          <span className="flex items-center gap-1.5">
+            <Flame size={13} style={{ color: '#FFE57C' }} />
+            <b className="text-white">{inProgress.length}</b> défi{inProgress.length === 1 ? '' : 's'} en cours
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Zap size={13} style={{ color: '#FFE57C' }} />
+            <b className="text-white">{xpInLevel}</b> XP ce niveau
+          </span>
+        </div>
+      </div>
 
+      {/* ── Ta journée ── */}
+      {inProgress.length > 0 && (
+        <>
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-xl font-bold"
+              style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
+              Ta journée
+            </h2>
+            <Link to="/challenges" className="text-xs font-semibold hover:underline" style={{ color: 'var(--q-accent)' }}>
+              Voir tout
+            </Link>
+          </div>
+          <div className="flex flex-col gap-3 mb-5">
+            {inProgress.slice(0, 3).map((uc, i) => {
+              const meta = CAT_META[uc.challenge.category] ?? DEFAULT_CAT;
+              const day = daysSince(uc.startedAt);
+              const total = 30;
+              const progress = Math.min(1, day / total);
               return (
-                <div 
-                  key={index} 
-                  className={`rounded-lg overflow-hidden shadow-lg border ${
-                    darkMode ? 'border-gray-700 bg-gray-800 hover:bg-gray-700' : 'border-gray-200 bg-white hover:bg-gray-100'
-                  } transition-colors cursor-pointer`}
-                  onClick={() => navigate(route)}
-                >
-                  <img 
-                    src={gameImages[game] || 'https://via.placeholder.com/150'} 
-                    alt={game} 
-                    className="w-full h-80 object-cover"
-                  />
-                  <div className="p-4">
-                    <h4 className="text-lg font-semibold">{game}</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Découvrez les dernières actualités et stratégies.</p>
-                    <span className="inline-block mt-3 px-3 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                      Populaire
-                    </span>
+                <button key={uc.id} onClick={() => navigate('/challenges')}
+                  className="q-press rounded-3xl w-full text-left flex gap-3 items-center p-3.5"
+                  style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
+                    animationDelay: `${i * 70}ms`, cursor: 'pointer' }}>
+                  <IconTile cat={uc.challenge.category} size={50} />
+                  <div className="flex-1 min-w-0">
+                    {/* Chips row */}
+                    <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white px-2.5 py-0.5 rounded-full uppercase tracking-wide"
+                        style={{ background: meta.grad, border: '1px solid rgba(255,255,255,0.25)',
+                          boxShadow: `0 3px 10px -2px ${meta.glow}` }}>
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff',
+                          boxShadow: '0 0 4px rgba(255,255,255,0.7)', flexShrink: 0, display: 'inline-block' }} />
+                        {meta.label}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: '#FFDDC2', color: '#D46B0F', border: '1px solid #FFDDC2' }}>
+                        <Flame size={10} style={{ color: '#D46B0F' }} /> {day}j
+                      </span>
+                    </div>
+                    {/* Title */}
+                    <div className="text-sm font-bold mb-1.5 truncate" style={{ color: 'var(--q-text)', letterSpacing: -0.1 }}>
+                      {uc.challenge.title}
+                    </div>
+                    {/* Progress */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(42,42,51,0.08)' }}>
+                        <div className="h-full rounded-full transition-all duration-700"
+                          style={{ width: `${progress * 100}%`, background: meta.grad }} />
+                      </div>
+                      <span className="text-[11px] font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--q-text2)' }}>
+                        J{day}/{total}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                  <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+                </button>
               );
             })}
           </div>
-        </section>
-      </section>
-      <section>
-        <h2 className="text-3xl font-bold mb-6 inline-block border-b-4 border-gray-300 pb-2">Activité récente</h2>
-        <div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recentTopics.length === 0 ? (
-              <div className="col-span-3 text-center text-gray-400 py-8">
-                Aucun topic récent trouvé.
+        </>
+      )}
+
+      {/* ── Quick nav cards — desktop only (mobile has bottom tab bar) ── */}
+      <div className="hidden md:block">
+      {inProgress.length > 0 ? (
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          {[
+            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={18} />, label: 'Défis' },
+            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={18} />, label: 'Classement' },
+            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={18} />, label: 'Boutique' },
+          ].map(({ to, grad, glow, icon, label }) => (
+            <Link key={to} to={to}
+              className="q-press rounded-2xl p-3 flex flex-col items-center gap-1.5 transition-opacity hover:opacity-90"
+              style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white"
+                style={{ background: grad, boxShadow: `0 4px 10px -2px ${glow}` }}>
+                {icon}
               </div>
-            ) : (
-              recentTopics.map((topic, index) => (
-                <div
-                  key={topic.id || index}
-                  className={`p-6 rounded-lg shadow-md border ${
-                    darkMode
-                      ? 'border-gray-700 bg-gray-800 hover:bg-gray-800'
-                      : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
-                  } transition-transform transform hover:scale-105 cursor-pointer`}
-                  onClick={() => navigate(`/tchat/${topic.id}`)}
-                >
-                  <p className="text-lg font-medium">{topic.title}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                    {topic.category ? topic.category : 'Sans catégorie'}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
+              <span className="text-xs font-bold" style={{ color: 'var(--q-text)' }}>{label}</span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+          {[
+            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} />, label: 'Découvrir les défis', sub: 'Relever un nouveau challenge' },
+            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={20} />, label: 'Classement', sub: 'Voir les meilleurs joueurs' },
+            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={20} />, label: 'Boutique', sub: 'Dépenser tes coins' },
+          ].map(({ to, grad, glow, icon, label, sub }) => (
+            <Link key={to} to={to}
+              className="q-press rounded-3xl p-4 flex items-center gap-3 transition-opacity hover:opacity-90"
+              style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white flex-shrink-0"
+                style={{ background: grad, boxShadow: `0 4px 12px -2px ${glow}` }}>
+                {icon}
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm truncate" style={{ color: 'var(--q-text)' }}>{label}</div>
+                <div className="text-xs truncate" style={{ color: 'var(--q-text2)' }}>{sub}</div>
+              </div>
+              <ChevronRight size={15} style={{ color: 'var(--q-text3)', flexShrink: 0, marginLeft: 'auto' }} />
+            </Link>
+          ))}
+        </div>
+      )}
+      </div>
+
+      {/* ── Suggestion du jour ── */}
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-xl font-bold"
+          style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
+          Suggestion du jour
+        </h2>
+      </div>
+      <div className="rounded-3xl p-4 mb-5 flex gap-3 items-center relative overflow-hidden"
+        style={{ background: 'var(--q-vibrant-lavender)',
+          boxShadow: '0 14px 32px -10px rgba(167,139,250,0.55)',
+          border: '1px solid rgba(255,255,255,0.25)' }}>
+        <div className="absolute right-[-28px] bottom-[-30px] w-32 h-32 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }} />
+        <div className="absolute right-8 top-[-20px] w-16 h-16 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
+        <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 relative z-10"
+          style={{ background: 'rgba(255,255,255,0.95)', boxShadow: '0 2px 8px rgba(124,58,237,0.25)' }}>
+          <Sparkles size={22} style={{ color: '#7C3AED' }} />
+        </div>
+        <div className="flex-1 relative z-10">
+          <div className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.9)' }}>
+            Défi recommandé
+          </div>
+          <Link to="/challenges" className="text-sm font-semibold text-white leading-snug hover:underline">
+            Explore un nouveau défi aujourd'hui — monte en niveau plus vite !
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Recent topics ── */}
+      {recentTopics.length > 0 && (
+        <>
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-xl font-bold"
+              style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
+              Activité récente
+            </h2>
+            <Link to="/discussions" className="text-xs font-semibold hover:underline" style={{ color: 'var(--q-accent)' }}>
+              Voir tout
+            </Link>
+          </div>
+          <div className="rounded-3xl overflow-hidden"
+            style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+            {recentTopics.slice(0, 4).map((topic, i) => (
+              <button key={topic.id} onClick={() => navigate(`/tchat/${topic.id}`)}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left transition-opacity hover:opacity-80"
+                style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none', background: 'transparent' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
+                  <MessageSquare size={15} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate" style={{ color: 'var(--q-text)' }}>{topic.title}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--q-text3)' }}>
                     {topic.createdAt
-                      ? new Date(topic.createdAt).toLocaleString('fr-FR', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
+                      ? new Date(topic.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
                       : ''}
+                    {topic.category ? ` · ${topic.category}` : ''}
                   </p>
                 </div>
-              ))
-            )}
+                <ChevronRight size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+              </button>
+            ))}
           </div>
-        </div>
-      </section>
+        </>
+      )}
     </div>
   );
 };

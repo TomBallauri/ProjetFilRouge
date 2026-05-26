@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { MessageSquare, Search, Plus, X, Filter, ThumbsUp, Clock, Tag as TagIcon, Send } from 'lucide-react';
+import BackButton from '../components/BackButton';
 import { useNavigate } from 'react-router-dom';
 import { getEquipped, TITLE_CLASSES } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
@@ -223,9 +224,12 @@ const DiscussionsPage: React.FC = () => {
   return (
     <div className={`p-4 md:p-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-0 inline-block border-b-4 border-gray-300 pb-2">
-          Discussions
-        </h1>
+        <div className="flex items-center gap-3 mb-4 md:mb-0">
+          <BackButton />
+          <h1 className="text-2xl md:text-3xl font-bold inline-block border-b-4 border-gray-300 pb-2">
+            Discussions
+          </h1>
+        </div>
         <button
           onClick={() => {
             if (!user) {

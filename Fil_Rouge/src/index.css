@@ -1,3 +1,107 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Design tokens (light mode) ─────────────────────────────── */
+:root {
+  --q-font: "Quicksand", ui-rounded, system-ui, sans-serif;
+  --q-display: "DM Serif Display", Georgia, serif;
+  --q-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Backgrounds */
+  --q-bg: radial-gradient(circle, rgba(42,42,51,0.10) 1.4px, transparent 1.7px) 0 0/16px 16px,
+          linear-gradient(180deg, #FAFAFC 0%, #F0F0F4 100%);
+  --q-bg-flat: #F6F6F8;
+  --q-chrome: #FFFFFF;
+
+  /* Text */
+  --q-text:  #2A2A33;
+  --q-text2: #6B6B78;
+  --q-text3: #B0B0BC;
+  --q-line:  rgba(42,42,51,0.10);
+
+  /* Accent */
+  --q-accent: #7C3AED;
+  --q-accent-soft: #E8DEFF;
+  --q-accent-deep: #5B21B6;
+
+  /* Vibrant gradients */
+  --q-vibrant-hero:     linear-gradient(135deg, #38BDF8 0%, #A78BFA 55%, #EC4899 100%);
+  --q-vibrant-lavender: linear-gradient(135deg, #A78BFA 0%, #EC4899 100%);
+  --q-vibrant-sky:      linear-gradient(135deg, #38BDF8 0%, #A78BFA 100%);
+  --q-vibrant-mint:     linear-gradient(135deg, #34D399 0%, #38BDF8 100%);
+  --q-vibrant-peach:    linear-gradient(135deg, #FACC15 0%, #FB923C 60%, #EC4899 100%);
+  --q-vibrant-butter:   linear-gradient(135deg, #FACC15 0%, #FB923C 100%);
+  --q-vibrant-rose:     linear-gradient(135deg, #EC4899 0%, #A78BFA 100%);
+  --q-vibrant-gold:     linear-gradient(135deg, #FACC15 0%, #FB923C 50%, #EC4899 100%);
+
+  /* Card shadow */
+  --q-shadow: 0 1px 2px rgba(42,42,51,0.05),
+              0 14px 32px -12px rgba(42,42,51,0.20);
+}
+
+/* ── Design tokens (dark mode) ──────────────────────────────── */
+.dark {
+  --q-bg: radial-gradient(circle, rgba(255,255,255,0.07) 1.4px, transparent 1.7px) 0 0/16px 16px,
+          linear-gradient(180deg, #1F2030 0%, #16172A 100%);
+  --q-bg-flat: #1F2030;
+  --q-chrome: #2A2B3F;
+
+  --q-text:  #EAEAF2;
+  --q-text2: #9B9BAA;
+  --q-text3: #5A5A6A;
+  --q-line:  rgba(255,255,255,0.08);
+
+  --q-accent: #A78BFA;
+  --q-accent-soft: #3B2F5C;
+  --q-accent-deep: #C8B3FF;
+
+  --q-shadow: 0 1px 2px rgba(0,0,0,0.30),
+              0 14px 32px -12px rgba(0,0,0,0.55);
+}
+
+/* ── Base typography ─────────────────────────────────────────── */
+body {
+  font-family: var(--q-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Utility classes ─────────────────────────────────────────── */
+.q-bg { background: var(--q-bg); }
+.q-card { background: var(--q-chrome); border-radius: 22px; box-shadow: var(--q-shadow); }
+
+/* Vibrant gradient helpers */
+.q-grad-hero     { background: var(--q-vibrant-hero); }
+.q-grad-lavender { background: var(--q-vibrant-lavender); }
+.q-grad-sky      { background: var(--q-vibrant-sky); }
+.q-grad-mint     { background: var(--q-vibrant-mint); }
+.q-grad-peach    { background: var(--q-vibrant-peach); }
+.q-grad-butter   { background: var(--q-vibrant-butter); }
+.q-grad-rose     { background: var(--q-vibrant-rose); }
+.q-grad-gold     { background: var(--q-vibrant-gold); }
+
+/* Decorative white orb (used on vibrant cards) */
+.q-orb {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  pointer-events: none;
+}
+
+/* Press animation */
+.q-press { transition: transform 0.18s cubic-bezier(0.2, 1.6, 0.3, 1); }
+.q-press:active { transform: scale(0.95); }
+
+/* Float animation for decorative icons */
+@keyframes q-float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
+}
+@keyframes q-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* Scrollbar */
+.q-hidescroll::-webkit-scrollbar { display: none; }
+.q-hidescroll { scrollbar-width: none; }

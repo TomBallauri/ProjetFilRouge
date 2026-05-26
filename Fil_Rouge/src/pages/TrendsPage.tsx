@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../lib/store';
 import { TrendingUp, MessageSquare, ThumbsUp, Eye } from 'lucide-react';
+import BackButton from '../components/BackButton';
 import { useNavigate } from 'react-router-dom';
 
 const TrendsPage: React.FC = () => {
@@ -45,10 +46,13 @@ const TrendsPage: React.FC = () => {
   return (
     <div className={`p-6 ${darkMode ? 'text-white' : ' text-gray-900'}`}>
       <div className={`p-8 mb-8 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow`}>
-        <h1 className="text-3xl font-bold mb-2 flex items-center">
-          <TrendingUp className="mr-2 text-blue-500" />
-          Tendances
-        </h1>
+        <div className="flex items-center gap-3 mb-2">
+          <BackButton />
+          <h1 className="text-3xl font-bold flex items-center">
+            <TrendingUp className="mr-2 text-blue-500" />
+            Tendances
+          </h1>
+        </div>
         <p className="text-gray-600 dark:text-gray-300">
           Découvrez ce qui fait vibrer la communauté en ce moment
         </p>

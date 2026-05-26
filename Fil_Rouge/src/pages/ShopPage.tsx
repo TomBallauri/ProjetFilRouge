@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, CheckCircle, SlidersHorizontal, Search, X } from 'lucide-react';
+import BackButton from '../components/BackButton';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES } from '../lib/cosmetics';
 
 type Cosmetic = {
@@ -230,14 +231,17 @@ const ShopPage: React.FC = () => {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <ShoppingBag className="text-pink-500" size={26} />
-            Boutique
-          </h1>
-          <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            Dépense tes coins pour te démarquer
-          </p>
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+              <ShoppingBag className="text-pink-500" size={26} />
+              Boutique
+            </h1>
+            <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              Dépense tes coins pour te démarquer
+            </p>
+          </div>
         </div>
         {user && (
           <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm ${darkMode ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-50 text-yellow-700'}`}>
