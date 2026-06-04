@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types/User';
-import { Priority } from '@prisma/client';
+
+type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export type Task = {
   id: string;

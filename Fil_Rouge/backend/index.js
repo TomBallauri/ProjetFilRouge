@@ -6,6 +6,7 @@ import multer from 'multer';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
+import Anthropic from '@anthropic-ai/sdk';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -30,7 +31,8 @@ app.post('/api/auth/register', async (req, res) => {
         avatar: avatar || DEFAULT_AVATAR
       }
     });
-    res.json({ message: 'Utilisateur créé', user });
+    const token = jwt.sign({ userId: user.id }, SECRET, { expiresIn: '1d' });
+    res.json({ message: 'Utilisateur créé', token, user });
   } catch (error) {
     res.status(400).json({ error: 'Utilisateur ou email déjà pris.' });
   }
@@ -664,6 +666,86 @@ app.get('/api/users/me/challenges', async (req, res) => {
     res.json(challenges);
   } catch (error) {
     res.status(401).json({ error: 'Token invalide' });
+  }
+});
+
+// ─── IA GÉNÉRATION DE DÉFIS ──────────────────────────────────────────────────
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const AI_SYSTEM_PROMPT = `Tu es un assistant de création de défis personnalisés pour une application de gamification. Aide l'utilisateur à créer des défis motivants et adaptés à ses objectifs.
+
+PROCESSUS:
+1. L'utilisateur décrit son objectif
+2. Tu peux poser des questions de suivi (maximum 3 au total, une à la fois) pour mieux cerner ses besoins
+3. Quand tu as assez d'informations, génère exactement 5 défis personnalisés
+
+RÈGLES:
+- Questions courtes et précises, une seule à la fois
+- Après 2-3 questions maximum, génère les défis
+- Si l'objectif est clair d'emblée, génère directement les défis sans poser de questions
+- Les défis doivent être concrets, actionnables et progressifs
+
+CATÉGORIES disponibles: GAMING, SPORT, CUISINE, FITNESS, CREATIVITY, KNOWLEDGE, SOCIAL
+DIFFICULTÉS disponibles: EASY, MEDIUM, HARD, EXPERT
+
+RÉPONDS UNIQUEMENT en JSON valide, rien d'autre:
+Pour une question: {"type":"question","content":"Ta question ici"}
+Pour les défis: {"type":"challenges","challenges":[{"title":"...","description":"...","category":"...","difficulty":"..."}]}
+
+Génère exactement 5 défis variés (idéalement 2 EASY, 2 MEDIUM, 1 HARD ou EXPERT).
+Titres: max 80 caractères. Descriptions: max 500 caractères, claires et actionnables.`;
+
+app.post('/api/challenges/ai-generate', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const { history } = req.body;
+  if (!history || !Array.isArray(history) || history.length === 0) {
+    return res.status(400).json({ error: 'Historique de conversation requis' });
+  }
+  try {
+    jwt.verify(authHeader.split(' ')[1], SECRET);
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: AI_SYSTEM_PROMPT,
+      messages: history,
+    });
+    const text = response.content[0].text.trim();
+    try {
+      const parsed = JSON.parse(text);
+      res.json(parsed);
+    } catch {
+      res.json({ type: 'question', content: text });
+    }
+  } catch (error) {
+    console.error('AI generation error:', error);
+    res.status(500).json({ error: 'Erreur lors de la génération par IA' });
+  }
+});
+
+app.post('/api/challenges/bulk-save', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  const { challenges } = req.body;
+  if (!challenges || !Array.isArray(challenges) || challenges.length === 0) {
+    return res.status(400).json({ error: 'Défis requis' });
+  }
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const rewards = { EASY: { coins: 50, xp: 100 }, MEDIUM: { coins: 150, xp: 300 }, HARD: { coins: 350, xp: 700 }, EXPERT: { coins: 700, xp: 1500 } };
+    const created = await Promise.all(
+      challenges.map(({ title, description, difficulty, category }) => {
+        const r = rewards[difficulty] || rewards.EASY;
+        return prisma.challenge.create({
+          data: { title, description, difficulty, category, coinReward: r.coins, xpReward: r.xp, createdBy: decoded.userId }
+        });
+      })
+    );
+    res.json(created);
+  } catch (error) {
+    res.status(400).json({ error: 'Erreur lors de la sauvegarde des défis' });
   }
 });
 
