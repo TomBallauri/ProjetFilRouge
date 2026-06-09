@@ -38,7 +38,7 @@ const Sidebar: React.FC = () => {
     <>
       {/* ── Desktop sidebar — always visible on md+ ── */}
       <aside className={`hidden md:flex flex-col w-56 shrink-0 border-r ${sidebarBg} sticky top-0 h-screen`}>
-        <nav className="flex flex-col gap-1 pt-4 pb-6 flex-1">
+        <nav aria-label="Navigation principale" className="flex flex-col gap-1 pt-4 pb-6 flex-1">
           {menuItems.map(item => (
             <NavLink
               key={item.path}
@@ -58,7 +58,7 @@ const Sidebar: React.FC = () => {
 
       {/* ── Mobile bottom tab bar — hidden on md+ ── */}
       <div className="fixed md:hidden z-40" style={{ bottom: 14, left: 12, right: 12 }}>
-        <nav style={{
+        <nav aria-label="Navigation mobile" style={{
           background: darkMode ? 'rgba(42,43,63,0.92)' : 'rgba(255,255,255,0.88)',
           backdropFilter: 'blur(20px) saturate(180%)',
           WebkitBackdropFilter: 'blur(20px) saturate(180%)',

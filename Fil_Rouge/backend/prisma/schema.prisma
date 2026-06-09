@@ -74,6 +74,7 @@ model Challenge {
   coinReward   Int
   xpReward     Int
   isDefault    Boolean         @default(false)
+  isPublic     Boolean         @default(true)
   createdBy    Int?
   createdAt    DateTime        @default(now())
   creator      User?           @relation(fields: [createdBy], references: [id])

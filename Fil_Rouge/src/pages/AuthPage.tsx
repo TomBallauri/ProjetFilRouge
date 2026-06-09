@@ -101,7 +101,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
             background: 'linear-gradient(135deg, #00DDFF 0%, #067DBA 35%, #2B1FD0 65%, #B71AEB 100%)',
             boxShadow: '0 8px 24px rgba(167,139,250,0.45)',
           }}>
-            <Zap size={28} color="#fff" />
+            <Zap size={28} color="#fff" aria-hidden="true" />
           </div>
           <div style={{ fontSize: 28, fontFamily: '"DM Serif Display", Georgia, serif', color: titleColor, letterSpacing: -0.5 }}>
             {isLogin ? 'Content de te revoir' : "Rejoins l'aventure"}
@@ -125,7 +125,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
                   Pseudo
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <User size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
+                  <User size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
                   <input
                     id="name" type="text" value={name} onChange={e => setName(e.target.value)}
                     placeholder="Ton pseudo" style={inputStyle}
@@ -142,7 +142,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
                 Adresse e-mail
               </label>
               <div style={{ position: 'relative' }}>
-                <Mail size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
+                <Mail size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
                 <input
                   id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
                   required placeholder="ton@email.com" style={inputStyle}
@@ -158,7 +158,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
                 Mot de passe
               </label>
               <div style={{ position: 'relative' }}>
-                <Lock size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
+                <Lock size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
                 <input
                   id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                   required placeholder="••••••••"
@@ -168,23 +168,24 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
                   onBlur={e => e.currentTarget.style.borderColor = inputBorder}
                 />
                 <button type="button" onClick={() => setShowPassword(p => !p)}
+                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
                     background: 'none', border: 'none', cursor: 'pointer', color: iconColor, padding: 2, display: 'flex' }}>
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                 </button>
               </div>
             </div>
 
             {/* Error */}
             {error && (
-              <div style={{ padding: '10px 14px', borderRadius: 12, background: errorBg,
+              <div role="alert" aria-live="assertive" style={{ padding: '10px 14px', borderRadius: 12, background: errorBg,
                 border: `1px solid ${errorBorder}`, color: errorColor, fontSize: 13 }}>
                 {error}
               </div>
             )}
 
             {/* Submit */}
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading} aria-busy={loading}
               style={{
                 width: '100%', height: 48, borderRadius: 16, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
                 background: 'linear-gradient(135deg, #00DDFF 0%, #067DBA 35%, #2B1FD0 65%, #B71AEB 100%)',
@@ -195,7 +196,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
                 marginTop: 4,
               }}>
               {loading
-                ? <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} />
+                ? <output aria-label="Chargement"><div aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /></output>
                 : submitLabel
               }
             </button>

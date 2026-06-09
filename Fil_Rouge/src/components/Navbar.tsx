@@ -52,7 +52,7 @@ const Navbar: React.FC = () => {
   const xpToNext = 1000 - xpInLevel;
 
   return (
-    <nav className="hidden md:block sticky top-0 z-10 shadow-sm border-b"
+    <nav aria-label="Navigation globale" className="hidden md:block sticky top-0 z-10 shadow-sm border-b"
       style={{ background: 'var(--q-chrome)', borderColor: 'var(--q-line)', fontFamily: 'var(--q-font)' }}>
       <div className="flex justify-between items-center px-3 py-2 md:px-6">
 
@@ -108,7 +108,7 @@ const Navbar: React.FC = () => {
           {/* Avatar / menu profil */}
           <div className="relative" ref={dropdownRef}>
             <button className="q-press flex items-center justify-center rounded-full transition-opacity hover:opacity-80"
-              onClick={() => setDropdownOpen(o => !o)} aria-label="Profil">
+              onClick={() => setDropdownOpen(o => !o)} aria-label="Profil" aria-expanded={dropdownOpen} aria-haspopup="menu">
               {user ? (
                 <UserAvatar avatar={user.avatar} username={user.username ?? ''} cosmetics={navCosmetics} size="sm" />
               ) : (
@@ -120,7 +120,7 @@ const Navbar: React.FC = () => {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-52 rounded-2xl shadow-2xl py-1 z-30 overflow-hidden"
+              <div role="menu" className="absolute right-0 mt-2 w-52 rounded-2xl shadow-2xl py-1 z-30 overflow-hidden"
                 style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
 
                 {user ? (

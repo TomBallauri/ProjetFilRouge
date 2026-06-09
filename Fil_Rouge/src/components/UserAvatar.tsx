@@ -79,6 +79,7 @@ const UserAvatar: React.FC<Props> = ({
         <img
           src={resolveUrl(equippedFrame.cosmetic.imageUrl)}
           alt=""
+          aria-hidden="true"
           className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
           style={{ objectFit: 'fill' }}
         />

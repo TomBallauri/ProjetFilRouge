@@ -5,8 +5,6 @@ import AdminDashboard from './pages/AdminDashboard';
 import GameForum from './pages/GameForum';
 import TasksPage from './pages/TasksPage';
 import TrendsPage from './pages/TrendsPage';
-import CompetitionPage from './pages/CompetitionPage';
-import CompetitionPres from './pages/CompetitionPres';
 import ProfilePage from './pages/ProfilePage';
 import EditProfile from './pages/EditProfile';
 import DiscussionsPage from './pages/DiscussionsPage';
@@ -14,6 +12,7 @@ import AuthPage from './pages/AuthPage';
 import ForumTchat from './pages/ForumTchat';
 import ChallengePage from './pages/ChallengePage';
 import CreateChallenge from './pages/CreateChallenge';
+import AIChallengeGenerator from './pages/AIChallengeGenerator';
 import ShopPage from './pages/ShopPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import UserProfilePage from './pages/UserProfilePage';
@@ -62,6 +61,7 @@ function App() {
           <Route path="settings" element={<div className="p-4">Settings (Coming Soon)</div>} />
           <Route path="challenges" element={<ChallengePage />} />
           <Route path="challenges/create" element={<CreateChallenge />} />
+          <Route path="challenges/ai-create" element={<AIChallengeGenerator />} />
           <Route path="shop" element={<ShopPage />} />
           <Route path="leaderboard" element={<LeaderboardPage />} />
           <Route path="user/:id" element={<UserProfilePage />} />

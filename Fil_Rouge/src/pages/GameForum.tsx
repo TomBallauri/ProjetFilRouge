@@ -4,8 +4,9 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Flame, Zap, ChevronRight, Sparkles, Trophy, ShoppingBag,
-  Gamepad2, Activity, Music, Palette, BookOpen, FlaskConical,
+  Gamepad2, Activity, Music, Palette, BookOpen,
   UtensilsCrossed, MessageSquare, Bell, CircleDollarSign,
+  Dumbbell, Users, Leaf, Heart, Wrench, LayoutGrid,
 } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
 import type { EquippedCosmetic } from '../lib/cosmetics';
@@ -71,13 +72,18 @@ const GLOW: Record<string, string> = {
 type CatMeta = { grad: string; glow: string; icon: React.ReactNode; label: string };
 
 const CAT_META: Record<string, CatMeta> = {
-  GAMING:   { grad: GRAD.sky,      glow: GLOW.sky,      icon: <Gamepad2 size={22} />,       label: 'Gaming' },
-  SPORT:    { grad: GRAD.mint,     glow: GLOW.mint,     icon: <Activity size={22} />,        label: 'Sport' },
-  SCIENCE:  { grad: GRAD.lavender, glow: GLOW.lavender, icon: <FlaskConical size={22} />,   label: 'Science' },
-  MUSIC:    { grad: GRAD.rose,     glow: GLOW.rose,     icon: <Music size={22} />,           label: 'Musique' },
-  ART:      { grad: GRAD.peach,    glow: GLOW.peach,    icon: <Palette size={22} />,         label: 'Art' },
-  CUISINE:  { grad: GRAD.peach,    glow: GLOW.peach,    icon: <UtensilsCrossed size={22} />, label: 'Cuisine' },
-  CULTURE:  { grad: GRAD.butter,   glow: GLOW.butter,   icon: <BookOpen size={22} />,        label: 'Culture' },
+  GAMING:     { grad: GRAD.sky,      glow: GLOW.sky,      icon: <Gamepad2 size={22} />,        label: 'Gaming' },
+  SPORT:      { grad: GRAD.mint,     glow: GLOW.mint,     icon: <Activity size={22} />,         label: 'Sport' },
+  CUISINE:    { grad: GRAD.peach,    glow: GLOW.peach,    icon: <UtensilsCrossed size={22} />,  label: 'Cuisine' },
+  FITNESS:    { grad: GRAD.sky,      glow: GLOW.sky,      icon: <Dumbbell size={22} />,         label: 'Fitness' },
+  CREATIVITY: { grad: GRAD.rose,     glow: GLOW.rose,     icon: <Palette size={22} />,          label: 'Créativité' },
+  KNOWLEDGE:  { grad: GRAD.sky,      glow: GLOW.sky,      icon: <BookOpen size={22} />,         label: 'Savoir' },
+  SOCIAL:     { grad: GRAD.butter,   glow: GLOW.butter,   icon: <Users size={22} />,            label: 'Social' },
+  NATURE:     { grad: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.5)',  icon: <Leaf size={22} />,   label: 'Nature' },
+  MUSIC:      { grad: GRAD.rose,     glow: GLOW.rose,     icon: <Music size={22} />,            label: 'Musique' },
+  WELLNESS:   { grad: GRAD.mint,     glow: GLOW.mint,     icon: <Heart size={22} />,            label: 'Bien-être' },
+  DIY:        { grad: GRAD.peach,    glow: GLOW.peach,    icon: <Wrench size={22} />,           label: 'DIY' },
+  OTHERS:     { grad: GRAD.lavender, glow: GLOW.lavender, icon: <LayoutGrid size={22} />,       label: 'Autres' },
 };
 const DEFAULT_CAT: CatMeta = { grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={22} />, label: 'Défi' };
 
@@ -290,9 +296,11 @@ const GameForum: React.FC = () => {
               Encore {1000 - xpInLevel} XP<br />pour le niveau {(user.level ?? 1) + 1}
             </div>
           </div>
-          <XpRing value={xpPercent} size={54} stroke={5} color="#fff" trackColor="rgba(255,255,255,0.25)">
-            <div className="text-xs font-bold text-white">{Math.round(xpPercent * 100)}%</div>
-          </XpRing>
+          <div role="img" aria-label={`Progression : ${Math.round(xpPercent * 100)}% vers le niveau ${(user.level ?? 1) + 1}`}>
+            <XpRing value={xpPercent} size={54} stroke={5} color="#fff" trackColor="rgba(255,255,255,0.25)">
+              <div className="text-xs font-bold text-white" aria-hidden="true">{Math.round(xpPercent * 100)}%</div>
+            </XpRing>
+          </div>
         </div>
         {/* Progress bar */}
         <div className="mt-4 relative z-10">
@@ -316,64 +324,81 @@ const GameForum: React.FC = () => {
       </div>
 
       {/* ── Ta journée ── */}
-      {inProgress.length > 0 && (
-        <>
-          <div className="flex items-baseline justify-between mb-3">
-            <h2 className="text-xl font-bold"
-              style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
-              Ta journée
-            </h2>
-            <Link to="/challenges" className="text-xs font-semibold hover:underline" style={{ color: 'var(--q-accent)' }}>
-              Voir tout
-            </Link>
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-xl font-bold"
+          style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
+          Ta journée
+        </h2>
+        {inProgress.length > 0 && (
+          <Link to="/challenges" className="text-xs font-semibold hover:underline" style={{ color: 'var(--q-accent)' }}>
+            Voir tout
+          </Link>
+        )}
+      </div>
+
+      {inProgress.length === 0 ? (
+        <button onClick={() => navigate('/challenges')}
+          className="q-press w-full rounded-3xl flex items-center gap-4 p-4 mb-5 text-left"
+          style={{ background: 'var(--q-chrome)', border: '1px dashed var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)', boxShadow: '0 6px 14px -4px rgba(167,139,250,0.5)' }}>
+            <Trophy size={22} className="text-white" aria-hidden="true" />
           </div>
-          <div className="flex flex-col gap-3 mb-5">
-            {inProgress.slice(0, 3).map((uc, i) => {
-              const meta = CAT_META[uc.challenge.category] ?? DEFAULT_CAT;
-              const day = daysSince(uc.startedAt);
-              const total = 30;
-              const progress = Math.min(1, day / total);
-              return (
-                <button key={uc.id} onClick={() => navigate('/challenges')}
-                  className="q-press rounded-3xl w-full text-left flex gap-3 items-center p-3.5"
-                  style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
-                    animationDelay: `${i * 70}ms`, cursor: 'pointer' }}>
-                  <IconTile cat={uc.challenge.category} size={50} />
-                  <div className="flex-1 min-w-0">
-                    {/* Chips row */}
-                    <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white px-2.5 py-0.5 rounded-full uppercase tracking-wide"
-                        style={{ background: meta.grad, boxShadow: `0 3px 10px -2px ${meta.glow}` }}>
-                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff',
-                          boxShadow: '0 0 4px rgba(255,255,255,0.7)', flexShrink: 0, display: 'inline-block' }} />
-                        {meta.label}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                        style={{ background: '#FFDDC2', color: '#D46B0F', border: '1px solid #FFDDC2' }}>
-                        <Flame size={10} style={{ color: '#D46B0F' }} aria-hidden="true" /> {day}j
-                      </span>
-                    </div>
-                    {/* Title */}
-                    <div className="text-sm font-bold mb-1.5 truncate" style={{ color: 'var(--q-text)', letterSpacing: -0.1 }}>
-                      {uc.challenge.title}
-                    </div>
-                    {/* Progress */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(42,42,51,0.08)' }}>
-                        <div className="h-full rounded-full transition-all duration-700"
-                          style={{ width: `${progress * 100}%`, background: meta.grad }} />
-                      </div>
-                      <span className="text-[11px] font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--q-text2)' }}>
-                        J{day}/{total}
-                      </span>
-                    </div>
+          <div>
+            <p className="text-sm font-bold" style={{ color: 'var(--q-text)' }}>
+              Aucun défi en cours
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--q-text2)' }}>
+              Commence un défi dès maintenant !
+            </p>
+          </div>
+          <ChevronRight size={16} className="ml-auto flex-shrink-0" style={{ color: 'var(--q-text3)' }} aria-hidden="true" />
+        </button>
+      ) : (
+        <div className="flex flex-col gap-3 mb-5">
+          {inProgress.slice(0, 3).map((uc, i) => {
+            const meta = CAT_META[uc.challenge.category] ?? DEFAULT_CAT;
+            const day = daysSince(uc.startedAt);
+            const total = 30;
+            const progress = Math.min(1, day / total);
+            return (
+              <button key={uc.id} onClick={() => navigate('/challenges')}
+                aria-label={`Voir le défi : ${uc.challenge.title}`}
+                className="q-press rounded-3xl w-full text-left flex gap-3 items-center p-3.5"
+                style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
+                  animationDelay: `${i * 70}ms`, cursor: 'pointer' }}>
+                <IconTile cat={uc.challenge.category} size={50} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white px-2.5 py-0.5 rounded-full uppercase tracking-wide"
+                      style={{ background: meta.grad, boxShadow: `0 3px 10px -2px ${meta.glow}` }}>
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff',
+                        boxShadow: '0 0 4px rgba(255,255,255,0.7)', flexShrink: 0, display: 'inline-block' }} />
+                      {meta.label}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: '#FFDDC2', color: '#D46B0F', border: '1px solid #FFDDC2' }}>
+                      <Flame size={10} style={{ color: '#D46B0F' }} aria-hidden="true" /> {day}j
+                    </span>
                   </div>
-                  <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
-        </>
+                  <div className="text-sm font-bold mb-1.5 truncate" style={{ color: 'var(--q-text)', letterSpacing: -0.1 }}>
+                    {uc.challenge.title}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(42,42,51,0.08)' }}>
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${progress * 100}%`, background: meta.grad }} />
+                    </div>
+                    <span className="text-[11px] font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--q-text2)' }}>
+                      J{day}/{total}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {/* ── Quick nav cards — desktop only (mobile has bottom tab bar) ── */}

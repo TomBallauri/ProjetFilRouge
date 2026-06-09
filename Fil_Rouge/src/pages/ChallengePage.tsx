@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useStore } from '../lib/store';
-import { useNavigate } from 'react-router-dom';
-import { Trophy, Star, Zap, Search, Plus, CheckCircle, Clock, Flame, SlidersHorizontal, X, ChevronDown, ChevronUp, Gamepad2, Activity, UtensilsCrossed, Dumbbell, Palette, BookOpen, Users } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Trophy, Star, Zap, Search, Plus, CheckCircle, Clock, Flame, SlidersHorizontal, X, ChevronDown, ChevronUp, Gamepad2, Activity, UtensilsCrossed, Dumbbell, Palette, BookOpen, Users, Leaf, Music, Heart, Wrench, LayoutGrid } from 'lucide-react';
 import BackButton from '../components/BackButton';
 
 type Challenge = {
@@ -28,16 +28,21 @@ const CATEGORY_GRAD: Record<string, { grad: string; glow: string; Icon: React.FC
   CUISINE:    { grad: 'linear-gradient(135deg,#FACC15,#FB923C,#EC4899)', glow: 'rgba(251,146,60,0.5)', Icon: UtensilsCrossed, label: 'Cuisine' },
   FITNESS:    { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.5)',  Icon: Dumbbell,        label: 'Fitness' },
   CREATIVITY: { grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.5)',  Icon: Palette,         label: 'Créativité' },
-  KNOWLEDGE:  { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.5)',  Icon: BookOpen,        label: 'Connaissance' },
+  KNOWLEDGE:  { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.5)',  Icon: BookOpen,        label: 'Savoir' },
   SOCIAL:     { grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(250,204,21,0.5)',  Icon: Users,           label: 'Social' },
+  NATURE:     { grad: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.5)',  Icon: Leaf,            label: 'Nature' },
+  MUSIC:      { grad: 'linear-gradient(135deg,#F472B6,#A78BFA)', glow: 'rgba(244,114,182,0.5)', Icon: Music,           label: 'Musique' },
+  WELLNESS:   { grad: 'linear-gradient(135deg,#6EE7B7,#3B82F6)', glow: 'rgba(110,231,183,0.5)', Icon: Heart,           label: 'Bien-être' },
+  DIY:        { grad: 'linear-gradient(135deg,#FB923C,#D97706)', glow: 'rgba(251,146,60,0.5)',  Icon: Wrench,          label: 'DIY' },
+  OTHERS:     { grad: 'linear-gradient(135deg,#94A3B8,#64748B)', glow: 'rgba(148,163,184,0.5)', Icon: LayoutGrid,      label: 'Autres' },
 };
 
 // Difficulty → label + gradient
 const DIFF_GRAD: Record<string, { label: string; grad: string; glow: string; icon: React.ReactNode }> = {
-  EASY:   { label: 'Facile',    grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.45)',  icon: <Star size={11} /> },
-  MEDIUM: { label: 'Moyen',    grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(251,146,60,0.45)',  icon: <Zap size={11} /> },
-  HARD:   { label: 'Difficile', grad: 'linear-gradient(135deg,#FB923C,#EC4899)', glow: 'rgba(251,146,60,0.45)', icon: <Flame size={11} /> },
-  EXPERT: { label: 'Expert',   grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.45)', icon: <Trophy size={11} /> },
+  EASY:   { label: 'Facile',    grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.45)',  icon: <Star size={11} aria-hidden="true" /> },
+  MEDIUM: { label: 'Moyen',    grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(251,146,60,0.45)',  icon: <Zap size={11} aria-hidden="true" /> },
+  HARD:   { label: 'Difficile', grad: 'linear-gradient(135deg,#FB923C,#EC4899)', glow: 'rgba(251,146,60,0.45)', icon: <Flame size={11} aria-hidden="true" /> },
+  EXPERT: { label: 'Expert',   grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.45)', icon: <Trophy size={11} aria-hidden="true" /> },
 };
 
 const CATEGORIES   = Object.keys(CATEGORY_GRAD);
@@ -62,7 +67,7 @@ function IconTile({ cat }: Readonly<{ cat: string }>) {
       style={{ background: cfg.grad, boxShadow: `0 6px 14px -4px ${cfg.glow}` }}>
       <div className="absolute right-[-8px] top-[-8px] w-7 h-7 rounded-full"
         style={{ background: 'rgba(255,255,255,0.20)' }} />
-      <div className="relative z-10 text-white"><CatIcon size={22} /></div>
+      <div className="relative z-10 text-white" aria-hidden="true"><CatIcon size={22} /></div>
     </div>
   );
 }
@@ -81,6 +86,8 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
   const diff = DIFF_GRAD[challenge.difficulty] ?? DIFF_GRAD.EASY;
   const cat  = CATEGORY_GRAD[challenge.category] ?? CATEGORY_GRAD.GAMING;
   const CatIcon = cat.Icon;
+  const [expanded, setExpanded] = useState(false);
+  const hasLongDescription = challenge.description.length > 120;
 
   const actionButton = () => {
     if (!user) return (
@@ -122,22 +129,30 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap gap-1.5 mb-1">
             <VibrantChip grad={diff.grad} glow={diff.glow}>{diff.icon}{diff.label}</VibrantChip>
-            <VibrantChip grad={cat.grad} glow={cat.glow}><CatIcon size={11} /> {cat.label}</VibrantChip>
+            <VibrantChip grad={cat.grad} glow={cat.glow}><CatIcon size={11} aria-hidden="true" /> {cat.label}</VibrantChip>
           </div>
-          {status === 'COMPLETED'   && <CheckCircle size={16} className="text-emerald-400 float-right mt-0.5" />}
-          {status === 'IN_PROGRESS' && <Clock size={16} className="text-sky-400 float-right mt-0.5" />}
+          {status === 'COMPLETED'   && <CheckCircle size={16} aria-hidden="true" className="text-emerald-400 float-right mt-0.5" />}
+          {status === 'IN_PROGRESS' && <Clock size={16} aria-hidden="true" className="text-sky-400 float-right mt-0.5" />}
         </div>
       </div>
 
       <div className="flex-1">
         <h3 className="font-bold text-sm leading-snug" style={{ color: 'var(--q-text)' }}>{challenge.title}</h3>
-        <p className="mt-1 text-xs line-clamp-2" style={{ color: 'var(--q-text2)' }}>{challenge.description}</p>
+        <div className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--q-text2)' }}>
+          <p className={expanded ? '' : 'line-clamp-2'}>{challenge.description}</p>
+          {hasLongDescription && (
+            <button type="button" onClick={() => setExpanded(e => !e)}
+              className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-500 hover:text-sky-400 transition-colors">
+              {expanded ? 'Voir moins' : 'Voir plus'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3 text-xs">
         <span className="font-bold" style={{ color: '#FB923C' }}>🪙 {challenge.coinReward}</span>
         <span className="font-bold" style={{ color: '#A78BFA' }}>
-          <Zap size={11} className="inline mr-0.5" />{challenge.xpReward} XP
+          <Zap size={11} aria-hidden="true" className="inline mr-0.5" />{challenge.xpReward} XP
         </span>
         {challenge._count && (
           <span className="ml-auto font-semibold" style={{ color: 'var(--q-text3)' }}>
@@ -185,6 +200,7 @@ const ChallengePage: React.FC = () => {
   usePageTitle('Défis');
   const { user, setUser } = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,8 +217,8 @@ const ChallengePage: React.FC = () => {
 
   const token = localStorage.getItem('token');
 
-  useEffect(() => { fetchChallenges(); }, [selectedCategory, selectedDifficulty]);
-  useEffect(() => { if (user) fetchUserChallenges(); }, [user]);
+  useEffect(() => { fetchChallenges(); }, [search, selectedCategory, selectedDifficulty, location.key]);
+  useEffect(() => { if (user) fetchUserChallenges(); }, [user, location.key]);
   useEffect(() => { setVisibleAvailable(9); }, [search, selectedCategory, selectedDifficulty]);
 
   const fetchChallenges = async () => {
@@ -211,8 +227,17 @@ const ChallengePage: React.FC = () => {
       const params = new URLSearchParams();
       if (selectedCategory) params.set('category', selectedCategory);
       if (selectedDifficulty) params.set('difficulty', selectedDifficulty);
-      const res = await fetch(`/api/challenges?${params}`);
-      setChallenges(await res.json());
+      if (search) params.set('search', search);
+      const res = await fetch(`/api/challenges?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data: Challenge[] = await res.json();
+      data.sort((a, b) => {
+        const catCmp = a.category.localeCompare(b.category, 'fr');
+        if (catCmp !== 0) return catCmp;
+        return a.title.localeCompare(b.title, 'fr', { numeric: true, sensitivity: 'base' });
+      });
+      setChallenges(data);
     } catch { setChallenges([]); }
     finally { setLoading(false); }
   };
@@ -273,11 +298,12 @@ const ChallengePage: React.FC = () => {
     <div className="py-4 md:p-6 min-h-screen" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
 
       {/* Notification toast */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">{notification?.msg}</div>
       {notification && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-50 px-5 py-3 rounded-2xl shadow-lg text-white font-bold text-sm ${notification.type === 'success' ? '' : 'bg-red-500'}`}
+        <output className={`fixed top-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-50 px-5 py-3 rounded-2xl shadow-lg text-white font-bold text-sm ${notification.type === 'success' ? '' : 'bg-red-500'}`}
           style={notification.type === 'success' ? { background: 'linear-gradient(135deg,#34D399,#38BDF8)', boxShadow: '0 8px 24px rgba(52,211,153,0.45)' } : {}}>
           {notification.msg}
-        </div>
+        </output>
       )}
 
       {/* Header */}
@@ -286,17 +312,18 @@ const ChallengePage: React.FC = () => {
           <BackButton />
           <div>
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
-              <Trophy className="text-yellow-400" size={26} />
+              <Trophy className="text-yellow-400" size={26} aria-hidden="true" />
               Défis
             </h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--q-text2)' }}>Relève des défis et gagne des récompenses</p>
           </div>
         </div>
         <button onClick={() => navigate('/challenges/create')}
+          aria-label="Créer un défi"
           className="q-press flex items-center gap-1.5 px-4 py-2 rounded-full text-white font-bold text-sm transition-opacity hover:opacity-85"
           style={{ background: 'var(--q-vibrant-lavender)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
-          <Plus size={15} />
-          <span className="hidden sm:inline">Créer</span>
+          <Plus size={15} aria-hidden="true" />
+          <span className="hidden sm:inline" aria-hidden="true">Créer</span>
         </button>
       </div>
 
@@ -309,11 +336,11 @@ const ChallengePage: React.FC = () => {
           </span>
           <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
             style={{ background: 'var(--q-vibrant-hero)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
-            <Zap size={11} /> Niv. {user.level ?? 1}
+            <Zap size={11} aria-hidden="true" /> Niv. {user.level ?? 1}
           </span>
           <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
             style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', boxShadow: '0 4px 12px rgba(52,211,153,0.40)' }}>
-            <CheckCircle size={11} /> {userChallenges.filter(c => c.status === 'COMPLETED').length} complétés
+            <CheckCircle size={11} aria-hidden="true" /> {userChallenges.filter(c => c.status === 'COMPLETED').length} complétés
           </span>
         </div>
       )}
@@ -321,23 +348,26 @@ const ChallengePage: React.FC = () => {
       {/* Recherche + filtres */}
       <div className="rounded-2xl p-3 mb-3 flex gap-2" style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
         <div className="flex items-center gap-2 flex-1">
-          <Search size={15} style={{ color: 'var(--q-text3)' }} className="flex-shrink-0" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un défi..."
+          <Search size={15} aria-hidden="true" style={{ color: 'var(--q-text3)' }} className="flex-shrink-0" />
+          <label htmlFor="challenge-search" className="sr-only">Rechercher un défi</label>
+          <input id="challenge-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un défi..."
             className="flex-1 bg-transparent text-sm outline-none min-w-0"
             style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }} />
           {search && (
-            <button onClick={() => setSearch('')} style={{ color: 'var(--q-text3)' }}>
-              <X size={14} />
+            <button onClick={() => setSearch('')} aria-label="Effacer la recherche" style={{ color: 'var(--q-text3)' }}>
+              <X size={14} aria-hidden="true" />
             </button>
           )}
         </div>
         <button onClick={() => setFiltersOpen(o => !o)}
+          aria-expanded={filtersOpen}
+          aria-label={`Filtres${activeFilters > 0 ? ` (${activeFilters} actif${activeFilters > 1 ? 's' : ''})` : ''}`}
           className="q-press flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold flex-shrink-0 transition-opacity"
           style={filtersOpen || activeFilters > 0
             ? { background: 'var(--q-accent)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }
             : { background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
-          <SlidersHorizontal size={13} />
-          Filtres{activeFilters > 0 && ` (${activeFilters})`}
+          <SlidersHorizontal size={13} aria-hidden="true" />
+          <span aria-hidden="true">Filtres{activeFilters > 0 && ` (${activeFilters})`}</span>
         </button>
       </div>
 
@@ -346,9 +376,9 @@ const ChallengePage: React.FC = () => {
         <div className="rounded-2xl p-4 mb-3 space-y-4" style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
           <div>
             <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: 'var(--q-text3)' }}>Catégorie</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
               <button onClick={() => setSelectedCategory('')}
-                className="q-press px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
+                className="q-press flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
                 style={selectedCategory
                   ? { background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }
                   : { background: 'var(--q-accent)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
@@ -372,9 +402,9 @@ const ChallengePage: React.FC = () => {
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: 'var(--q-text3)' }}>Difficulté</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
               <button onClick={() => setSelectedDifficulty('')}
-                className="q-press px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
+                className="q-press flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
                 style={selectedDifficulty
                   ? { background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }
                   : { background: 'var(--q-accent)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
@@ -399,8 +429,9 @@ const ChallengePage: React.FC = () => {
       )}
 
       {loading && (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" role="status" aria-label="Chargement des défis">
           <div className="w-10 h-10 rounded-full border-2 border-transparent animate-spin"
+            aria-hidden="true"
             style={{ borderTopColor: 'var(--q-accent)', borderRightColor: 'var(--q-accent)' }} />
         </div>
       )}

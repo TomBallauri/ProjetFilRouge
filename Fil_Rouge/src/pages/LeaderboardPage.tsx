@@ -74,7 +74,7 @@ const LeaderboardPage: React.FC = () => {
           <BackButton />
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Trophy size={26} style={{ color: '#FACC15', flexShrink: 0 }} />
+              <Trophy size={26} aria-hidden="true" style={{ color: '#FACC15', flexShrink: 0 }} />
               <div style={{ fontSize: 26, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.3, lineHeight: 1.1, fontWeight: 700 }}>
                 Classement
               </div>
@@ -87,7 +87,7 @@ const LeaderboardPage: React.FC = () => {
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4,
               background: 'rgba(250,204,21,0.15)', color: '#FDE047',
               padding: '6px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-              <Flame size={12} color="#FDE047" /> #{myRank}
+              <Flame size={12} color="#FDE047" aria-hidden="true" /> #{myRank}
             </div>
           )}
         </div>
@@ -101,6 +101,7 @@ const LeaderboardPage: React.FC = () => {
             const on = scope === id;
             return (
               <button key={id} onClick={() => setScope(id)}
+                aria-pressed={on}
                 style={{ flex: 1, height: 36, border: 'none', borderRadius: 14,
                   background: on ? 'var(--q-accent)' : 'transparent',
                   color: on ? '#fff' : 'var(--q-text2)',
@@ -149,6 +150,7 @@ const LeaderboardPage: React.FC = () => {
                   const medal = MEDAL_COLORS[rank];
                   return (
                     <button key={u.id} onClick={() => goToProfile(u)}
+                      aria-label={`Voir le profil de ${u.username} — rang ${rank}`}
                       style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                         position: 'relative', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       <div style={{ position: 'relative', display: 'inline-flex' }}>
@@ -200,6 +202,7 @@ const LeaderboardPage: React.FC = () => {
                   const isMe = user?.id === u.id;
                   return (
                     <button key={u.id} onClick={() => goToProfile(u)}
+                      aria-label={`Voir le profil de ${u.username}${isMe ? ' (vous)' : ''}`}
                       style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
                         borderBottom: i < rest.length - 1 ? `1px solid var(--q-line)` : 'none',
                         background: isMe ? 'var(--q-accent-soft)' : 'transparent',
@@ -219,7 +222,7 @@ const LeaderboardPage: React.FC = () => {
                           {u.xp.toLocaleString('fr')} XP
                         </div>
                       </div>
-                      <div style={{ color: 'var(--q-text3)', flexShrink: 0 }}>
+                      <div style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true">
                         <ChevronRight size={14} />
                       </div>
                     </button>
@@ -241,7 +244,7 @@ const LeaderboardPage: React.FC = () => {
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(255,255,255,0.95)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Users size={18} color="#EC4899" />
+                  <Users size={18} color="#EC4899" aria-hidden="true" />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontFamily: 'var(--q-display)', color: '#fff', letterSpacing: -0.2 }}>
@@ -251,7 +254,7 @@ const LeaderboardPage: React.FC = () => {
                     {sorted.length} joueurs · {sorted.reduce((s, u) => s + u.xp, 0).toLocaleString('fr')} XP collectifs
                   </div>
                 </div>
-                <div style={{ color: '#fff' }}><ChevronRight size={16} /></div>
+                <div style={{ color: '#fff' }} aria-hidden="true"><ChevronRight size={16} /></div>
               </div>
               <div style={{ position: 'relative', marginTop: 12 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.92)',

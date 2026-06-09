@@ -6,7 +6,7 @@ import multer from 'multer';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
-import Anthropic from '@anthropic-ai/sdk';
+import Groq from 'groq-sdk';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -547,10 +547,21 @@ app.get('/api/users/:id/topics', async (req, res) => {
 app.get('/api/challenges', async (req, res) => {
   try {
     const { category, difficulty, search } = req.query;
-    const where = {};
-    if (category) where.category = category;
-    if (difficulty) where.difficulty = difficulty;
-    if (search) where.title = { contains: search };
+    const authHeader = req.headers.authorization;
+    let currentUserId = null;
+    if (authHeader) {
+      try { currentUserId = jwt.verify(authHeader.split(' ')[1], SECRET).userId; } catch {}
+    }
+    const visibilityClause = currentUserId
+      ? { OR: [{ isPublic: true }, { createdBy: currentUserId }] }
+      : { isPublic: true };
+
+    const where = {
+      ...visibilityClause,
+      ...(category   ? { category }                       : {}),
+      ...(difficulty ? { difficulty }                     : {}),
+      ...(search     ? { title: { contains: search } }   : {}),
+    };
     const challenges = await prisma.challenge.findMany({
       where,
       include: {
@@ -587,14 +598,14 @@ app.post('/api/challenges', async (req, res) => {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, SECRET);
-    const { title, description, difficulty, category } = req.body;
+    const { title, description, difficulty, category, isPublic } = req.body;
     if (!title || !description || !difficulty || !category) {
       return res.status(400).json({ error: "Champs requis manquants" });
     }
     const rewards = { EASY: { coins: 50, xp: 100 }, MEDIUM: { coins: 150, xp: 300 }, HARD: { coins: 350, xp: 700 }, EXPERT: { coins: 700, xp: 1500 } };
     const r = rewards[difficulty] || rewards.EASY;
     const challenge = await prisma.challenge.create({
-      data: { title, description, difficulty, category, coinReward: r.coins, xpReward: r.xp, createdBy: decoded.userId }
+      data: { title, description, difficulty, category, coinReward: r.coins, xpReward: r.xp, createdBy: decoded.userId, isPublic: isPublic !== false }
     });
     res.json(challenge);
   } catch (error) {
@@ -671,30 +682,37 @@ app.get('/api/users/me/challenges', async (req, res) => {
 
 // ─── IA GÉNÉRATION DE DÉFIS ──────────────────────────────────────────────────
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+console.log('[AI] Groq API key:', process.env.GROQ_API_KEY ? `chargée (${process.env.GROQ_API_KEY.slice(0, 8)}...)` : '❌ MANQUANTE');
 
-const AI_SYSTEM_PROMPT = `Tu es un assistant de création de défis personnalisés pour une application de gamification. Aide l'utilisateur à créer des défis motivants et adaptés à ses objectifs.
+const AI_SYSTEM_PROMPT = `Tu es un assistant de création de défis personnalisés pour une application de gamification.
 
 PROCESSUS:
 1. L'utilisateur décrit son objectif
-2. Tu peux poser des questions de suivi (maximum 3 au total, une à la fois) pour mieux cerner ses besoins
-3. Quand tu as assez d'informations, génère exactement 5 défis personnalisés
+2. Tu peux poser au maximum 2 questions de suivi, une à la fois, pour mieux cerner ses besoins
+3. Dès que tu as assez d'informations, génère les défis
 
-RÈGLES:
-- Questions courtes et précises, une seule à la fois
-- Après 2-3 questions maximum, génère les défis
-- Si l'objectif est clair d'emblée, génère directement les défis sans poser de questions
-- Les défis doivent être concrets, actionnables et progressifs
+NOMBRE DE DÉFIS À GÉNÉRER:
+- Programme sur N jours → N défis (un par jour, nommés "Jour 1:", "Jour 2:", etc.)
+- Sans durée précisée → 5 défis variés
 
-CATÉGORIES disponibles: GAMING, SPORT, CUISINE, FITNESS, CREATIVITY, KNOWLEDGE, SOCIAL
-DIFFICULTÉS disponibles: EASY, MEDIUM, HARD, EXPERT
+CATÉGORIES (utilise EXACTEMENT ces valeurs):
+GAMING, SPORT, CUISINE, FITNESS, CREATIVITY, KNOWLEDGE, SOCIAL, NATURE, MUSIC, WELLNESS, DIY, OTHERS
 
-RÉPONDS UNIQUEMENT en JSON valide, rien d'autre:
-Pour une question: {"type":"question","content":"Ta question ici"}
-Pour les défis: {"type":"challenges","challenges":[{"title":"...","description":"...","category":"...","difficulty":"..."}]}
+Correspondances:
+- Jardinage, plein air, écologie, randonnée → NATURE
+- Instrument, chant, composition → MUSIC
+- Méditation, bien-être, sommeil, stress → WELLNESS
+- Bricolage, artisanat, forgeron, menuiserie, couture → DIY
+- Tout le reste → OTHERS
 
-Génère exactement 5 défis variés (idéalement 2 EASY, 2 MEDIUM, 1 HARD ou EXPERT).
-Titres: max 80 caractères. Descriptions: max 500 caractères, claires et actionnables.`;
+DIFFICULTÉS (utilise EXACTEMENT ces valeurs): EASY, MEDIUM, HARD, EXPERT
+
+Titres: max 80 caractères. Descriptions: max 500 caractères, claires et actionnables.
+
+FORMAT DE RÉPONSE — JSON uniquement, rien d'autre:
+Question: {"type":"question","content":"Ta question"}
+Défis: {"type":"challenges","challenges":[{"title":"...","description":"...","category":"...","difficulty":"..."}]}`;
 
 app.post('/api/challenges/ai-generate', async (req, res) => {
   const authHeader = req.headers.authorization;
@@ -705,15 +723,18 @@ app.post('/api/challenges/ai-generate', async (req, res) => {
   }
   try {
     jwt.verify(authHeader.split(' ')[1], SECRET);
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: AI_SYSTEM_PROMPT,
-      messages: history,
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 2048,
+      messages: [
+        { role: 'system', content: AI_SYSTEM_PROMPT },
+        ...history.map(m => ({ role: m.role, content: m.content })),
+      ],
     });
-    const text = response.content[0].text.trim();
+    const text = response.choices[0].message.content.trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     try {
-      const parsed = JSON.parse(text);
+      const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
       res.json(parsed);
     } catch {
       res.json({ type: 'question', content: text });
@@ -736,10 +757,25 @@ app.post('/api/challenges/bulk-save', async (req, res) => {
     const decoded = jwt.verify(token, SECRET);
     const rewards = { EASY: { coins: 50, xp: 100 }, MEDIUM: { coins: 150, xp: 300 }, HARD: { coins: 350, xp: 700 }, EXPERT: { coins: 700, xp: 1500 } };
     const created = await Promise.all(
-      challenges.map(({ title, description, difficulty, category }) => {
+      challenges.map(({ title, description, difficulty, category, isPublic }) => {
         const r = rewards[difficulty] || rewards.EASY;
         return prisma.challenge.create({
-          data: { title, description, difficulty, category, coinReward: r.coins, xpReward: r.xp, createdBy: decoded.userId }
+          data: {
+            title,
+            description,
+            difficulty,
+            category,
+            coinReward: r.coins,
+            xpReward: r.xp,
+            createdBy: decoded.userId,
+            isPublic: isPublic !== false,
+            participants: {
+              create: {
+                userId: decoded.userId,
+                status: 'IN_PROGRESS'
+              }
+            }
+          }
         });
       })
     );

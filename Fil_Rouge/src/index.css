@@ -17,7 +17,7 @@
   /* Text */
   --q-text:  #2A2A33;
   --q-text2: #6B6B78;
-  --q-text3: #B0B0BC;
+  --q-text3: #717181; /* was #B0B0BC — darkened for WCAG AA 4.5:1 on white */
   --q-line:  rgba(42,42,51,0.10);
 
   /* Accent */

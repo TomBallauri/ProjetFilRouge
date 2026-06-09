@@ -123,8 +123,8 @@ const ForumChat: React.FC = () => {
     >
       <div className={`p-4 border-b ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
         <div className="flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-            <ArrowLeft size={20} />
+          <button onClick={() => navigate(-1)} aria-label="Retour" className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+            <ArrowLeft size={20} aria-hidden="true" />
           </button>
           <div className="flex-1 flex justify-center">
             <div className="flex items-center space-x-3">
@@ -138,8 +138,11 @@ const ForumChat: React.FC = () => {
               <button
                 className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
                 onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Options du topic"
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
               >
-                <MoreVertical size={20} />
+                <MoreVertical size={20} aria-hidden="true" />
               </button>
               {menuOpen && (
                 <div className={`absolute right-0 mt-2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-10`}>
@@ -161,13 +164,15 @@ const ForumChat: React.FC = () => {
           )}
         </div>
         {editOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+          <dialog open aria-labelledby="edit-topic-title" className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 m-0 p-0 border-0 max-w-none max-h-none w-full h-full">
             <form
               onSubmit={handleEditSubmit}
               className={`bg-white dark:bg-gray-800 p-6 rounded shadow-lg flex flex-col space-y-4`}
             >
-              <h3 className="font-bold text-lg mb-2">Modifier le topic</h3>
+              <h3 id="edit-topic-title" className="font-bold text-lg mb-2">Modifier le topic</h3>
+              <label htmlFor="edit-title" className="sr-only">Titre</label>
               <input
+                id="edit-title"
                 type="text"
                 value={editTitle}
                 onChange={e => setEditTitle(e.target.value)}
@@ -175,14 +180,18 @@ const ForumChat: React.FC = () => {
                 required
                 placeholder="Titre"
               />
+              <label htmlFor="edit-content" className="sr-only">Contenu</label>
               <textarea
+                id="edit-content"
                 value={editContent}
                 onChange={e => setEditContent(e.target.value)}
                 className="border px-3 py-2 rounded"
                 placeholder="Contenu"
                 rows={3}
               />
+              <label htmlFor="edit-tags" className="sr-only">Tags (séparés par des virgules)</label>
               <input
+                id="edit-tags"
                 type="text"
                 value={editTags}
                 onChange={e => setEditTags(e.target.value)}
@@ -205,7 +214,7 @@ const ForumChat: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
+          </dialog>
         )}
       </div>
 
@@ -263,35 +272,40 @@ const ForumChat: React.FC = () => {
 
       <div className={`p-3 border-t ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
         <div className="flex items-center space-x-2">
+          <label htmlFor="chat-message" className="sr-only">Écrire un message</label>
           <input
+            id="chat-message"
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="Write a message..."
+            placeholder="Écrire un message..."
             className={`flex-1 py-2 px-4 rounded-full ${darkMode ? 'bg-gray-700 focus:bg-gray-600' : 'bg-gray-100 focus:bg-white'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
           />
-          <button 
+          <button
             onClick={handleSendMessage}
             disabled={!newMessage.trim()}
-            className={`p-2 rounded-full ${newMessage.trim() 
-              ? 'bg-blue-500 text-white hover:bg-blue-600' 
+            aria-label="Envoyer le message"
+            className={`p-2 rounded-full ${newMessage.trim()
+              ? 'bg-blue-500 text-white hover:bg-blue-600'
               : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
             }`}
           >
-            <Send size={20} />
+            <Send size={20} aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      {isEditMode ? (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+      {isEditMode && (
+        <dialog open aria-labelledby="edit-topic-title-url" className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 m-0 p-0 border-0 max-w-none max-h-none w-full h-full">
           <form
             onSubmit={handleEditSubmit}
             className={`bg-white dark:bg-gray-800 p-6 rounded shadow-lg flex flex-col space-y-4`}
           >
-            <h3 className="font-bold text-lg mb-2">Modifier le topic</h3>
+            <h3 id="edit-topic-title-url" className="font-bold text-lg mb-2">Modifier le topic</h3>
+            <label htmlFor="edit-title-url" className="sr-only">Titre</label>
             <input
+              id="edit-title-url"
               type="text"
               value={editTitle}
               onChange={e => setEditTitle(e.target.value)}
@@ -299,14 +313,18 @@ const ForumChat: React.FC = () => {
               required
               placeholder="Titre"
             />
+            <label htmlFor="edit-content-url" className="sr-only">Contenu</label>
             <textarea
+              id="edit-content-url"
               value={editContent}
               onChange={e => setEditContent(e.target.value)}
               className="border px-3 py-2 rounded"
               placeholder="Contenu"
               rows={3}
             />
+            <label htmlFor="edit-tags-url" className="sr-only">Tags (séparés par des virgules)</label>
             <input
+              id="edit-tags-url"
               type="text"
               value={editTags}
               onChange={e => setEditTags(e.target.value)}
@@ -329,9 +347,7 @@ const ForumChat: React.FC = () => {
               </button>
             </div>
           </form>
-        </div>
-      ) : (
-        <div className="p-4"></div>
+        </dialog>
       )}
     </div>
   );

@@ -226,16 +226,17 @@ const DiscussionsPage: React.FC = () => {
         </h1>
         <button
           onClick={() => setShowForm(!showForm)}
+          aria-expanded={showForm}
           className="flex items-center justify-center w-full md:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >
           {showForm ? (
             <>
-              <X size={16} className="mr-2" />
+              <X size={16} aria-hidden="true" className="mr-2" />
               Annuler
             </>
           ) : (
             <>
-              <Plus size={16} className="mr-2" />
+              <Plus size={16} aria-hidden="true" className="mr-2" />
               Nouvelle discussion
             </>
           )}
@@ -246,8 +247,9 @@ const DiscussionsPage: React.FC = () => {
           <h2 className="text-lg md:text-xl font-semibold mb-4">Créer une nouvelle discussion</h2>
           <form onSubmit={handleCreateDiscussion} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Titre</label>
+              <label htmlFor="disc-title" className="block text-sm font-medium mb-1">Titre</label>
               <input
+                id="disc-title"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -260,8 +262,9 @@ const DiscussionsPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Contenu</label>
+              <label htmlFor="disc-content" className="block text-sm font-medium mb-1">Contenu</label>
               <textarea
+                id="disc-content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={5}
@@ -275,8 +278,9 @@ const DiscussionsPage: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Jeu</label>
+                <label htmlFor="disc-game" className="block text-sm font-medium mb-1">Jeu</label>
                 <select
+                  id="disc-game"
                   value={selectedGame}
                   onChange={(e) => setSelectedGame(e.target.value)}
                   className={`w-full px-3 py-2 rounded-md ${
@@ -295,8 +299,9 @@ const DiscussionsPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Catégorie</label>
+                <label htmlFor="disc-category" className="block text-sm font-medium mb-1">Catégorie</label>
                 <select
+                  id="disc-category"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className={`w-full px-3 py-2 rounded-md ${
@@ -331,16 +336,19 @@ const DiscussionsPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => removeTag(tag.id)}
+                      aria-label={`Retirer le tag ${tag.name}`}
                       className="ml-1 hover:text-red-500 focus:outline-none"
                     >
-                      <X size={14} />
+                      <X size={14} aria-hidden="true" />
                     </button>
                   </span>
                 ))}
               </div>
               <div className="flex gap-2">
                 <div className="relative flex-grow">
+                  <label htmlFor="disc-new-tag" className="sr-only">Ajouter un nouveau tag</label>
                   <input
+                    id="disc-new-tag"
                     type="text"
                     value={newTagName}
                     onChange={(e) => setNewTagName(e.target.value)}
@@ -354,9 +362,10 @@ const DiscussionsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={addNewTag}
+                    aria-label="Ajouter le tag"
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-500"
                   >
-                    <Plus size={16} />
+                    <Plus size={16} aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -377,7 +386,7 @@ const DiscussionsPage: React.FC = () => {
                 type="submit"
                 className="w-full md:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center"
               >
-                <Send size={16} className="mr-2" />
+                <Send size={16} aria-hidden="true" className="mr-2" />
                 Publier
               </button>
             </div>
@@ -387,30 +396,33 @@ const DiscussionsPage: React.FC = () => {
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center mb-4">
           <div className="relative flex-grow mb-4 md:mb-0 md:mr-4">
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Search size={16} aria-hidden="true" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <label htmlFor="disc-search-old" className="sr-only">Rechercher des discussions</label>
             <input
+              id="disc-search-old"
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Rechercher des discussions..."
               className={`w-full pl-10 pr-3 py-2 rounded-md ${
-                darkMode 
-                  ? 'bg-gray-700 border-gray-600 text-white' 
+                darkMode
+                  ? 'bg-gray-700 border-gray-600 text-white'
                   : 'bg-white border-gray-300 text-gray-900'
               } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
+            aria-expanded={showFilters}
             className={`flex items-center px-3 py-2 rounded ${
-              showFilters 
-                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
-                : darkMode 
-                  ? 'bg-gray-700 text-white hover:bg-gray-600' 
+              showFilters
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                : darkMode
+                  ? 'bg-gray-700 text-white hover:bg-gray-600'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             } transition-colors`}
           >
-            <Filter size={16} className="mr-2" />
+            <Filter size={16} aria-hidden="true" className="mr-2" />
             Filtres
           </button>
         </div>
@@ -418,13 +430,14 @@ const DiscussionsPage: React.FC = () => {
           <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'} mb-4`}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Jeu</label>
+                <label htmlFor="filter-game" className="block text-sm font-medium mb-1">Jeu</label>
                 <select
+                  id="filter-game"
                   value={filterGame}
                   onChange={(e) => setFilterGame(e.target.value)}
                   className={`w-full px-3 py-2 rounded-md ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white' 
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white'
                       : 'bg-white border-gray-300 text-gray-900'
                   } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
@@ -435,13 +448,14 @@ const DiscussionsPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Catégorie</label>
+                <label htmlFor="filter-category" className="block text-sm font-medium mb-1">Catégorie</label>
                 <select
+                  id="filter-category"
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
                   className={`w-full px-3 py-2 rounded-md ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white' 
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white'
                       : 'bg-white border-gray-300 text-gray-900'
                   } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
@@ -452,13 +466,14 @@ const DiscussionsPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Trier par</label>
+                <label htmlFor="filter-sort" className="block text-sm font-medium mb-1">Trier par</label>
                 <select
+                  id="filter-sort"
                   value={sortBy}
                   onChange={e => setSortBy(e.target.value as 'date' | 'likes')}
                   className={`w-full px-3 py-2 rounded-md ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white' 
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white'
                       : 'bg-white border-gray-300 text-gray-900'
                   } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
@@ -472,17 +487,13 @@ const DiscussionsPage: React.FC = () => {
       </div>
       <div className="space-y-4">
         {filteredDiscussions.map((discussion) => (
-          <div
+          <button
             key={discussion.id}
             onClick={() => navigate(`/tchat/${discussion.id}`)}
-            role="button"
-            tabIndex={0}
+            aria-label={`Ouvrir la discussion : ${discussion.title}`}
             className={`w-full text-left ${
               darkMode ? 'bg-gray-800' : 'bg-white'
             } rounded-lg shadow p-6 transition-all duration-200 hover:shadow-lg cursor-pointer`}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') navigate(`/tchat/${discussion.id}`);
-            }}
           >
             <div className="flex items-start space-x-4">
               <img
@@ -544,6 +555,7 @@ const DiscussionsPage: React.FC = () => {
                     >
                       <ThumbsUp
                         size={16}
+                        aria-hidden="true"
                         className="mr-1"
                         fill={likedDiscussions.includes(Number(discussion.id)) ? "#2563eb" : "none"}
                         stroke={likedDiscussions.includes(Number(discussion.id)) ? "#2563eb" : "currentColor"}
@@ -552,17 +564,17 @@ const DiscussionsPage: React.FC = () => {
                     </button>
                   </div>
                   <div className="flex items-center">
-                    <MessageSquare size={16} className="mr-1" />
+                    <MessageSquare size={16} aria-hidden="true" className="mr-1" />
                     <span>{discussion.replies}</span>
                   </div>
                   <div className="flex items-center">
-                    <Clock size={16} className="ml(1" />
+                    <Clock size={16} aria-hidden="true" className="ml(1" />
                     <span>{formatDate(discussion.createdAt)}</span>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>

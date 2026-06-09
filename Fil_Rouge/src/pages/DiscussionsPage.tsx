@@ -152,21 +152,21 @@ const DiscussionsPage: React.FC = () => {
           <BackButton />
           <div>
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
-              <MessageSquare size={26} style={{ color: 'var(--q-accent)' }} />
+              <MessageSquare size={26} aria-hidden="true" style={{ color: 'var(--q-accent)' }} />
               Discussions
             </h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--q-text2)' }}>Échange avec la communauté</p>
           </div>
         </div>
         {user ? (
-          <button onClick={() => setShowForm(f => !f)} className="q-press flex items-center gap-1.5 px-4 py-2 rounded-full text-white font-bold text-sm"
+          <button onClick={() => setShowForm(f => !f)} aria-expanded={showForm} className="q-press flex items-center gap-1.5 px-4 py-2 rounded-full text-white font-bold text-sm"
             style={{ background: showForm ? 'var(--q-text3)' : 'var(--q-accent)', boxShadow: showForm ? 'none' : '0 4px 12px rgba(167,139,250,0.40)', transition: 'all 0.15s' }}>
-            {showForm ? <><X size={15} /> Annuler</> : <><Plus size={15} /><span className="hidden sm:inline">Nouvelle discussion</span></>}
+            {showForm ? <><X size={15} aria-hidden="true" /> Annuler</> : <><Plus size={15} aria-hidden="true" /><span className="hidden sm:inline">Nouvelle discussion</span></>}
           </button>
         ) : (
           <Link to="/login" className="q-press flex items-center gap-1.5 px-4 py-2 rounded-full text-white font-bold text-sm"
             style={{ background: 'var(--q-accent)', boxShadow: '0 4px 12px rgba(167,139,250,0.40)' }}>
-            <Plus size={15} /> Participer
+            <Plus size={15} aria-hidden="true" /> Participer
           </Link>
         )}
       </div>
@@ -211,16 +211,17 @@ const DiscussionsPage: React.FC = () => {
                 {selectedTags.map(tag => (
                   <span key={tag.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
                     {tag.name}
-                    <button type="button" onClick={() => setSelectedTags(prev => prev.filter(t => t.id !== tag.id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-accent)', padding: 0, display: 'flex' }}><X size={12} /></button>
+                    <button type="button" aria-label={`Retirer le tag ${tag.name}`} onClick={() => setSelectedTags(prev => prev.filter(t => t.id !== tag.id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-accent)', padding: 0, display: 'flex' }}><X size={12} aria-hidden="true" /></button>
                   </span>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input type="text" value={newTagName} onChange={e => setNewTagName(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                <label htmlFor="new-tag-input" className="sr-only">Ajouter un tag</label>
+                <input id="new-tag-input" type="text" value={newTagName} onChange={e => setNewTagName(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
                   placeholder="Ajouter un tag..." style={{ ...inputStyle, flex: 1 }}
                   onFocus={e => e.currentTarget.style.borderColor = 'var(--q-accent)'}
                   onBlur={e => e.currentTarget.style.borderColor = 'var(--q-line)'} />
-                <button type="button" onClick={addTag} className="q-press" style={{ padding: '10px 14px', borderRadius: 12, background: 'var(--q-accent-soft)', color: 'var(--q-accent)', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>+</button>
+                <button type="button" onClick={addTag} aria-label="Ajouter le tag" className="q-press" style={{ padding: '10px 14px', borderRadius: 12, background: 'var(--q-accent-soft)', color: 'var(--q-accent)', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>+</button>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
@@ -228,7 +229,7 @@ const DiscussionsPage: React.FC = () => {
                 Annuler
               </button>
               <button type="submit" disabled={submitting} className="q-press" style={{ padding: '10px 20px', borderRadius: 12, background: 'var(--q-accent)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting ? 0.7 : 1 }}>
-                <Send size={14} /> Publier
+                <Send size={14} aria-hidden="true" /> Publier
               </button>
             </div>
           </form>
@@ -239,13 +240,14 @@ const DiscussionsPage: React.FC = () => {
       <div className="rounded-2xl p-3 mb-3" style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Search size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
-            <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Rechercher une discussion..."
+            <Search size={15} aria-hidden="true" style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+            <label htmlFor="discussions-search" className="sr-only">Rechercher une discussion</label>
+            <input id="discussions-search" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Rechercher une discussion..."
               style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'var(--q-text)', fontFamily: 'var(--q-font)' }} />
-            {searchTerm && <button onClick={() => setSearchTerm('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', display: 'flex' }}><X size={14} /></button>}
+            {searchTerm && <button onClick={() => setSearchTerm('')} aria-label="Effacer la recherche" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', display: 'flex' }}><X size={14} aria-hidden="true" /></button>}
           </div>
-          <button onClick={() => setShowFilters(f => !f)} className="q-press" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: showFilters ? 'var(--q-accent)' : 'var(--q-bg)', color: showFilters ? '#fff' : 'var(--q-text2)', transition: 'all 0.15s' }}>
-            <SlidersHorizontal size={13} /> Filtres
+          <button onClick={() => setShowFilters(f => !f)} aria-expanded={showFilters} className="q-press" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: showFilters ? 'var(--q-accent)' : 'var(--q-bg)', color: showFilters ? '#fff' : 'var(--q-text2)', transition: 'all 0.15s' }}>
+            <SlidersHorizontal size={13} aria-hidden="true" /> Filtres
           </button>
         </div>
         {showFilters && (
@@ -288,6 +290,7 @@ const DiscussionsPage: React.FC = () => {
             const titleCosmetic = getEquipped(discussion.author.cosmetics ?? [], 'TITLE');
             return (
               <button key={discussion.id} onClick={() => navigate(user ? `/tchat/${discussion.id}` : '/login')}
+                aria-label={`Ouvrir la discussion : ${discussion.title}`}
                 style={{ width: '100%', textAlign: 'left', background: 'var(--q-chrome)', border: '1px solid var(--q-line)', borderRadius: 20, padding: '14px 16px', cursor: 'pointer', boxShadow: 'var(--q-shadow)', transition: 'opacity 0.15s' }}
                 className="q-press">
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -296,7 +299,7 @@ const DiscussionsPage: React.FC = () => {
                     {/* Title row */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
                       <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--q-text)', lineHeight: 1.3 }}>{discussion.title}</h3>
-                      <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0, marginTop: 2 }} />
+                      <ChevronRight size={16} aria-hidden="true" style={{ color: 'var(--q-text3)', flexShrink: 0, marginTop: 2 }} />
                     </div>
                     {/* Author + date */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -322,22 +325,24 @@ const DiscussionsPage: React.FC = () => {
                       )}
                       {discussion.tags.map((tag, idx) => (
                         <span key={tag.id || tag.name + idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: `${tag.color}22`, color: tag.color }}>
-                          <TagIcon size={10} />{tag.name}
+                          <TagIcon size={10} aria-hidden="true" />{tag.name}
                         </span>
                       ))}
                     </div>
                     {/* Stats */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                       <button onClick={e => { e.stopPropagation(); handleLike(Number(discussion.id)); }} disabled={liked}
+                        aria-label={`${liked ? 'Vous avez aimé cette discussion' : 'Liker cette discussion'} — ${discussion.likes} like${discussion.likes !== 1 ? 's' : ''}`}
+                        aria-pressed={liked}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: liked ? 'not-allowed' : 'pointer', padding: 0, fontSize: 12, fontWeight: 600, color: liked ? 'var(--q-accent)' : 'var(--q-text3)', transition: 'color 0.15s' }}>
-                        <ThumbsUp size={14} fill={liked ? 'var(--q-accent)' : 'none'} stroke={liked ? 'var(--q-accent)' : 'currentColor'} />
-                        {discussion.likes}
+                        <ThumbsUp size={14} aria-hidden="true" fill={liked ? 'var(--q-accent)' : 'none'} stroke={liked ? 'var(--q-accent)' : 'currentColor'} />
+                        <span aria-hidden="true">{discussion.likes}</span>
                       </button>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--q-text3)', fontWeight: 600 }}>
-                        <MessageSquare size={14} />{discussion.replies}
+                        <MessageSquare size={14} aria-hidden="true" /><span aria-label={`${discussion.replies} réponse${discussion.replies !== 1 ? 's' : ''}`}>{discussion.replies}</span>
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--q-text3)', fontWeight: 600 }}>
-                        <Clock size={14} />{formatDate(discussion.createdAt)}
+                        <Clock size={14} aria-hidden="true" />{formatDate(discussion.createdAt)}
                       </span>
                     </div>
                   </div>
