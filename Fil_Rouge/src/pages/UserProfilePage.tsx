@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Award, ChevronLeft } from 'lucide-react';
+import { CheckCircle, Award, ChevronLeft, UserPlus, UserCheck, UserX, Clock } from 'lucide-react';
 import { BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 import UserAvatar from '../components/UserAvatar';
+import { useStore } from '../lib/store';
+import PageLoader from '../components/PageLoader';
 
 const BACKEND_URL = 'http://localhost:3001';
 
@@ -40,12 +42,20 @@ const BADGE_GRADS: Record<string, { grad: string; glow: string }> = {
   LEGENDARY: { grad: 'linear-gradient(135deg,#FACC15,#FB923C 50%,#EC4899)', glow: 'rgba(251,146,60,0.55)' },
 };
 
+type FriendStatus = { status: 'NONE' | 'PENDING' | 'ACCEPTED'; requestId?: number; isSender?: boolean };
+
 const UserProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user: currentUser } = useStore();
   const [profile, setProfile] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [friendStatus, setFriendStatus] = useState<FriendStatus>({ status: 'NONE' });
+  const [friendLoading, setFriendLoading] = useState(false);
+
+  const token = localStorage.getItem('token');
+  const isOwnProfile = currentUser?.id === Number(id);
 
   useEffect(() => {
     if (!id) return;
@@ -53,15 +63,39 @@ const UserProfilePage: React.FC = () => {
       .then(r => { if (r.status === 404) { setNotFound(true); return null; } return r.json(); })
       .then(data => { if (data) setProfile(data); })
       .finally(() => setLoading(false));
+
+    if (token && !isOwnProfile) {
+      fetch(`/api/friends/status/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json())
+        .then(data => setFriendStatus(data))
+        .catch(() => {});
+    }
   }, [id]);
 
-  if (loading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
-      <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid transparent',
-        borderTopColor: 'var(--q-accent)', borderRightColor: 'var(--q-accent)',
-        animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  );
+  const sendFriendRequest = async () => {
+    setFriendLoading(true);
+    await fetch(`/api/friends/request/${id}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    setFriendStatus({ status: 'PENDING', isSender: true });
+    setFriendLoading(false);
+  };
+
+  const acceptFriendRequest = async () => {
+    if (!friendStatus.requestId) return;
+    setFriendLoading(true);
+    await fetch(`/api/friends/accept/${friendStatus.requestId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    setFriendStatus({ status: 'ACCEPTED', requestId: friendStatus.requestId });
+    setFriendLoading(false);
+  };
+
+  const removeFriend = async () => {
+    if (!friendStatus.requestId) return;
+    setFriendLoading(true);
+    await fetch(`/api/friends/${friendStatus.requestId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    setFriendStatus({ status: 'NONE' });
+    setFriendLoading(false);
+  };
+
+  if (loading) return <PageLoader />;
 
   if (notFound || !profile) return (
     <div style={{ textAlign: 'center', padding: '60px 24px', fontFamily: 'var(--q-font)' }}>
@@ -144,6 +178,58 @@ const UserProfilePage: React.FC = () => {
               Niveau {profile.level}
             </span>
           </div>
+
+          {/* ── Bouton ami ── */}
+          {!isOwnProfile && currentUser && (
+            <div style={{ marginTop: 14 }}>
+              {friendStatus.status === 'NONE' && (
+                <button onClick={sendFriendRequest} disabled={friendLoading}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px',
+                    borderRadius: 999, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                    background: 'linear-gradient(135deg,#A78BFA,#3B82F6)', color: '#fff',
+                    boxShadow: '0 6px 18px -4px rgba(167,139,250,0.55)',
+                    opacity: friendLoading ? 0.6 : 1 }}>
+                  <UserPlus size={16} /> Ajouter en ami
+                </button>
+              )}
+              {friendStatus.status === 'PENDING' && friendStatus.isSender && (
+                <button onClick={removeFriend} disabled={friendLoading}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px',
+                    borderRadius: 999, border: '2px solid rgba(148,163,184,0.4)', cursor: 'pointer',
+                    fontWeight: 700, fontSize: 13, background: 'transparent',
+                    color: 'var(--q-text2)', opacity: friendLoading ? 0.6 : 1 }}>
+                  <Clock size={16} /> Demande envoyée
+                </button>
+              )}
+              {friendStatus.status === 'PENDING' && !friendStatus.isSender && (
+                <div style={{ display: 'inline-flex', gap: 8 }}>
+                  <button onClick={acceptFriendRequest} disabled={friendLoading}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px',
+                      borderRadius: 999, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                      background: 'linear-gradient(135deg,#34D399,#3B82F6)', color: '#fff',
+                      opacity: friendLoading ? 0.6 : 1 }}>
+                    <UserCheck size={16} /> Accepter
+                  </button>
+                  <button onClick={removeFriend} disabled={friendLoading}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px',
+                      borderRadius: 999, border: '2px solid rgba(239,68,68,0.4)', cursor: 'pointer',
+                      fontWeight: 700, fontSize: 13, background: 'transparent',
+                      color: '#EF4444', opacity: friendLoading ? 0.6 : 1 }}>
+                    <UserX size={16} /> Refuser
+                  </button>
+                </div>
+              )}
+              {friendStatus.status === 'ACCEPTED' && (
+                <button onClick={removeFriend} disabled={friendLoading}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px',
+                    borderRadius: 999, border: '2px solid rgba(52,211,153,0.5)', cursor: 'pointer',
+                    fontWeight: 700, fontSize: 13, background: 'rgba(52,211,153,0.1)',
+                    color: '#34D399', opacity: friendLoading ? 0.6 : 1 }}>
+                  <UserCheck size={16} /> Amis · Retirer
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

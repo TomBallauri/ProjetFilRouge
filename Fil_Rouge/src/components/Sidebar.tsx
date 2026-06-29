@@ -1,17 +1,57 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useStore } from '../lib/store';
-import { Home, Trophy, MessageSquare, Lock, ShoppingBag, Star, User } from 'lucide-react';
+import { Home, Trophy, MessageSquare, Lock, ShoppingBag, Star, User, Users, Sparkles, Zap, Flame } from 'lucide-react';
 
 type TabItem = { path: string; label: string; icon: React.ReactNode; end: boolean };
+
+type DailyChallenge = {
+  id: number;
+  title: string;
+  difficulty: string;
+  category: string;
+  coinReward: number;
+  xpReward: number;
+  dailyBonusMultiplier: number;
+};
+
+const DIFF_COLORS: Record<string, string> = {
+  EASY:   '#34D399',
+  MEDIUM: '#FACC15',
+  HARD:   '#FB923C',
+  EXPERT: '#EC4899',
+};
+
+const DIFF_LABELS: Record<string, string> = {
+  EASY:   'Facile',
+  MEDIUM: 'Moyen',
+  HARD:   'Difficile',
+  EXPERT: 'Expert',
+};
+
+const DIFF_ICONS: Record<string, typeof Zap> = {
+  EASY:   Star,
+  MEDIUM: Zap,
+  HARD:   Flame,
+  EXPERT: Flame,
+};
 
 const Sidebar: React.FC = () => {
   const { darkMode, user } = useStore();
   const location = useLocation();
+  const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
+
+  useEffect(() => {
+    fetch('/api/challenges/daily-suggestion')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setDailyChallenge(data))
+      .catch(() => {});
+  }, []);
 
   const menuItems: TabItem[] = [
     { path: '/',            label: 'Accueil',     icon: <Home size={20} />,         end: true },
     { path: '/challenges',  label: 'Défis',       icon: <Trophy size={20} />,       end: false },
+    { path: '/friends',     label: 'Amis',        icon: <Users size={20} />,        end: false },
     { path: '/leaderboard', label: 'Classement',  icon: <Star size={20} />,         end: false },
     { path: '/shop',        label: 'Boutique',    icon: <ShoppingBag size={20} />,  end: false },
     { path: '/discussions', label: 'Discussions', icon: <MessageSquare size={20} />,end: false },
@@ -19,11 +59,11 @@ const Sidebar: React.FC = () => {
   ];
 
   const mobileTabs: TabItem[] = [
-    { path: '/',            label: 'Accueil',    icon: <Home size={20} />,        end: true },
-    { path: '/challenges',  label: 'Défis',      icon: <Trophy size={20} />,      end: false },
-    { path: '/discussions', label: 'Communauté', icon: <MessageSquare size={20} />, end: false },
-    { path: '/leaderboard', label: 'Classement', icon: <Star size={20} />,        end: false },
-    { path: '/profile',     label: 'Profil',     icon: <User size={20} />,        end: false },
+    { path: '/',           label: 'Accueil', icon: <Home size={20} />,        end: true },
+    { path: '/challenges', label: 'Défis',   icon: <Trophy size={20} />,      end: false },
+    { path: '/friends',    label: 'Amis',    icon: <Users size={20} />,       end: false },
+    { path: '/shop',       label: 'Boutique',icon: <ShoppingBag size={20} />, end: false },
+    { path: '/profile',    label: 'Profil',  icon: <User size={20} />,        end: false },
   ];
 
   const isActiveTab = (path: string, end: boolean): boolean =>
@@ -34,11 +74,13 @@ const Sidebar: React.FC = () => {
     ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900';
 
+  const DiffIcon = DIFF_ICONS[dailyChallenge?.difficulty ?? ''] ?? Star;
+
   return (
     <>
       {/* ── Desktop sidebar — always visible on md+ ── */}
       <aside className={`hidden md:flex flex-col w-56 shrink-0 border-r ${sidebarBg} sticky top-0 h-screen`}>
-        <nav aria-label="Navigation principale" className="flex flex-col gap-1 pt-4 pb-6 flex-1">
+        <nav aria-label="Navigation principale" className="flex flex-col gap-1 pt-4 pb-4 flex-1">
           {menuItems.map(item => (
             <NavLink
               key={item.path}
@@ -54,6 +96,62 @@ const Sidebar: React.FC = () => {
             </NavLink>
           ))}
         </nav>
+
+        {/* ── Suggestion du jour ── */}
+        {dailyChallenge && (
+          <div className="px-2 pb-4">
+            <div className={`h-px mb-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+            <div className="flex items-center gap-1.5 px-2 mb-2">
+              <Sparkles size={13} className="text-amber-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                Suggestion du jour
+              </span>
+            </div>
+            <NavLink to={`/challenges?daily=${dailyChallenge.id}`} tabIndex={0}>
+              <div
+                className="rounded-xl p-3 cursor-pointer transition-all"
+                style={{
+                  background: darkMode
+                    ? 'linear-gradient(135deg, rgba(251,191,36,0.12), rgba(245,158,11,0.06))'
+                    : 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
+                  border: `1px solid ${darkMode ? 'rgba(251,191,36,0.2)' : 'rgba(251,191,36,0.4)'}`,
+                }}
+              >
+                <p
+                  className="text-sm font-semibold mb-2 leading-snug"
+                  style={{
+                    color: darkMode ? '#F9FAFB' : '#1F2937',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {dailyChallenge.title}
+                </p>
+
+                <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                  <span
+                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold text-white"
+                    style={{ background: DIFF_COLORS[dailyChallenge.difficulty] ?? '#94A3B8' }}
+                  >
+                    <DiffIcon size={10} aria-hidden="true" />
+                    {DIFF_LABELS[dailyChallenge.difficulty] ?? dailyChallenge.difficulty}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-bold bg-amber-400 text-white">
+                    <Sparkles size={10} aria-hidden="true" />
+                    +50%
+                  </span>
+                </div>
+
+                <p className="text-xs" style={{ color: darkMode ? '#9CA3AF' : '#6B7280' }}>
+                  {dailyChallenge.coinReward} coins · {dailyChallenge.xpReward} XP
+                  <span className="block text-amber-500 font-medium">si réalisé aujourd'hui</span>
+                </p>
+              </div>
+            </NavLink>
+          </div>
+        )}
       </aside>
 
       {/* ── Mobile bottom tab bar — hidden on md+ ── */}

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Sparkles, Check, Trophy, ChevronDown, ChevronUp, Globe, Lock } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Check, Trophy, ChevronDown, ChevronUp, Globe, Lock, CircleDollarSign, Zap } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -277,7 +277,7 @@ const AIChallengeGenerator: React.FC = () => {
                 {isExpanded && (
                   <div className={`px-3 pb-3 border-t ${darkMode ? 'border-gray-700/60' : 'border-gray-200/60'}`}>
                     <p className={`text-xs leading-relaxed pt-2 mb-1.5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{ch.description}</p>
-                    <p className={`text-xs font-semibold ${diff.text}`}>🪙 {diff.coins} coins · ⚡ {diff.xp} XP</p>
+                    <p className={`text-xs font-semibold flex items-center gap-1 ${diff.text}`}><CircleDollarSign size={11} aria-hidden="true" /> {diff.coins} coins <span style={{ opacity: 0.5 }}>·</span> <Zap size={11} aria-hidden="true" /> {diff.xp} XP</p>
                   </div>
                 )}
               </div>

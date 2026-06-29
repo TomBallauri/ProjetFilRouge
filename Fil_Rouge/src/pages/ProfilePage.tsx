@@ -12,7 +12,7 @@ type OwnedCosmetic = EquippedCosmetic & { id: number; purchasedAt: string };
 const TYPE_LABELS: Record<string, string> = {
   AVATAR_FRAME: "Cadre d'avatar", BANNER: 'Bannière', BADGE: 'Badge', TITLE: 'Titre',
 };
-const TYPE_ICONS: Record<string, React.FC<{ size?: number; color?: string }>> = {
+const TYPE_ICONS: Record<string, React.FC<{ size?: number | string; color?: string; style?: React.CSSProperties; [k: string]: unknown }>> = {
   AVATAR_FRAME: Frame, BANNER: PanelTop, BADGE: Award, TITLE: Tag,
 };
 const RARITY_LABELS: Record<string, string> = {
@@ -96,14 +96,22 @@ const EditProfile: React.FC = () => {
 
   const [recentActivities, setRecentActivities] = useState<{ id: number; title: string; content: string; date: string }[]>([]);
   const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
+  const [challengesTotal, setChallengesTotal] = useState(0);
+  const [totalCompleted, setTotalCompleted] = useState(0);
+  const [totalInProgress, setTotalInProgress] = useState(0);
+  const [challengesHasMore, setChallengesHasMore] = useState(false);
+  const [loadingMoreChallenges, setLoadingMoreChallenges] = useState(false);
   const [ownedCosmetics, setOwnedCosmetics] = useState<OwnedCosmetic[]>([]);
   const [cosmeticLoading, setCosmeticLoading] = useState<number | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
 
   const [openSection, setOpenSection] = useState<string | null>('appearance');
-  const [notifToggles, setNotifToggles] = useState({ defis: true, messages: true, updates: false });
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const [language, setLanguage] = useState('Français');
+  const [notifToggles, setNotifToggles] = useState<{ defis: boolean; messages: boolean; updates: boolean }>(() => {
+    try { return JSON.parse(localStorage.getItem('notifToggles') ?? 'null') ?? { defis: true, messages: true, updates: false }; }
+    catch { return { defis: true, messages: true, updates: false }; }
+  });
+  const [reduceMotion, setReduceMotion] = useState(() => localStorage.getItem('reduceMotion') === 'true');
+  const [language, setLanguage] = useState(() => localStorage.getItem('appLanguage') ?? 'Français');
   const [openProfileSections, setOpenProfileSections] = useState({
     cosmetics: true, info: true, defis: true, topics: true,
   });
@@ -111,16 +119,55 @@ const EditProfile: React.FC = () => {
     setOpenProfileSections(prev => ({ ...prev, [key]: !prev[key] }));
 
   useEffect(() => {
+    localStorage.setItem('reduceMotion', String(reduceMotion));
+    if (reduceMotion) document.documentElement.classList.add('reduce-motion');
+    else document.documentElement.classList.remove('reduce-motion');
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    localStorage.setItem('notifToggles', JSON.stringify(notifToggles));
+  }, [notifToggles]);
+
+  useEffect(() => {
+    localStorage.setItem('appLanguage', language);
+    const langMap: Record<string, string> = { 'Français': 'fr', 'English': 'en', 'Español': 'es', 'Deutsch': 'de' };
+    document.documentElement.lang = langMap[language] ?? 'fr';
+  }, [language]);
+
+  useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token || !user) { setPageLoading(false); return; }
     setPageLoading(true);
     Promise.all([
-      fetch('/api/users/me/challenges', { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.json()).then(data => setUserChallenges(Array.isArray(data) ? data : [])).catch(() => {}),
+      fetch('/api/users/me/challenges?limit=10', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(data => {
+          const list = Array.isArray(data) ? data : (data.challenges ?? []);
+          setUserChallenges(list);
+          if (!Array.isArray(data)) {
+            setChallengesTotal(data.total ?? list.length);
+            setTotalCompleted(data.totalCompleted ?? 0);
+            setTotalInProgress(data.totalInProgress ?? 0);
+            setChallengesHasMore(data.hasMore ?? false);
+          }
+        }).catch(() => {}),
       fetch('/api/users/me/cosmetics', { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json()).then(data => setOwnedCosmetics(Array.isArray(data) ? data : [])).catch(() => {}),
     ]).finally(() => setPageLoading(false));
   }, [user]);
+
+  const loadMoreChallenges = async () => {
+    const token = localStorage.getItem('token');
+    if (!token || loadingMoreChallenges) return;
+    setLoadingMoreChallenges(true);
+    try {
+      const res = await fetch(`/api/users/me/challenges?limit=10&skip=${userChallenges.length}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const more: UserChallenge[] = Array.isArray(data) ? data : (data.challenges ?? []);
+      setUserChallenges(prev => [...prev, ...more]);
+      if (!Array.isArray(data)) setChallengesHasMore(data.hasMore ?? false);
+    } catch { /* silent */ }
+    finally { setLoadingMoreChallenges(false); }
+  };
 
   const refreshCosmetics = async (token: string) => {
     const data = await fetch('/api/users/me/cosmetics', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
@@ -483,7 +530,11 @@ const EditProfile: React.FC = () => {
           ) : (
             <div style={{ fontSize: 24, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.3, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               {user.username}
-              {equippedBadge && <Award size={16} style={{ color: '#FACC15', flexShrink: 0 }} title={equippedBadge.cosmetic.name} />}
+              {equippedBadge && (
+                <span title={equippedBadge.cosmetic.name} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  <Award size={16} style={{ color: '#FACC15', flexShrink: 0 }} />
+                </span>
+              )}
             </div>
           )}
           {equippedTitle && (
@@ -524,8 +575,8 @@ const EditProfile: React.FC = () => {
       {/* ── Stats 3-col (mockup style) ── */}
       <div style={{ padding: '20px 18px 0', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
         {[
-          { value: userChallenges.filter(c => c.status === 'COMPLETED').length, label: 'Défis réussis' },
-          { value: userChallenges.filter(c => c.status === 'IN_PROGRESS').length, label: 'En cours' },
+          { value: totalCompleted || userChallenges.filter(c => c.status === 'COMPLETED').length, label: 'Défis réussis' },
+          { value: totalInProgress || userChallenges.filter(c => c.status === 'IN_PROGRESS').length, label: 'En cours' },
           { value: fmt(user.xp ?? 0), label: 'XP totale' },
         ].map(({ value, label }) => (
           <div key={label} style={{ borderRadius: 22, padding: 14, textAlign: 'center', background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
@@ -534,6 +585,57 @@ const EditProfile: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* ── Streak card ── */}
+      {(() => {
+        const streak = (user as any).currentStreak ?? 0;
+        const longest = (user as any).longestStreak ?? 0;
+        const multiplier = Math.min(3, Math.round((1 + Math.floor(streak / 7) * 0.05) * 100) / 100);
+        return (
+          <div style={{ padding: '12px 18px 0' }}>
+            <div style={{ borderRadius: 22, padding: 16, background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: 18, flexShrink: 0, fontSize: 26,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: streak > 0 ? 'linear-gradient(135deg,#FB923C,#FACC15)' : 'rgba(148,163,184,0.15)',
+                boxShadow: streak > 0 ? '0 6px 18px -4px rgba(251,146,60,0.55)' : 'none',
+              }}>
+                {streak > 0
+                  ? <Flame size={26} color="#ffffff" aria-hidden="true" />
+                  : <Moon size={26} color="#94A3B8" aria-hidden="true" />}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 20, fontWeight: 800, fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
+                    {streak} jour{streak !== 1 ? 's' : ''}
+                  </span>
+                  {multiplier > 1 && (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+                      background: 'linear-gradient(135deg,#FB923C,#FACC15)', color: '#fff' }}>
+                      ×{multiplier}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 2 }}>
+                  Record : {longest} jour{longest !== 1 ? 's' : ''} · ×{multiplier}
+                </div>
+                {/* Barre de progression vers le prochain +0.05× (cycle 7 jours) */}
+                <div style={{ marginTop: 8, height: 6, borderRadius: 999, background: 'rgba(251,146,60,0.2)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 999,
+                    width: `${((streak % 7) / 7) * 100}%`,
+                    background: 'linear-gradient(90deg,#FB923C,#FACC15)',
+                    transition: 'width 0.7s ease',
+                  }} />
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--q-text3)', marginTop: 4 }}>
+                  {7 - (streak % 7)} jour{7 - (streak % 7) !== 1 ? 's' : ''} avant +0.05×
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── XP bar ── */}
       <div style={{ padding: '12px 18px 0' }}>
@@ -753,7 +855,7 @@ const EditProfile: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Mes défis</p>
                   <p className="text-xs" style={{ color: 'var(--q-text2)' }}>
-                    {userChallenges.filter(c => c.status === 'COMPLETED').length} complétés · {userChallenges.filter(c => c.status === 'IN_PROGRESS').length} en cours
+                    {totalCompleted || userChallenges.filter(c => c.status === 'COMPLETED').length} complétés · {totalInProgress || userChallenges.filter(c => c.status === 'IN_PROGRESS').length} en cours
                   </p>
                 </div>
                 <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
@@ -796,7 +898,7 @@ const EditProfile: React.FC = () => {
           </div>
           <div style={{ padding: '0 18px' }}>
             <div style={{ borderRadius: 22, overflow: 'hidden', background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-              {userChallenges.slice(0, 5).map((uc, i, a) => {
+              {userChallenges.map((uc, i, a) => {
                 const ok = uc.status === 'COMPLETED';
                 return (
                   <div key={uc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: i < a.length - 1 ? '1px solid var(--q-line)' : 'none' }}>
@@ -813,6 +915,15 @@ const EditProfile: React.FC = () => {
                   </div>
                 );
               })}
+              {challengesHasMore && (
+                <div style={{ padding: '12px 16px', borderTop: '1px solid var(--q-line)' }}>
+                  <button onClick={loadMoreChallenges} disabled={loadingMoreChallenges}
+                    className="q-press w-full py-2.5 rounded-xl text-sm font-bold disabled:opacity-60"
+                    style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {loadingMoreChallenges ? 'Chargement…' : `Charger plus (${challengesTotal - userChallenges.length} restants)`}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </>

@@ -4,6 +4,10 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import App from './App.tsx';
 import './index.css';
 
+if (localStorage.getItem('reduceMotion') === 'true') {
+  document.documentElement.classList.add('reduce-motion');
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Router>

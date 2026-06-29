@@ -23,12 +23,31 @@ model User {
   coins      Int      @default(0)
   xp         Int      @default(0)
   level      Int      @default(1)
+  currentStreak  Int       @default(0)
+  longestStreak  Int       @default(0)
+  lastStreakDate DateTime?
   topics     Topic[]
   posts      Post[]          @relation("UserPosts")
   likes      Like[]
   challenges        UserChallenge[]
   cosmetics         UserCosmetic[]
   createdChallenges Challenge[]
+  sentFriendRequests     Friend[] @relation("SentRequests")
+  receivedFriendRequests Friend[] @relation("ReceivedRequests")
+  createdGroups          ChallengeGroup[]       @relation("GroupCreator")
+  groupMemberships       ChallengeGroupMember[]
+  groupMessages          GroupMessage[]
+}
+
+model Friend {
+  id         Int      @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  status     String   @default("PENDING") // PENDING, ACCEPTED
+  createdAt  DateTime @default(now())
+  sender     User     @relation("SentRequests",    fields: [senderId],   references: [id])
+  receiver   User     @relation("ReceivedRequests", fields: [receiverId], references: [id])
+  @@unique([senderId, receiverId])
 }
 
 model Topic {
@@ -79,6 +98,7 @@ model Challenge {
   createdAt    DateTime        @default(now())
   creator      User?           @relation(fields: [createdBy], references: [id])
   participants UserChallenge[]
+  groups       ChallengeGroup[]
 }
 
 model UserChallenge {
@@ -113,4 +133,38 @@ model UserCosmetic {
   user        User     @relation(fields: [userId], references: [id])
   cosmetic    Cosmetic @relation(fields: [cosmeticId], references: [id])
   @@unique([userId, cosmeticId])
+}
+
+model ChallengeGroup {
+  id          Int                   @id @default(autoincrement())
+  challengeId Int
+  createdBy   Int
+  createdAt   DateTime              @default(now())
+  challenge   Challenge             @relation(fields: [challengeId], references: [id])
+  creator     User                  @relation("GroupCreator", fields: [createdBy], references: [id])
+  members     ChallengeGroupMember[]
+  messages    GroupMessage[]
+}
+
+model ChallengeGroupMember {
+  id          Int            @id @default(autoincrement())
+  groupId     Int
+  userId      Int
+  status      String         @default("INVITED") // INVITED, JOINED, COMPLETED
+  invitedAt   DateTime       @default(now())
+  joinedAt    DateTime?
+  completedAt DateTime?
+  group       ChallengeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [userId], references: [id])
+  @@unique([groupId, userId])
+}
+
+model GroupMessage {
+  id        Int            @id @default(autoincrement())
+  groupId   Int
+  userId    Int
+  content   String
+  createdAt DateTime       @default(now())
+  group     ChallengeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id])
 }

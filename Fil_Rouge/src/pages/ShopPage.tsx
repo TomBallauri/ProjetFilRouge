@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, CheckCircle, SlidersHorizontal, Search, X } from 'lucide-react';
+import { ShoppingBag, CheckCircle, SlidersHorizontal, Search, X, CircleDollarSign } from 'lucide-react';
 import BackButton from '../components/BackButton';
 import { usePageTitle } from '../hooks/usePageTitle';
+import PageLoader from '../components/PageLoader';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES } from '../lib/cosmetics';
 
 type Cosmetic = {
@@ -120,7 +121,7 @@ type CosmeticCardProps = {
   alreadyOwned: boolean;
   canAfford: boolean;
   isLoading: boolean;
-  user: ReturnType<typeof useStore>['user'];
+  user: any;
   darkMode: boolean;
   card: string;
   onBuy: (c: Cosmetic) => void;
@@ -164,7 +165,7 @@ const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, can
       </div>
       <div className={`pt-2 border-t ${darkMode ? 'border-gray-700' : 'border-gray-100'} mt-auto`}>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="font-bold text-sm text-yellow-600 dark:text-yellow-400">🪙 {cosmetic.price}</span>
+          <span className="font-bold text-sm text-yellow-600 dark:text-yellow-400 flex items-center gap-1"><CircleDollarSign size={13} aria-hidden="true" /> {cosmetic.price}</span>
           {!canAfford && !alreadyOwned && user && (
             <span className="text-xs text-red-400">-{cosmetic.price - (user.coins ?? 0)}</span>
           )}
@@ -257,8 +258,13 @@ const ShopPage: React.FC = () => {
           </div>
         </div>
         {user && (
-          <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm ${darkMode ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-50 text-yellow-700'}`}>
-            🪙 {(user.coins ?? 0).toLocaleString()}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6,
+            background: 'linear-gradient(135deg,#FACC15,#FB923C)',
+            color: '#fff',
+            padding: '7px 12px', borderRadius: 999, fontWeight: 700, fontSize: 13,
+            fontVariantNumeric: 'tabular-nums',
+            boxShadow: '0 4px 12px rgba(251,146,60,0.40)' }}>
+            <CircleDollarSign size={14} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString('fr')}
           </div>
         )}
       </div>
@@ -329,9 +335,7 @@ const ShopPage: React.FC = () => {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500" />
-        </div>
+        <PageLoader message="Chargement de la boutique..." />
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <ShoppingBag size={44} className="mx-auto mb-3 opacity-30" aria-hidden="true" />

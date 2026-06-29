@@ -14,5 +14,6 @@ export interface User {
   tournamentsWon?: number;
   discussionsStarted?: number;
   reputation?: number;
+  currentStreak?: number;
   recentActivities?: { content: string; date: string }[];
 }

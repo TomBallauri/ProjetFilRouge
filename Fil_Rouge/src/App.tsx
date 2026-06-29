@@ -16,6 +16,7 @@ import AIChallengeGenerator from './pages/AIChallengeGenerator';
 import ShopPage from './pages/ShopPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import UserProfilePage from './pages/UserProfilePage';
+import FriendsPage from './pages/FriendsPage';
 import { useStore } from './lib/store';
 
 function App() {
@@ -65,6 +66,7 @@ function App() {
           <Route path="shop" element={<ShopPage />} />
           <Route path="leaderboard" element={<LeaderboardPage />} />
           <Route path="user/:id" element={<UserProfilePage />} />
+          <Route path="friends" element={<FriendsPage />} />
         </Route>
       </Routes>
     </div>

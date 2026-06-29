@@ -6,6 +6,25 @@ import BackButton from '../components/BackButton';
 
 type AuthMode = 'login' | 'register';
 
+/* ── Bubble configs (module-level — no re-creation on render) ── */
+const BUBBLES: Array<{
+  size: number; rgb: [number, number, number]; alpha: number;
+  dur: number; del: number; rev?: boolean; pos: React.CSSProperties;
+}> = [
+  { size: 90,  rgb: [124, 58,  237], alpha: 0.18, dur: 9,  del: 0,   pos: { top: '7%',    left: '5%' } },
+  { size: 58,  rgb: [56,  189, 248], alpha: 0.22, dur: 11, del: 1.3, pos: { top: '10%',   right: '9%' } },
+  { size: 44,  rgb: [236, 72,  153], alpha: 0.2,  dur: 7,  del: 2.6, pos: { top: '29%',   right: '4%' } },
+  { size: 115, rgb: [167, 139, 250], alpha: 0.14, dur: 14, del: 0.7, pos: { top: '42%',   left: '2%' } },
+  { size: 62,  rgb: [52,  211, 153], alpha: 0.2,  dur: 8,  del: 3.2, pos: { top: '54%',   right: '7%' } },
+  { size: 78,  rgb: [251, 146, 60],  alpha: 0.19, dur: 10, del: 1.9, rev: true, pos: { bottom: '17%', left: '7%' } },
+  { size: 50,  rgb: [250, 204, 21],  alpha: 0.24, dur: 9,  del: 2.1, rev: true, pos: { bottom: '24%', right: '5%' } },
+  { size: 100, rgb: [236, 72,  153], alpha: 0.13, dur: 12, del: 0.5, rev: true, pos: { bottom: '7%',  left: '38%' } },
+  { size: 40,  rgb: [56,  189, 248], alpha: 0.2,  dur: 8,  del: 4.1, pos: { top: '64%',   left: '20%' } },
+  { size: 70,  rgb: [124, 58,  237], alpha: 0.15, dur: 11, del: 1.6, rev: true, pos: { top: '18%',   left: '24%' } },
+  { size: 35,  rgb: [52,  211, 153], alpha: 0.22, dur: 7,  del: 3.8, pos: { top: '38%',   right: '18%' } },
+  { size: 55,  rgb: [250, 204, 21],  alpha: 0.18, dur: 10, del: 0.9, rev: true, pos: { bottom: '40%', left: '14%' } },
+];
+
 const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
   const navigate = useNavigate();
   const { setUser, darkMode } = useStore();
@@ -83,8 +102,23 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
       minHeight: '100vh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       padding: '24px 16px', fontFamily: '"Quicksand", ui-rounded, system-ui, sans-serif',
-      background: pageBg, position: 'relative',
+      background: pageBg, position: 'relative', overflowX: 'hidden',
     }}>
+
+      {/* Floating colour bubbles */}
+      {BUBBLES.map((b) => {
+        const [r, g, bl] = b.rgb;
+        return (
+          <div key={`${b.size}-${b.del}`} aria-hidden="true" style={{
+            position: 'absolute', width: b.size, height: b.size,
+            borderRadius: '50%', pointerEvents: 'none',
+            background: `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.38) 0%, rgba(${r},${g},${bl},${b.alpha}) 55%, rgba(${r},${g},${bl},${b.alpha * 0.25}) 100%)`,
+            boxShadow: `0 8px 28px rgba(${r},${g},${bl},${b.alpha * 0.7}), inset 0 1px 2px rgba(255,255,255,0.28)`,
+            animation: `${b.rev ? 'auth-bubble-rev' : 'auth-bubble'} ${b.dur}s ease-in-out ${b.del}s infinite`,
+            ...b.pos,
+          }} />
+        );
+      })}
 
       {/* Back button */}
       <div style={{ position: 'absolute', top: 24, left: 20 }}>

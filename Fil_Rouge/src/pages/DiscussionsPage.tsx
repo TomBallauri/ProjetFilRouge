@@ -280,7 +280,7 @@ const DiscussionsPage: React.FC = () => {
       {/* ── Liste des discussions ── */}
       {filteredDiscussions.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 18px', color: 'var(--q-text3)' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
+          <div style={{ marginBottom: 12 }}><MessageSquare size={44} style={{ margin: '0 auto', opacity: 0.3 }} aria-hidden="true" /></div>
           <p style={{ fontSize: 14 }}>{searchTerm ? 'Aucune discussion trouvée.' : 'Soyez le premier à lancer une discussion !'}</p>
         </div>
       ) : (

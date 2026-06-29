@@ -4,11 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   Trophy, ArrowLeft, Sparkles, Globe, Lock, Plus, Trash2, Check,
   Gamepad2, Activity, UtensilsCrossed, Dumbbell, Palette,
-  BookOpen, Users, Leaf, Music, Heart, Wrench, LayoutGrid,
+  BookOpen, Users, Leaf, Music, Heart, Wrench, LayoutGrid, CircleDollarSign, Zap, Rocket,
+  type LucideIcon,
 } from 'lucide-react';
 
 // ── Category meta (icon + gradient + glow) ────────────────────────────────────
-const CAT_META: Record<string, { label: string; grad: string; glow: string; Icon: React.FC<{ size?: number }> }> = {
+const CAT_META: Record<string, { label: string; grad: string; glow: string; Icon: LucideIcon }> = {
   GAMING:     { label: 'Gaming',     grad: 'linear-gradient(135deg,#A78BFA,#EC4899)', glow: 'rgba(167,139,250,0.55)', Icon: Gamepad2 },
   SPORT:      { label: 'Sport',      grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.55)',  Icon: Activity },
   CUISINE:    { label: 'Cuisine',    grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(251,146,60,0.55)',  Icon: UtensilsCrossed },
@@ -142,7 +143,7 @@ function ChallengeCard({
           ))}
         </div>
         <p className={`text-xs mt-1.5 text-center font-semibold ${diff.text}`}>
-          🪙 {diff.coins} coins · ⚡ {diff.xp} XP
+          <span className="flex items-center justify-center gap-1"><CircleDollarSign size={11} aria-hidden="true" /> {diff.coins} coins <span style={{ opacity: 0.5 }}>·</span> <Zap size={11} aria-hidden="true" /> {diff.xp} XP</span>
         </p>
       </div>
     </div>
@@ -258,8 +259,8 @@ const CreateChallenge: React.FC = () => {
           <button type="submit" disabled={loading}
             className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 text-sm active:scale-95">
             {loading ? 'Création...' : isPublic
-              ? `🚀 Publier ${challenges.length > 1 ? `${challenges.length} défis` : 'le défi'}`
-              : `🔒 Créer en privé`}
+              ? <span className="flex items-center justify-center gap-1.5"><Rocket size={15} /> Publier {challenges.length > 1 ? `${challenges.length} défis` : 'le défi'}</span>
+              : <span className="flex items-center justify-center gap-1.5"><Lock size={15} /> Créer en privé</span>}
           </button>
         </form>
       </div>
