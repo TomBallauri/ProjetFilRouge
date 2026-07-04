@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useStore } from '../lib/store';
 import { useNotificationPolling } from '../hooks/useNotificationPolling';
-import { Home, Trophy, MessageSquare, Lock, ShoppingBag, Star, User, Users, Sparkles, Zap, Flame } from 'lucide-react';
+import { Home, Trophy, Lock, ShoppingBag, Star, User, Users, Sparkles, Zap, Flame } from 'lucide-react';
 
 type TabItem = { path: string; label: string; icon: React.ReactNode; end: boolean };
 
@@ -58,7 +58,6 @@ const Sidebar: React.FC = () => {
     { path: '/friends',     label: 'Amis',        icon: <Users size={20} />,        end: false },
     { path: '/leaderboard', label: 'Classement',  icon: <Star size={20} />,         end: false },
     { path: '/shop',        label: 'Boutique',    icon: <ShoppingBag size={20} />,  end: false },
-    { path: '/discussions', label: 'Discussions', icon: <MessageSquare size={20} />,end: false },
     ...(user?.isAdmin ? [{ path: '/admin', label: 'Dashboard', icon: <Lock size={20} />, end: false }] : []),
   ];
 

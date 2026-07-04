@@ -7,91 +7,31 @@ import path from 'path';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import Groq from 'groq-sdk';
+import { StreakService } from './services/StreakService.js';
+import { RewardCalculator, GroupBonus, LevelProgression } from './services/RewardCalculator.js';
 
 const app = express();
 const prisma = new PrismaClient();
+const streakService = new StreakService(prisma);
 
 app.use(cors());
 app.use(express.json());
+// express.json() laisse req.body à `undefined` (au lieu de `{}`) quand la requête
+// n'a pas de Content-Type application/json — ce qui fait planter (500) toute route
+// qui déstructure req.body directement, avant même sa validation métier.
+app.use((req, res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
 app.use('/uploads', express.static('uploads'));
 
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 const DEFAULT_AVATAR = '/default-avatar.svg';
 
-// ─── STREAK ──────────────────────────────────────────────────────────────────
-
-const STREAK_MILESTONES = [
-  { days: 7,   coins: 100,  xp: 200,  label: '7 jours de streak !' },
-  { days: 14,  coins: 250,  xp: 500,  label: '14 jours de streak !' },
-  { days: 30,  coins: 700,  xp: 1500, label: '30 jours de streak !', cosmeticName: 'Cadre Flamme' },
-  { days: 60,  coins: 1500, xp: 3000, label: '60 jours de streak !' },
-  { days: 100, coins: 3000, xp: 5000, label: '100 jours de streak !', cosmeticName: 'Cadre Légendaire' },
-];
-
-function getStreakMultiplier(streak) {
-  return Math.min(3, Math.round((1 + Math.floor(streak / 7) * 0.05) * 100) / 100);
-}
-
-function getMilestoneReward(oldStreak, newStreak) {
-  for (const m of STREAK_MILESTONES) {
-    if (oldStreak < m.days && newStreak >= m.days) return m;
-  }
-  return null;
-}
-
+// Alias conservé le temps de la migration : toute la logique de streak vit
+// désormais dans services/StreakService.js (voir docs/architecture-reutilisable.md).
 async function updateStreak(userId) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) return null;
-
-  const todayUTC = new Date();
-  todayUTC.setUTCHours(0, 0, 0, 0);
-
-  const last = user.lastStreakDate ? new Date(user.lastStreakDate) : null;
-  if (last) last.setUTCHours(0, 0, 0, 0);
-
-  const diffDays = last ? Math.round((todayUTC - last) / 86_400_000) : -1;
-
-  // Already updated today — return without change
-  if (diffDays === 0) return { user, streakUpdated: false, milestone: null };
-
-  const oldStreak = user.currentStreak;
-  const newStreak = diffDays === 1 ? oldStreak + 1 : 1; // continue or reset
-  const longestStreak = Math.max(user.longestStreak, newStreak);
-  const milestone = getMilestoneReward(oldStreak, newStreak);
-
-  const updateData = {
-    currentStreak: newStreak,
-    longestStreak,
-    lastStreakDate: todayUTC,
-    ...(milestone ? { coins: { increment: milestone.coins }, xp: { increment: milestone.xp } } : {}),
-  };
-
-  // Recalculate level if XP added
-  if (milestone) {
-    const newXp = user.xp + milestone.xp;
-    updateData.xp = newXp;
-    updateData.level = Math.floor(newXp / 1000) + 1;
-    delete updateData.xp; // remove duplicate key, re-add properly
-    updateData.xp = newXp;
-    updateData.level = Math.floor(newXp / 1000) + 1;
-  }
-
-  const updated = await prisma.user.update({ where: { id: userId }, data: updateData });
-
-  // Auto-award cosmetic at milestone
-  if (milestone?.cosmeticName) {
-    const cosmetic = await prisma.cosmetic.findFirst({ where: { name: milestone.cosmeticName } });
-    if (cosmetic) {
-      const alreadyOwned = await prisma.userCosmetic.findUnique({
-        where: { userId_cosmeticId: { userId, cosmeticId: cosmetic.id } }
-      });
-      if (!alreadyOwned) {
-        await prisma.userCosmetic.create({ data: { userId, cosmeticId: cosmetic.id } });
-      }
-    }
-  }
-
-  return { user: updated, streakUpdated: true, newStreak, milestone };
+  return streakService.updateForUser(userId);
 }
 
 app.post('/api/auth/register', async (req, res) => {
@@ -125,8 +65,14 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token, user: { ...user, avatar: user.avatar || DEFAULT_AVATAR } });
 });
 
-app.get('/users', async (req, res) => {
-  const users = await prisma.user.findMany();
+app.get('/api/users', isAdmin, async (req, res) => {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true, username: true, email: true, isAdmin: true,
+      coins: true, xp: true, level: true, currentStreak: true, createdAt: true,
+    },
+    orderBy: { id: 'asc' },
+  });
   res.json(users);
 });
 
@@ -170,13 +116,16 @@ app.put('/api/users/me', async (req, res) => {
   }
 });
 
-app.put('/api/users/:id', async (req, res) => {
-  const { id } = req.params;
-  const { username, email, bio, avatar, banner, isAdmin } = req.body;
+app.put('/api/users/:id', isAdmin, async (req, res) => {
+  const targetId = Number(req.params.id);
+  const { username, email, bio, avatar, banner, isAdmin: makeAdmin, coins, xp, level, currentStreak } = req.body;
+  if (targetId === req.user.id && makeAdmin === false) {
+    return res.status(400).json({ error: 'Tu ne peux pas retirer ton propre rôle admin.' });
+  }
   try {
     const updatedUser = await prisma.user.update({
-      where: { id: Number(id) || id },
-      data: { username, email, bio, avatar, banner, isAdmin }
+      where: { id: targetId },
+      data: { username, email, bio, avatar, banner, isAdmin: makeAdmin, coins, xp, level, currentStreak }
     });
     res.json({ user: updatedUser });
   } catch (err) {
@@ -257,232 +206,21 @@ app.get('/api/users/:id', async (req, res) => {
   }
 });
 
-app.get('/api/topics', async (req, res) => {
-  try {
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
-    const skip  = Math.max(0, parseInt(req.query.skip) || 0);
-    const topics = await prisma.topic.findMany({
-      include: {
-        user: { select: { id: true, username: true, avatar: true } },
-        _count: { select: { posts: true } }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip,
-    });
-    res.json(topics);
-  } catch (error) {
-    res.status(500).json({ error: "Erreur lors de la récupération des topics" });
-  }
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
+    cb(null, true);
+  },
 });
 
-app.get('/api/topics/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  try {
-    const topic = await prisma.topic.findUnique({
-      where: { id },
-      include: {
-        user: true,
-        posts: true,
-        _count: { select: { posts: true } }
-      }
-    });
-    if (!topic) return res.status(404).json({ error: "Topic non trouvé" });
-    res.json(topic);
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la récupération du topic" });
-  }
-});
-
-app.post('/api/topics', async (req, res) => {
-  const { title, content, game, category, tags, createdBy } = req.body;
-  if (!title || !content || !game || !category || !createdBy) {
-    return res.status(400).json({ error: "Champs requis manquants" });
-  }
-  try {
-    const tagsString = Array.isArray(tags) ? JSON.stringify(tags) : tags || null;
-    const topic = await prisma.topic.create({
-      data: {
-        title,
-        content,
-        game,
-        category,
-        tags: tagsString,
-        createdBy: Number(createdBy)
-      }
-    });
-    res.json(topic);
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la création du topic" });
-  }
-});
-
-app.put('/api/topics/:id', async (req, res) => {
-  const { id } = req.params;
-  const { title, content, tags, userId } = req.body;
-  try {
-    const topic = await prisma.topic.findUnique({ where: { id: Number(id) } });
-    if (!topic) return res.status(404).json({ error: "Topic non trouvé" });
-    if (topic.createdBy !== Number(userId)) return res.status(403).json({ error: "Non autorisé" });
-    const tagsString = Array.isArray(tags) ? JSON.stringify(tags) : tags || null;
-    const updated = await prisma.topic.update({
-      where: { id: Number(id) },
-      data: { title, content, tags: tagsString }
-    });
-    res.json(updated);
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la modification du topic" });
-  }
-});
-
-app.delete('/api/topics/:id/:userId', async (req, res) => {
-  const { id, userId } = req.params;
-  try {
-    const topic = await prisma.topic.findUnique({ where: { id: Number(id) } });
-    if (!topic) return res.status(404).json({ error: "Topic non trouvé" });
-    if (topic.createdBy !== Number(userId)) return res.status(403).json({ error: "Non autorisé" });
-    await prisma.topic.delete({ where: { id: Number(id) } });
-    res.json({ message: "Topic supprimé" });
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la suppression du topic" });
-  }
-});
-
-app.get('/api/posts', async (req, res) => {
-  try {
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
-    const skip  = Math.max(0, parseInt(req.query.skip) || 0);
-    const posts = await prisma.post.findMany({
-      include: { user: { select: { id: true, username: true, avatar: true } }, topic: { select: { id: true, title: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip,
-    });
-    res.json(posts);
-  } catch (error) {
-    res.status(500).json({ error: "Erreur lors de la récupération des posts" });
-  }
-});
-
-app.get('/api/topics/:topicId/posts', async (req, res) => {
-  const { topicId } = req.params;
-  try {
-    const posts = await prisma.post.findMany({
-      where: { topicId: Number(topicId) },
-      include: { user: { select: { id: true, username: true, avatar: true } } },
-      orderBy: { createdAt: 'asc' },
-      take: 100,
-    });
-    res.json(posts);
-  } catch (error) {
-    res.status(500).json({ error: "Erreur lors de la récupération des posts du topic" });
-  }
-});
-
-app.post('/api/topics/:topicId/posts', async (req, res) => {
-  const { topicId } = req.params;
-  const { content, createdBy } = req.body;
-  if (!content || !createdBy) return res.status(400).json({ error: "Champs requis manquants" });
-  try {
-    const post = await prisma.post.create({
-      data: {
-        content,
-        topicId: Number(topicId),
-        createdBy: Number(createdBy)
-      }
-    });
-    res.json(post);
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la création du post" });
-  }
-});
-
-app.delete('/api/posts/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-    await prisma.post.delete({ where: { id: Number(id) } });
-    res.json({ message: "Post supprimé" });
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la suppression du post" });
-  }
-});
-
-app.post('/api/topics/:id/like', async (req, res) => {
-  const topicId = Number(req.params.id);
-  const userId = Number(req.body.userId);
-  if (!userId) return res.status(400).json({ error: "userId requis" });
-
-  try {
-    const topic = await prisma.topic.findUnique({ where: { id: topicId } });
-    if (!topic) return res.status(404).json({ error: "Topic non trouvé" });
-
-    const existing = await prisma.like.findUnique({
-      where: { userId_topicId: { userId, topicId } }
-    });
-
-    if (existing) {
-      await prisma.like.delete({
-        where: { userId_topicId: { userId, topicId } }
-      });
-      await prisma.topic.update({
-        where: { id: topicId },
-        data: { likes: { decrement: 1 } }
-      });
-      return res.json({ liked: false });
-    } else {
-      await prisma.like.create({
-        data: { userId, topicId }
-      });
-      await prisma.topic.update({
-        where: { id: topicId },
-        data: { likes: { increment: 1 } }
-      });
-      return res.json({ liked: true });
-    }
-  } catch (error) {
-    res.status(500).json({ error: "Erreur lors du like/unlike" });
-  }
-});
-
-app.get('/api/topics/:id/like', async (req, res) => {
-  const topicId = Number(req.params.id);
-  const userId = Number(req.query.userId);
-  if (!userId) return res.status(400).json({ error: "userId requis" });
-
-  try {
-    const like = await prisma.like.findUnique({
-      where: { userId_topicId: { userId, topicId } }
-    });
-    res.json({ liked: !!like });
-  } catch (error) {
-    res.status(500).json({ error: "Erreur lors de la vérification du like" });
-  }
-});
-
-app.get('/api/likes', async (req, res) => {
-  try {
-    const skip = Math.max(0, parseInt(req.query.skip) || 0);
-    const take = Math.min(50, Math.max(1, parseInt(req.query.limit) || 50));
-    const likes = await prisma.like.findMany({
-      include: {
-        user: { select: { id: true, username: true } },
-        topic: { select: { id: true, title: true } }
-      },
-      orderBy: { id: 'desc' },
-      skip,
-      take,
-    });
-    res.json(likes);
-  } catch (error) {
-    res.status(500).json({ error: "Erreur lors de la récupération des likes" });
-  }
-});
-
-const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
-
-app.post('/api/upload', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Aucun fichier' });
-  res.json({ url: `/uploads/${req.file.filename}` });
+app.post('/api/upload', authMiddleware, (req, res) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message || 'Erreur upload' });
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier' });
+    res.json({ url: `/uploads/${req.file.filename}` });
+  });
 });
 
 app.get('/uploads/:filename', (req, res) => {
@@ -503,7 +241,10 @@ app.listen(port, () => {
   ]).catch(() => {});
 });
 
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', isAdmin, async (req, res) => {
+  if (Number(req.params.id) === req.user.id) {
+    return res.status(400).json({ error: 'Tu ne peux pas supprimer ton propre compte.' });
+  }
   try {
     await prisma.user.delete({ where: { id: Number(req.params.id) } });
     res.json({ message: "Utilisateur supprimé" });
@@ -512,188 +253,19 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/topics/:id', async (req, res) => {
-  try {
-    await prisma.topic.delete({ where: { id: Number(req.params.id) } });
-    res.json({ message: "Topic supprimé" });
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la suppression du topic" });
-  }
-});
-
-app.delete('/api/posts/:id', async (req, res) => {
-  try {
-    await prisma.post.delete({ where: { id: Number(req.params.id) } });
-    res.json({ message: "Post supprimé" });
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la suppression du post" });
-  }
-});
-
-app.post('/api/discussions', async (req, res) => {
-  const {
-    title,
-    content,
-    game,
-    category,
-    tags,
-    createdAt,
-    createdBy
-  } = req.body;
-
-  try {
-    if (
-      !title ||
-      !content ||
-      !game ||
-      !category ||
-      !createdBy
-    ) {
-      return res.status(400).json({ error: "Champs obligatoires manquants" });
-    }
-
-    const tagsString = Array.isArray(tags) ? JSON.stringify(tags) : tags || null;
-
-    const topic = await prisma.topic.create({
-      data: {
-        title,
-        content,
-        game,
-        category,
-        tags: tagsString,
-        createdAt: createdAt ? new Date(createdAt) : new Date(),
-        createdBy: Number(createdBy)
-      }
-    });
-
-    res.json(topic);
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la création de la discussion" });
-  }
-});
-
-app.get('/api/discussions', async (req, res) => {
-  try {
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
-    const skip  = Math.max(0, parseInt(req.query.skip) || 0);
-    const topics = await prisma.topic.findMany({
-      include: {
-        user: {
-          select: {
-            id: true, username: true, avatar: true,
-            cosmetics: { where: { equipped: true }, select: { equipped: true, cosmeticId: true, cosmetic: { select: { id: true, name: true, type: true, rarity: true, imageUrl: true } } } }
-          }
-        },
-        _count: { select: { posts: true } }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip,
-    });
-    const topicsWithTags = topics.map(topic => {
-      let tags = [];
-      if (Array.isArray(topic.tags)) {
-        tags = topic.tags;
-      } else if (typeof topic.tags === "string") {
-        try {
-          const parsed = JSON.parse(topic.tags);
-          if (Array.isArray(parsed)) {
-            tags = parsed.map(tag =>
-              typeof tag === "string"
-                ? { name: tag, color: "#3B82F6" }
-                : tag
-            );
-          }
-        } catch {
-          tags = [{ name: topic.tags, color: "#3B82F6" }];
-        }
-      }
-      return { ...topic, tags };
-    });
-    res.json(topicsWithTags);
-  } catch (error) {
-    res.status(500).json({ error: "Erreur lors de la récupération des discussions" });
-  }
-});
-
-app.get('/api/topics/:topicId/messages', async (req, res) => {
-  const { topicId } = req.params;
-  try {
-    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 100));
-    const skip  = Math.max(0, parseInt(req.query.skip) || 0);
-    const messages = await prisma.post.findMany({
-      where: { topicId: Number(topicId) },
-      include: { user: { include: { cosmetics: { where: { equipped: true }, include: { cosmetic: true } } } } },
-      orderBy: { createdAt: 'asc' },
-      take: limit,
-      skip,
-    });
-    res.json(messages);
-  } catch (error) {
-    res.status(500).json({ error: "Erreur lors de la récupération des messages" });
-  }
-});
-
-app.post('/api/topics/:topicId/messages', async (req, res) => {
-  const { topicId } = req.params;
-  const { content, createdBy } = req.body;
-
-  if (!content || !createdBy) {
-    return res.status(400).json({ error: "Missing content or createdBy" });
-  }
-  try {
-    const message = await prisma.post.create({
-      data: {
-        content,
-        topicId: Number(topicId),      
-        createdBy: Number(createdBy),  
-        createdAt: new Date()
-      },
-      include: { user: true }
-    });
-    res.json(message);
-  } catch (error) {
-    res.status(500).json({ error: "Erreur lors de la création du message" });
-  }
-});
-
-function isAdmin(req, res, next) {
+async function isAdmin(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
-  const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, SECRET);
-    prisma.user.findUnique({ where: { id: decoded.userId } }).then(user => {
-      if (!user || !user.isAdmin) {
-        return res.status(403).json({ error: 'Accès refusé' });
-      }
-      req.user = user;
-      next();
-    });
+    const decoded = jwt.verify(authHeader.split(' ')[1], SECRET);
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    if (!user || !user.isAdmin) return res.status(403).json({ error: 'Accès refusé' });
+    req.user = user;
+    next();
   } catch (err) {
     return res.status(401).json({ error: 'Token invalide' });
   }
 }
-
-app.delete('/api/likes/:id', async (req, res) => {
-  try {
-    await prisma.like.delete({ where: { id: Number(req.params.id) } });
-    res.json({ message: "Like supprimé" });
-  } catch (error) {
-    res.status(400).json({ error: "Erreur lors de la suppression du like" });
-  }
-});
-
-app.get('/api/users/:id/topics', async (req, res) => {
-  const userId = req.params.id;
-  const topics = await prisma.topic.findMany({
-    where: { createdBy: Number(userId) },
-    select: { id: true, title: true, category: true, createdAt: true, likes: true, _count: { select: { posts: true } } },
-    orderBy: { createdAt: 'desc' },
-    take: 20,
-  });
-  res.json(topics);
-});
 
 // ─── DÉFIS ───────────────────────────────────────────────────────────────────
 
@@ -734,20 +306,32 @@ app.get('/api/challenges', async (req, res) => {
       ...(difficulty ? { difficulty }                     : {}),
       ...(search     ? { title: { contains: search } }   : {}),
     };
-    const [challenges, total] = await Promise.all([
-      prisma.challenge.findMany({
-        where,
-        include: {
-          creator: { select: { id: true, username: true, avatar: true } },
-          _count: { select: { participants: true } }
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit
-      }),
-      prisma.challenge.count({ where })
-    ]);
-    res.json({ challenges, total, hasMore: skip + challenges.length < total });
+    const all = await prisma.challenge.findMany({
+      where,
+      include: {
+        creator: { select: { id: true, username: true, avatar: true } },
+        _count: { select: { participants: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Une série (défis liés par seriesName) compte comme UN seul objet pour la pagination,
+    // au même titre qu'un défi solo — sinon "Charger plus" ne renvoie parfois que des jours
+    // d'une série déjà entièrement affichée en une seule carte côté frontend, et le bouton
+    // semble ne rien faire.
+    const groupKeys = [];
+    const groupMap = new Map();
+    for (const c of all) {
+      const key = c.seriesName ?? `solo-${c.id}`;
+      if (!groupMap.has(key)) { groupMap.set(key, []); groupKeys.push(key); }
+      groupMap.get(key).push(c);
+    }
+
+    const total = groupKeys.length;
+    const pageKeys = groupKeys.slice(skip, skip + limit);
+    const challenges = pageKeys.flatMap(key => groupMap.get(key));
+
+    res.json({ challenges, total, hasMore: skip + pageKeys.length < total });
   } catch (error) {
     res.status(500).json({ error: "Erreur lors de la récupération des défis" });
   }
@@ -830,6 +414,69 @@ app.post('/api/challenges', async (req, res) => {
   }
 });
 
+// ─── ADMIN : gestion complète des défis ──────────────────────────────────────
+
+app.get('/api/admin/challenges', isAdmin, async (req, res) => {
+  try {
+    const challenges = await prisma.challenge.findMany({
+      include: {
+        creator: { select: { id: true, username: true } },
+        _count: { select: { participants: true } },
+      },
+      orderBy: { id: 'desc' },
+    });
+    res.json(challenges);
+  } catch (error) {
+    res.status(500).json({ error: "Erreur lors de la récupération des défis" });
+  }
+});
+
+app.post('/api/admin/challenges', isAdmin, async (req, res) => {
+  const { title, description, difficulty, category, coinReward, xpReward, isPublic, isDefault, seriesName } = req.body;
+  if (!title || !description || !difficulty || !category) {
+    return res.status(400).json({ error: "Champs requis manquants" });
+  }
+  try {
+    const created = await prisma.challenge.create({
+      data: {
+        title, description, difficulty, category,
+        coinReward: coinReward ?? 50, xpReward: xpReward ?? 100,
+        isPublic: isPublic !== false, isDefault: !!isDefault,
+        seriesName: seriesName || null,
+        createdBy: req.user.id,
+      },
+    });
+    res.json(created);
+  } catch (error) {
+    res.status(400).json({ error: "Impossible de créer le défi" });
+  }
+});
+
+app.put('/api/admin/challenges/:id', isAdmin, async (req, res) => {
+  const { title, description, difficulty, category, coinReward, xpReward, isPublic, isDefault, seriesName } = req.body;
+  try {
+    const updated = await prisma.challenge.update({
+      where: { id: Number(req.params.id) },
+      data: {
+        title, description, difficulty, category, coinReward, xpReward,
+        isPublic, isDefault, seriesName: seriesName || null,
+      },
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: "Impossible de mettre à jour le défi" });
+  }
+});
+
+app.delete('/api/admin/challenges/:id', isAdmin, async (req, res) => {
+  try {
+    await prisma.challenge.delete({ where: { id: Number(req.params.id) } });
+    res.json({ message: 'Défi supprimé' });
+  } catch (error) {
+    res.status(400).json({ error: "Impossible de supprimer ce défi (probablement encore lié à des participants)" });
+  }
+});
+
 app.post('/api/challenges/:id/start', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
@@ -869,24 +516,52 @@ app.post('/api/challenges/:id/complete', async (req, res) => {
     });
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
     let streakResult = null;
-    try { streakResult = await updateStreak(decoded.userId); } catch {}
+    try { streakResult = await streakService.updateForUser(decoded.userId); } catch {}
     const freshUser = streakResult?.user ?? user;
-    const multiplier = getStreakMultiplier(freshUser?.currentStreak ?? 0);
+    const streakMultiplier = StreakService.multiplierFor(freshUser?.currentStreak ?? 0);
     const dailyChallenge = await getDailyChallenge();
     const isDailyBonus = dailyChallenge?.id === challengeId;
     const dailyMultiplier = isDailyBonus ? DAILY_BONUS_MULTIPLIER : 1;
-    const coinsEarned = Math.floor(challenge.coinReward * multiplier * dailyMultiplier);
-    const xpEarned = Math.floor(challenge.xpReward * multiplier * dailyMultiplier);
+
+    // Bonus de groupe : +10% de récompenses par membre supplémentaire ayant
+    // rejoint le groupe du défi (2 joueurs = x1.1, 3 = x1.2, 4 = x1.3...).
+    // Couvre les deux types de groupe : défi unique (ChallengeGroup) et série (SeriesGroup).
+    let groupSize = 1;
+    const challengeGroup = await prisma.challengeGroup.findFirst({
+      where: { challengeId, members: { some: { userId: decoded.userId, status: { in: ['JOINED', 'COMPLETED'] } } } },
+      include: { members: true },
+    });
+    if (challengeGroup) {
+      groupSize = challengeGroup.members.filter(m => m.status === 'JOINED' || m.status === 'COMPLETED').length;
+    } else if (challenge.seriesName && seriesGroupReady()) {
+      const seriesGroup = await prisma.seriesGroup.findFirst({
+        where: { seriesName: challenge.seriesName, members: { some: { userId: decoded.userId, status: 'JOINED' } } },
+        include: { members: true },
+      });
+      if (seriesGroup) {
+        groupSize = seriesGroup.members.filter(m => m.status === 'JOINED').length;
+      }
+    }
+    const groupBonus = new GroupBonus(groupSize);
+    const reward = new RewardCalculator({
+      streakMultiplier,
+      dailyMultiplier,
+      groupMultiplier: groupBonus.multiplier,
+    });
+
+    const coinsEarned = reward.coinsFor(challenge.coinReward);
+    const xpEarned = reward.xpFor(challenge.xpReward);
     const newXp = freshUser.xp + xpEarned;
-    const newLevel = Math.floor(newXp / 1000) + 1;
+    const newLevel = LevelProgression.levelForXp(newXp);
     const updatedUser = await prisma.user.update({
       where: { id: decoded.userId },
       data: { coins: { increment: coinsEarned }, xp: newXp, level: newLevel }
     });
     res.json({
       message: "Défi complété !",
-      coinsEarned, xpEarned, multiplier,
+      coinsEarned, xpEarned, multiplier: streakMultiplier,
       isDailyBonus, dailyMultiplier,
+      groupSize, groupBonusMultiplier: groupBonus.multiplier,
       streak: { current: freshUser.currentStreak, milestone: streakResult?.milestone ?? null },
       user: updatedUser
     });
@@ -906,19 +581,31 @@ app.get('/api/users/me/challenges', async (req, res) => {
     const status = req.query.status; // optional: 'IN_PROGRESS' | 'COMPLETED'
     const where  = { userId: decoded.userId, ...(status ? { status } : {}) };
 
-    const [challenges, total, totalCompleted, totalInProgress] = await Promise.all([
+    const [all, totalCompleted, totalInProgress] = await Promise.all([
       prisma.userChallenge.findMany({
         where,
         include: { challenge: true },
         orderBy: { startedAt: 'desc' },
-        skip,
-        take: limit,
       }),
-      prisma.userChallenge.count({ where }),
       prisma.userChallenge.count({ where: { userId: decoded.userId, status: 'COMPLETED' } }),
       prisma.userChallenge.count({ where: { userId: decoded.userId, status: 'IN_PROGRESS' } }),
     ]);
-    res.json({ challenges, total, totalCompleted, totalInProgress, hasMore: skip + challenges.length < total });
+
+    // Une série compte comme UN seul objet pour la pagination, comme un défi solo — même
+    // correctif que sur GET /api/challenges, pour que "Charger plus" ramène toujours des
+    // groupes réellement nouveaux au lieu de jours d'une série déjà entièrement affichée.
+    const groupKeys = [];
+    const groupMap = new Map();
+    for (const uc of all) {
+      const key = uc.challenge.seriesName ?? `solo-${uc.challengeId}`;
+      if (!groupMap.has(key)) { groupMap.set(key, []); groupKeys.push(key); }
+      groupMap.get(key).push(uc);
+    }
+    const total = groupKeys.length;
+    const pageKeys = groupKeys.slice(skip, skip + limit);
+    const challenges = pageKeys.flatMap(key => groupMap.get(key));
+
+    res.json({ challenges, total, totalCompleted, totalInProgress, hasMore: skip + pageKeys.length < total });
   } catch (error) {
     res.status(401).json({ error: 'Token invalide' });
   }
@@ -929,18 +616,16 @@ app.get('/api/users/me/dashboard', authMiddleware, async (req, res) => {
   const userId = req.userId;
   try {
     await expireStaleInvites();
-    const [inProgress, completed, allStatuses, groups, pendingSeriesInvites] = await Promise.all([
+    const [inProgressAll, completedAll, allStatuses, groups, pendingSeriesInvites] = await Promise.all([
       prisma.userChallenge.findMany({
         where: { userId, status: 'IN_PROGRESS' },
         include: { challenge: true },
         orderBy: { startedAt: 'desc' },
-        take: 10,
       }),
       prisma.userChallenge.findMany({
         where: { userId, status: 'COMPLETED' },
         include: { challenge: true },
         orderBy: { startedAt: 'desc' },
-        take: 10,
       }),
       prisma.userChallenge.findMany({
         where: { userId },
@@ -959,12 +644,27 @@ app.get('/api/users/me/dashboard', authMiddleware, async (req, res) => {
         },
       }) : Promise.resolve([]),
     ]);
-    const inProgressTotal = allStatuses.filter(s => s.status === 'IN_PROGRESS').length;
-    const completedTotal  = allStatuses.filter(s => s.status === 'COMPLETED').length;
+
+    // Une série compte comme UN seul objet pour la pagination, comme un défi solo — même
+    // correctif que sur GET /api/challenges et /api/users/me/challenges, pour que la
+    // première page (chargée ici au montage) et "Charger plus" restent cohérents.
+    const firstPage = (all, limit) => {
+      const groupKeys = [];
+      const groupMap = new Map();
+      for (const uc of all) {
+        const key = uc.challenge.seriesName ?? `solo-${uc.challengeId}`;
+        if (!groupMap.has(key)) { groupMap.set(key, []); groupKeys.push(key); }
+        groupMap.get(key).push(uc);
+      }
+      const total = groupKeys.length;
+      const pageKeys = groupKeys.slice(0, limit);
+      return { challenges: pageKeys.flatMap(key => groupMap.get(key)), total, hasMore: pageKeys.length < total };
+    };
+
     res.json({
       challenges: allStatuses,
-      inProgress: { challenges: inProgress, total: inProgressTotal, hasMore: inProgressTotal > 10 },
-      completed:  { challenges: completed,  total: completedTotal,  hasMore: completedTotal  > 10 },
+      inProgress: firstPage(inProgressAll, 10),
+      completed:  firstPage(completedAll, 10),
       groups,
       pendingSeriesInvites,
     });
@@ -1100,6 +800,45 @@ app.get('/api/cosmetics', async (req, res) => {
     res.json(cosmetics);
   } catch (error) {
     res.status(500).json({ error: "Erreur lors de la récupération des cosmétiques" });
+  }
+});
+
+// ─── ADMIN : gestion complète des cosmétiques ────────────────────────────────
+
+app.post('/api/admin/cosmetics', isAdmin, async (req, res) => {
+  const { name, description, type, imageUrl, price, rarity } = req.body;
+  if (!name || !description || !type || price == null || !rarity) {
+    return res.status(400).json({ error: "Champs requis manquants" });
+  }
+  try {
+    const created = await prisma.cosmetic.create({
+      data: { name, description, type, imageUrl: imageUrl || null, price: Number(price), rarity },
+    });
+    res.json(created);
+  } catch (error) {
+    res.status(400).json({ error: "Impossible de créer le cosmétique" });
+  }
+});
+
+app.put('/api/admin/cosmetics/:id', isAdmin, async (req, res) => {
+  const { name, description, type, imageUrl, price, rarity } = req.body;
+  try {
+    const updated = await prisma.cosmetic.update({
+      where: { id: Number(req.params.id) },
+      data: { name, description, type, imageUrl: imageUrl || null, price: price != null ? Number(price) : undefined, rarity },
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: "Impossible de mettre à jour le cosmétique" });
+  }
+});
+
+app.delete('/api/admin/cosmetics/:id', isAdmin, async (req, res) => {
+  try {
+    await prisma.cosmetic.delete({ where: { id: Number(req.params.id) } });
+    res.json({ message: 'Cosmétique supprimé' });
+  } catch (error) {
+    res.status(400).json({ error: "Impossible de supprimer ce cosmétique (probablement déjà possédé par des utilisateurs)" });
   }
 });
 

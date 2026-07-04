@@ -36,12 +36,10 @@ const TYPE: Record<string, { label: string; emoji: string }> = {
 const RARITIES = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY'];
 const TYPES    = ['AVATAR_FRAME', 'BANNER', 'BADGE', 'TITLE'];
 
-const BACKEND_URL = 'http://localhost:3001';
 function resolveUrl(url?: string): string {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('/uploads/')) return `${BACKEND_URL}${url}`;
-  return url;
+  // /uploads/... est proxifié vers le backend (vite en dev, vercel.json en prod) —
+  // pas besoin de préfixer une origine en dur.
+  return url ?? '';
 }
 
 function applyFilters(cosmetics: Cosmetic[], search: string, type: string, rarity: string): Cosmetic[] {

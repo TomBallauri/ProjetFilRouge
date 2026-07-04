@@ -7,8 +7,6 @@ import UserAvatar from '../components/UserAvatar';
 import { useStore } from '../lib/store';
 import PageLoader from '../components/PageLoader';
 
-const BACKEND_URL = 'http://localhost:3001';
-
 type PublicUser = {
   id: number;
   username: string;
@@ -23,10 +21,9 @@ type PublicUser = {
 };
 
 function resolveUrl(url?: string): string {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('/uploads/')) return `${BACKEND_URL}${url}`;
-  return url;
+  // /uploads/... est proxifié vers le backend (vite en dev, vercel.json en prod) —
+  // pas besoin de préfixer une origine en dur.
+  return url ?? '';
 }
 
 const fmt = (n: number): string => {

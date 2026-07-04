@@ -4,12 +4,8 @@ import Layout from './components/Layout';
 import AdminDashboard from './pages/AdminDashboard';
 import GameForum from './pages/GameForum';
 import TasksPage from './pages/TasksPage';
-import TrendsPage from './pages/TrendsPage';
 import ProfilePage from './pages/ProfilePage';
-import EditProfile from './pages/EditProfile';
-import DiscussionsPage from './pages/DiscussionsPage';
 import AuthPage from './pages/AuthPage';
-import ForumTchat from './pages/ForumTchat';
 import ChallengePage from './pages/ChallengePage';
 import CreateChallenge from './pages/CreateChallenge';
 import AIChallengeGenerator from './pages/AIChallengeGenerator';
@@ -54,12 +50,8 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<GameForum />} />
-          <Route path="discussions" element={<DiscussionsPage />} />
-          <Route path="/tchat/:id" element={<ForumTchat />} />
           <Route path="tasks" element={<TasksPage />} />
-          <Route path="trends" element={<TrendsPage />} />
           <Route path="profile" element={<ProfilePage />} />
-          <Route path="edit" element={<EditProfile />} />
           <Route path="settings" element={<div className="p-4">Settings (Coming Soon)</div>} />
           <Route path="challenges" element={<ChallengePage />} />
           <Route path="challenges/create" element={<CreateChallenge />} />

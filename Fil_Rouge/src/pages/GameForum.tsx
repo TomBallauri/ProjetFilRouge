@@ -29,8 +29,6 @@ type UserChallenge = {
   };
 };
 
-type Topic = { id: number; title: string; category?: string; createdAt?: string };
-
 type PublicChallenge = {
   id: number; title: string; description: string;
   difficulty: string; category: string;
@@ -38,7 +36,7 @@ type PublicChallenge = {
   _count?: { participants: number };
 };
 
-type TopUser = { id: number; username: string; avatar?: string; currentStreak: number; level: number; cosmetics: import('../lib/cosmetics').EquippedCosmetic[] };
+type TopUser = { id: number; username: string; avatar?: string; currentStreak: number; level: number; xp: number; cosmetics: import('../lib/cosmetics').EquippedCosmetic[] };
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -94,6 +92,20 @@ const DEFAULT_CAT: CatMeta = { grad: GRAD.lavender, glow: GLOW.lavender, icon: <
 
 const DIFF_LABEL: Record<string, string> = { EASY: 'Facile', MEDIUM: 'Moyen', HARD: 'Difficile', EXPERT: 'Expert' };
 
+// ── Podium (widget "Classement" accueil) ────────────────────────────────────
+// Ordre d'affichage : 2e à gauche, 1er au centre, 3e à droite.
+const PODIUM_SLOTS = [
+  { rank: 2, idx: 1 },
+  { rank: 1, idx: 0 },
+  { rank: 3, idx: 2 },
+];
+const PODIUM_BAR_H: Record<number, number> = { 1: 68, 2: 50, 3: 40 };
+const PODIUM_MEDAL: Record<number, { bg: string; border: string; color: string }> = {
+  1: { bg: '#fff', border: '#FACC15', color: '#92400E' },
+  2: { bg: '#fff', border: '#A78BFA', color: '#7C3AED' },
+  3: { bg: '#fff', border: '#FB923C', color: '#9A3412' },
+};
+
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 type XpRingProps = Readonly<{
@@ -147,12 +159,10 @@ const GameForum: React.FC = () => {
   const { user, notifData, notifCount, setNotifCount } = useStore();
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<UserChallenge[]>([]);
-  const [recentTopics, setRecentTopics] = useState<Topic[]>([]);
   const [homeCosmetics, setHomeCosmetics] = useState<EquippedCosmetic[]>([]);
   const [dailyChallenge, setDailyChallenge] = useState<PublicChallenge | null>(null);
   const [dailyStatus, setDailyStatus] = useState<'none' | 'in_progress' | 'completed'>('none');
   const [loadingMain, setLoadingMain] = useState(true);
-  const [loadingTopics, setLoadingTopics] = useState(true);
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [panelUnreadGroups, setPanelUnreadGroups] = useState<{ groupId: number; seriesName: string }[]>([]);
@@ -183,12 +193,6 @@ const GameForum: React.FC = () => {
     } else {
       setLoadingMain(false);
     }
-    fetch('/api/topics?limit=6&sort=desc')
-      .then(r => r.json())
-      .then(data => setRecentTopics(Array.isArray(data) ? data : []))
-      .catch(() => {})
-      .finally(() => setLoadingTopics(false));
-
     fetch('/api/leaderboard')
       .then(r => r.json())
       .then(data => setTopUsers(Array.isArray(data) ? data.slice(0, 3) : []))
@@ -277,7 +281,23 @@ const GameForum: React.FC = () => {
 
   const xpInLevel  = (user.xp ?? 0) % 1000;
   const xpPercent  = xpInLevel / 1000;
-  const inProgress = challenges.filter(c => c.status === 'IN_PROGRESS');
+  const seriesDayNumber = (title: string) => {
+    const m = /^Jour\s+(\d+)/i.exec(title);
+    return m ? parseInt(m[1], 10) : null;
+  };
+  // Au sein d'une même série, on affiche les jours dans l'ordre (2, 3, 4…) plutôt que par
+  // date de création — la sauvegarde en masse des défis IA les crée tous "en cours" en
+  // parallèle, ce qui ne garantit pas que le jour le plus ancien apparaisse en premier.
+  const inProgress = challenges
+    .filter(c => c.status === 'IN_PROGRESS')
+    .sort((a, b) => {
+      if (a.challenge.seriesName && a.challenge.seriesName === b.challenge.seriesName) {
+        const da = seriesDayNumber(a.challenge.title);
+        const db = seriesDayNumber(b.challenge.title);
+        if (da !== null && db !== null) return da - db;
+      }
+      return 0;
+    });
   const levelTitle = getLevelTitle(user.level ?? 1);
 
   const streak = (user as any).currentStreak ?? 0;
@@ -698,7 +718,42 @@ const GameForum: React.FC = () => {
           style={{ background: GRAD.butter, boxShadow: `0 14px 32px -10px ${GLOW.butter}` }}>
           <div className="absolute right-[-28px] bottom-[-30px] w-32 h-32 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }} />
           <div className="absolute right-8 top-[-20px] w-16 h-16 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
-          {topUsers.length > 0 ? (
+          {topUsers.length >= 3 ? (
+            <div className="relative z-10 flex items-end justify-center gap-2">
+              {PODIUM_SLOTS.map(({ rank, idx }) => {
+                const u = topUsers[idx];
+                if (!u) return null;
+                const medal = PODIUM_MEDAL[rank];
+                return (
+                  <div key={u.id} className="flex-1 flex flex-col items-center min-w-0">
+                    <div className="relative inline-flex mb-1.5">
+                      <UserAvatar avatar={u.avatar} username={u.username} cosmetics={u.cosmetics ?? []}
+                        size={rank === 1 ? 'md' : 'sm'}
+                        className={rank === 1 ? 'ring-4 ring-white/60' : 'ring-2 ring-white/40'} />
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                        style={{ background: medal.bg, color: medal.color, border: `2px solid ${medal.border}`,
+                          fontSize: 10, fontWeight: 800, fontFamily: 'var(--q-display)' }}>
+                        {rank}
+                      </div>
+                    </div>
+                    <div className="text-xs font-bold text-white truncate max-w-full" style={{ opacity: rank === 1 ? 1 : 0.85 }}>
+                      {u.username}
+                    </div>
+                    <div className="text-[10px] mb-2" style={{ color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--q-mono)' }}>
+                      {(u.xp ?? 0).toLocaleString('fr')}
+                    </div>
+                    <div className="w-full flex items-center justify-center font-black"
+                      style={{ height: PODIUM_BAR_H[rank], background: 'rgba(255,255,255,0.25)',
+                        borderRadius: '16px 16px 4px 4px',
+                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -3px 0 rgba(0,0,0,0.08)',
+                        fontFamily: 'var(--q-display)', fontSize: rank === 1 ? 24 : 18, color: 'rgba(255,255,255,0.9)' }}>
+                      {rank}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : topUsers.length > 0 ? (
             <div className="relative z-10 flex flex-col gap-2.5">
               {topUsers.map((u, i) => (
                 <div key={u.id} className="flex items-center gap-3">
@@ -804,62 +859,6 @@ const GameForum: React.FC = () => {
         )}
       </Link>
 
-      {/* ── Recent topics ── */}
-      {loadingTopics ? (
-        <>
-          <div className="flex items-baseline justify-between mb-3">
-            <div className="h-6 w-36 rounded-full animate-pulse" style={{ background: 'var(--q-line)' }} />
-          </div>
-          <div className="rounded-3xl overflow-hidden animate-pulse"
-            style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)' }}>
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3"
-                style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none' }}>
-                <div className="w-8 h-8 rounded-xl flex-shrink-0" style={{ background: 'var(--q-line)' }} />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3.5 rounded-full w-2/3" style={{ background: 'var(--q-line)' }} />
-                  <div className="h-2.5 rounded-full w-1/3" style={{ background: 'var(--q-line)' }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : recentTopics.length > 0 && (
-        <>
-          <div className="flex items-baseline justify-between mb-3">
-            <h2 className="text-xl font-bold"
-              style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
-              Activité récente
-            </h2>
-            <Link to="/discussions" className="text-xs font-semibold hover:underline" style={{ color: 'var(--q-accent)' }}>
-              Voir tout
-            </Link>
-          </div>
-          <div className="rounded-3xl overflow-hidden"
-            style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-            {recentTopics.slice(0, 4).map((topic, i) => (
-              <button key={topic.id} onClick={() => navigate(`/tchat/${topic.id}`)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left transition-opacity hover:opacity-80"
-                style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none', background: 'transparent' }}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
-                  <MessageSquare size={15} aria-hidden="true" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate" style={{ color: 'var(--q-text)' }}>{topic.title}</p>
-                  <p className="text-xs truncate" style={{ color: 'var(--q-text3)' }}>
-                    {topic.createdAt
-                      ? new Date(topic.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
-                      : ''}
-                    {topic.category ? ` · ${topic.category}` : ''}
-                  </p>
-                </div>
-                <ChevronRight size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        </>
-      )}
     </div>
   );
 };
