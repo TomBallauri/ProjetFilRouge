@@ -1117,7 +1117,7 @@ const SeriesDropdown: React.FC<{
                     </div>
 
                     {/* Messages */}
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="q-hidescroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {messages.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--q-text3)', fontSize: 13 }}>
                           <MessageCircle size={32} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.3 }} />
@@ -1133,7 +1133,8 @@ const SeriesDropdown: React.FC<{
                               {!isMe && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-text3)', marginBottom: 3 }}>{msg.user.username}</div>}
                               <div style={{
                                 padding: '9px 13px', borderRadius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                                background: isMe ? 'var(--q-accent)' : 'var(--q-bg)',
+                                background: isMe ? 'var(--q-accent)' : 'var(--q-bg-flat)',
+                                border: isMe ? 'none' : '1px solid var(--q-line)',
                                 color: isMe ? '#fff' : 'var(--q-text)',
                                 fontSize: 13, lineHeight: 1.5, wordBreak: 'break-word',
                               }}>
@@ -1160,7 +1161,7 @@ const SeriesDropdown: React.FC<{
                         autoFocus
                         style={{
                           flex: 1, padding: '11px 14px', borderRadius: 14,
-                          border: '1px solid var(--q-line)', background: 'var(--q-bg)',
+                          border: '1px solid var(--q-line)', background: 'var(--q-bg-flat)',
                           color: 'var(--q-text)', fontSize: 14, outline: 'none',
                         }}
                       />
@@ -1957,8 +1958,8 @@ const ChallengePage: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between p-4"
               style={{ borderBottom: '1px solid var(--q-line)', flexShrink: 0 }}>
-              <h2 className="font-bold text-base" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
-                💬 Tchat du groupe
+              <h2 className="font-bold text-base flex items-center gap-1.5" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
+                <MessageCircle size={16} aria-hidden="true" /> Tchat du groupe
               </h2>
               <button onClick={() => { setChatGroupId(null); setChatMessages([]); }}
                 aria-label="Fermer le tchat"
@@ -2020,8 +2021,8 @@ const ChallengePage: React.FC = () => {
                         )}
                         <div className="p-3 text-sm break-words"
                           style={{
-                            background: isMe ? 'var(--q-accent)' : 'linear-gradient(135deg,rgba(124,58,237,0.14),rgba(167,139,250,0.08))',
-                            border: isMe ? 'none' : '1px solid rgba(124,58,237,0.22)',
+                            background: isMe ? 'var(--q-accent)' : 'var(--q-chrome)',
+                            border: isMe ? 'none' : '1px solid var(--q-line)',
                             color: isMe ? '#fff' : 'var(--q-text)',
                             borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                             wordBreak: 'break-word',

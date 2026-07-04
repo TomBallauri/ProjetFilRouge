@@ -1545,7 +1545,7 @@ app.get('/api/notifications', authMiddleware, async (req, res) => {
           select: {
             id: true,
             seriesName: true,
-            messages: { select: { id: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+            messages: { select: { id: true, userId: true }, orderBy: { createdAt: 'desc' }, take: 1 },
           },
         })
       : Promise.resolve([]),
@@ -1564,6 +1564,7 @@ app.get('/api/notifications', authMiddleware, async (req, res) => {
       groupId: g.id,
       seriesName: g.seriesName,
       latestMessageId: g.messages[0]?.id ?? null,
+      latestMessageUserId: g.messages[0]?.userId ?? null,
     })),
   });
 });

@@ -106,6 +106,10 @@ const LeaderboardPage: React.FC = () => {
             <div style={{ fontSize: 22, fontFamily: 'var(--q-display)', color: 'var(--q-text)', fontWeight: 700, letterSpacing: -0.4, lineHeight: 1.15 }}>
               {getSeason()}
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--q-text3)', marginTop: 2 }}>
+              <Flame size={11} color="#FB923C" aria-hidden="true" />
+              Classé par série de jours (streak)
+            </div>
           </div>
           {myRank > 0 && (
             <div style={{
@@ -234,9 +238,10 @@ const LeaderboardPage: React.FC = () => {
                           </div>
                         )}
 
-                        {/* XP */}
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--q-mono)', marginBottom: 8 }}>
-                          {u.xp.toLocaleString('fr')}
+                        {/* Streak — c'est le critère de classement, pas l'XP */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--q-mono)', marginBottom: 8 }}>
+                          <Flame size={11} aria-hidden="true" />
+                          {u.currentStreak}j
                         </div>
 
                         {/* Step bar */}
@@ -317,8 +322,6 @@ const LeaderboardPage: React.FC = () => {
                             )}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <span style={{ fontFamily: 'var(--q-mono)' }}>{u.xp.toLocaleString('fr')} XP</span>
-                            <span style={{ color: 'var(--q-line)' }}>·</span>
                             <Flame size={10} color={u.currentStreak > 0 ? '#FB923C' : 'var(--q-text3)'} aria-hidden="true" />
                             <span style={{ color: u.currentStreak > 0 ? '#FB923C' : 'var(--q-text3)', fontWeight: 600 }}>
                               {u.currentStreak}j

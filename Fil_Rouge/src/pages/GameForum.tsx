@@ -340,7 +340,8 @@ const GameForum: React.FC = () => {
                 // Snapshot unread groups BEFORE marking as seen so the panel can display them
                 setPanelUnreadGroups(
                   notifData.groups.filter(g =>
-                    g.latestMessageId && g.latestMessageId > ((currentSeen.groups?.[String(g.groupId)]) ?? 0)
+                    g.latestMessageId && g.latestMessageUserId !== user?.id &&
+                    g.latestMessageId > ((currentSeen.groups?.[String(g.groupId)]) ?? 0)
                   )
                 );
                 // Mark group messages as seen — friend/invite counts persist until acted on
