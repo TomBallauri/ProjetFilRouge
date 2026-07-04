@@ -1055,9 +1055,14 @@ app.post('/api/challenges/bulk-save', async (req, res) => {
     // tomberaient sinon sur le même nom et fusionneraient leur progression avec une série existante
     // sans rapport (même complétée par quelqu'un d'autre). On garantit donc un nom toujours neuf.
     if (resolvedSeries) {
-      const base = resolvedSeries;
-      for (let suffix = 2; await prisma.challenge.count({ where: { seriesName: resolvedSeries } }) > 0; suffix++) {
-        resolvedSeries = `${base} (${suffix})`.slice(0, 80);
+      try {
+        const base = resolvedSeries;
+        for (let suffix = 2; await prisma.challenge.count({ where: { seriesName: resolvedSeries } }) > 0; suffix++) {
+          resolvedSeries = `${base} (${suffix})`.slice(0, 80);
+        }
+      } catch {
+        // Prisma client not yet regenerated — skip dedup, fall back to no series name
+        resolvedSeries = null;
       }
     }
 
