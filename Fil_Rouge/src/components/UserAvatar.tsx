@@ -21,11 +21,12 @@ function resolveUrl(url?: string): string {
   return url ?? '';
 }
 
-type Size = 'sm' | 'md' | 'xl' | 'lg';
+type Size = 'xs' | 'sm' | 'md' | 'xl' | 'lg';
 
 // frameInset: how many px the avatar shrinks inward to leave room for the frame image.
 // The frame fills the full outer div — no negative insets, no overflow issues.
 const SIZE_MAP: Record<Size, { box: string; text: string; frameInset: number }> = {
+  xs: { box: 'w-7 h-7',   text: 'text-[10px]', frameInset: 2 },
   sm: { box: 'w-8 h-8',   text: 'text-xs', frameInset: 3 },
   md: { box: 'w-10 h-10', text: 'text-sm', frameInset: 3 },
   xl: { box: 'w-14 h-14', text: 'text-lg', frameInset: 4 },

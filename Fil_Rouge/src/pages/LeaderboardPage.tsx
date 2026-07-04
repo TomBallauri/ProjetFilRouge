@@ -336,52 +336,6 @@ const LeaderboardPage: React.FC = () => {
             );
           })()}
 
-          {/* ── Guild card ── */}
-          <div style={{ padding: '18px 0 0' }}>
-            <div style={{
-              padding: 16, borderRadius: 22,
-              background: 'var(--q-vibrant-rose)',
-              position: 'relative', overflow: 'hidden',
-              border: '1px solid rgba(255,255,255,0.25)',
-              boxShadow: '0 1px 0 rgba(255,255,255,0.35) inset, 0 14px 32px -10px rgba(236,72,153,0.55)',
-            }}>
-              {/* Decorative orbs */}
-              <div style={{ position: 'absolute', right: -30, top: -30, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', left: -10, bottom: -30, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.10)', pointerEvents: 'none' }} />
-
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 12,
-                  background: 'rgba(255,255,255,0.95)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Users size={18} color="#EC4899" aria-hidden="true" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontFamily: 'var(--q-display)', color: '#fff', letterSpacing: -0.2, fontWeight: 700 }}>
-                    Ma Guilde
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>
-                    Rejoins une guilde pour participer
-                  </div>
-                </div>
-                <ChevronRight size={16} color="#fff" aria-hidden="true" />
-              </div>
-
-              <div style={{ position: 'relative', marginTop: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
-                  Défi collectif en cours
-                </div>
-                <div style={{ fontSize: 13, color: '#fff', fontWeight: 600, marginBottom: 6 }}>
-                  Atteindre 50 000 XP avant la fin de saison
-                </div>
-                {/* Progress bar */}
-                <div style={{ width: '100%', height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.25)', overflow: 'hidden' }}>
-                  <div style={{ width: '0%', height: '100%', borderRadius: 999, background: '#fff' }} />
-                </div>
-              </div>
-            </div>
-          </div>
         </>
       )}
     </div>

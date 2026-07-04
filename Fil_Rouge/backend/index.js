@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import multer from 'multer';
-import path from 'path';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import Groq from 'groq-sdk';
@@ -23,8 +23,6 @@ app.use((req, res, next) => {
   if (req.body === undefined) req.body = {};
   next();
 });
-app.use('/uploads', express.static('uploads'));
-
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 const DEFAULT_AVATAR = '/default-avatar.svg';
 
@@ -206,8 +204,11 @@ app.get('/api/users/:id', async (req, res) => {
   }
 });
 
+// Stockage en mémoire (pas sur disque) : le disque de Render est éphémère et
+// perd son contenu à chaque redémarrage/redéploiement. Les fichiers sont
+// persistés dans PostgreSQL (modèle UploadedFile) plutôt que sur le filesystem.
 const upload = multer({
-  dest: 'uploads/',
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
@@ -216,16 +217,27 @@ const upload = multer({
 });
 
 app.post('/api/upload', authMiddleware, (req, res) => {
-  upload.single('file')(req, res, (err) => {
+  upload.single('file')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message || 'Erreur upload' });
     if (!req.file) return res.status(400).json({ error: 'Aucun fichier' });
-    res.json({ url: `/uploads/${req.file.filename}` });
+    try {
+      const id = crypto.randomBytes(16).toString('hex');
+      await prisma.uploadedFile.create({
+        data: { id, mimeType: req.file.mimetype, data: req.file.buffer },
+      });
+      res.json({ url: `/uploads/${id}` });
+    } catch {
+      res.status(500).json({ error: "Erreur lors de l'enregistrement du fichier" });
+    }
   });
 });
 
-app.get('/uploads/:filename', (req, res) => {
-  const filePath = path.join(process.cwd(), 'uploads', req.params.filename);
-  res.sendFile(filePath);
+app.get('/uploads/:filename', async (req, res) => {
+  const file = await prisma.uploadedFile.findUnique({ where: { id: req.params.filename } });
+  if (!file) return res.status(404).json({ error: 'Fichier non trouvé' });
+  res.set('Content-Type', file.mimeType);
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  res.send(Buffer.from(file.data));
 });
 
 const port = process.env.PORT || 3001;
@@ -838,7 +850,7 @@ app.delete('/api/admin/cosmetics/:id', isAdmin, async (req, res) => {
     await prisma.cosmetic.delete({ where: { id: Number(req.params.id) } });
     res.json({ message: 'Cosmétique supprimé' });
   } catch (error) {
-    res.status(400).json({ error: "Impossible de supprimer ce cosmétique (probablement déjà possédé par des utilisateurs)" });
+    res.status(400).json({ error: "Impossible de supprimer ce cosmétique" });
   }
 });
 

@@ -77,31 +77,29 @@ const challenges = [
 ];
 
 const cosmetics = [
-  // Cadres d'avatar COMMON
-  { name: "Cadre Argent", description: "Un élégant cadre argenté pour ton avatar.", type: "AVATAR_FRAME", imageUrl: null, price: 100, rarity: "COMMON" },
-  { name: "Cadre Or", description: "Un cadre doré qui brille de mille feux.", type: "AVATAR_FRAME", imageUrl: null, price: 250, rarity: "RARE" },
-  { name: "Cadre Diamant", description: "Le cadre le plus rare, en diamant étincelant.", type: "AVATAR_FRAME", imageUrl: null, price: 600, rarity: "EPIC" },
-  { name: "Cadre Légendaire", description: "Un cadre animé aux flammes violettes pour les vrais champions.", type: "AVATAR_FRAME", imageUrl: "/Legandary_frame.png", price: 1200, rarity: "LEGENDARY" },
+  // ─── Cadres d'avatar — étape 1 (image à uploader manuellement via le tableau de bord admin) ───
+  { name: "Cadre Fruits Pixel", description: "Un cadre pixel-art gourmand, entouré de fruits croquants.", type: "AVATAR_FRAME", imageUrl: null, price: 250, rarity: "COMMON" },
+  { name: "Cadre Coup de Cœur", description: "Des cœurs et une bulle attendrie pour les âmes sensibles.", type: "AVATAR_FRAME", imageUrl: null, price: 250, rarity: "COMMON" },
+  { name: "Cadre Étincelle", description: "Un simple anneau qui scintille de deux étincelles vertes.", type: "AVATAR_FRAME", imageUrl: null, price: 250, rarity: "COMMON" },
+  { name: "Cadre Ramen", description: "Un bol de ramen fumant, pour les affamés de défis.", type: "AVATAR_FRAME", imageUrl: null, price: 500, rarity: "RARE" },
+  { name: "Cadre Étreinte", description: "Deux bras musclés qui referment le cadre en une accolade.", type: "AVATAR_FRAME", imageUrl: null, price: 500, rarity: "RARE" },
+  { name: "Cadre Jump Retro", description: "Cœur, clé et champignons en pixel-art, clin d'œil aux classiques du jeu vidéo.", type: "AVATAR_FRAME", imageUrl: null, price: 500, rarity: "RARE" },
+  { name: "Cadre Fantôme", description: "Un petit fantôme timide veille sur ton avatar.", type: "AVATAR_FRAME", imageUrl: null, price: 500, rarity: "RARE" },
+  { name: "Cadre Démoniaque", description: "Cornes et crocs écarlates pour les défis les plus infernaux.", type: "AVATAR_FRAME", imageUrl: null, price: 1000, rarity: "EPIC" },
+  { name: "Cadre Vague Mystique", description: "Un tourbillon d'eau bleu et violet, comme figé par la magie.", type: "AVATAR_FRAME", imageUrl: null, price: 1000, rarity: "EPIC" },
+  { name: "Cadre Foudre Ardente", description: "Feu et foudre s'entremêlent en un anneau électrisant.", type: "AVATAR_FRAME", imageUrl: null, price: 2000, rarity: "LEGENDARY" },
 
-  // Titres
-  { name: "Titre : Débutant", description: "Affiche fièrement ton titre de débutant.", type: "TITLE", imageUrl: null, price: 50, rarity: "COMMON" },
-  { name: "Titre : Challenger", description: "Pour ceux qui aiment les défis.", type: "TITLE", imageUrl: null, price: 200, rarity: "RARE" },
-  { name: "Titre : Légende", description: "Un titre réservé aux meilleurs joueurs.", type: "TITLE", imageUrl: null, price: 500, rarity: "EPIC" },
-  { name: "Titre : Dieu du Défi", description: "Le titre ultime pour les champions de la plateforme.", type: "TITLE", imageUrl: null, price: 1000, rarity: "LEGENDARY" },
-
-  // Badges
-  { name: "Badge Gaming", description: "Montre ta passion pour les jeux vidéo.", type: "BADGE", imageUrl: null, price: 75, rarity: "COMMON" },
-  { name: "Badge Sport", description: "Pour les athlètes de la plateforme.", type: "BADGE", imageUrl: null, price: 75, rarity: "COMMON" },
-  { name: "Badge Cuisine", description: "Pour les chefs en devenir.", type: "BADGE", imageUrl: null, price: 75, rarity: "COMMON" },
-  { name: "Badge Créatif", description: "Pour les artistes et créatifs de la plateforme.", type: "BADGE", imageUrl: null, price: 75, rarity: "COMMON" },
-  { name: "Badge Élite", description: "Réservé aux joueurs d'exception.", type: "BADGE", imageUrl: null, price: 400, rarity: "EPIC" },
-  { name: "Badge Mythique", description: "Le badge le plus convoité de la plateforme.", type: "BADGE", imageUrl: null, price: 900, rarity: "LEGENDARY" },
-
-  // Banners
-  { name: "Bannière Bleue", description: "Une bannière de profil bleue élégante.", type: "BANNER", imageUrl: null, price: 150, rarity: "COMMON" },
-  { name: "Bannière Galaxie", description: "Une bannière représentant une galaxie étoilée.", type: "BANNER", imageUrl: null, price: 350, rarity: "RARE" },
-  { name: "Bannière Feu", description: "Une bannière enflammée pour les esprits ardents.", type: "BANNER", imageUrl: null, price: 700, rarity: "EPIC" },
-  { name: "Bannière Ultime", description: "La bannière absolue des maîtres de la plateforme.", type: "BANNER", imageUrl: null, price: 1500, rarity: "LEGENDARY" },
+  // ─── Titres — étape 2 ───
+  { name: "Titre : Débutant des défis", description: "Le tout premier pas dans l'aventure des défis.", type: "TITLE", imageUrl: null, price: 50, rarity: "COMMON" },
+  { name: "Titre : Nouveau Venu", description: "Tu viens à peine de commencer, et ça se voit.", type: "TITLE", imageUrl: null, price: 50, rarity: "COMMON" },
+  { name: "Titre : Apprenti Challenger", description: "Les bases sont là, la suite s'annonce prometteuse.", type: "TITLE", imageUrl: null, price: 50, rarity: "COMMON" },
+  { name: "Titre : Pro des défis", description: "Tu enchaînes les défis avec l'aisance d'un habitué.", type: "TITLE", imageUrl: null, price: 200, rarity: "RARE" },
+  { name: "Titre : Vétéran des défis", description: "Ton expérience parle pour toi, défi après défi.", type: "TITLE", imageUrl: null, price: 200, rarity: "RARE" },
+  { name: "Titre : Chasseur de Trophées", description: "Aucun défi ne t'échappe, tu les collectionnes tous.", type: "TITLE", imageUrl: null, price: 200, rarity: "RARE" },
+  { name: "Titre : Maître des défis", description: "Peu de joueurs atteignent ce niveau de maîtrise.", type: "TITLE", imageUrl: null, price: 500, rarity: "EPIC" },
+  { name: "Titre : Légende en Devenir", description: "Ton nom commence déjà à circuler.", type: "TITLE", imageUrl: null, price: 500, rarity: "EPIC" },
+  { name: "Titre : Le Meilleur des Meilleurs", description: "Au sommet, là où très peu parviennent à se hisser.", type: "TITLE", imageUrl: null, price: 1000, rarity: "LEGENDARY" },
+  { name: "Titre : Empereur des Défis", description: "Le titre ultime, réservé à ceux qui dominent tous les défis.", type: "TITLE", imageUrl: null, price: 1000, rarity: "LEGENDARY" },
 ];
 
 async function main() {
