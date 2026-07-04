@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { useStore } from '../lib/store';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
+import NotifToastContainer from './NotifToastContainer';
 
 const Footer: React.FC = () => {
   const { darkMode } = useStore();
@@ -29,6 +30,7 @@ const Layout: React.FC = () => {
         </main>
       </div>
       <Footer />
+      <NotifToastContainer />
     </div>
   );
 };

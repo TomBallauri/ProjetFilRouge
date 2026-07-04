@@ -2,6 +2,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types/User';
 
+export type NotifGroup = { groupId: number; seriesName: string; latestMessageId: number | null };
+export type NotifData = {
+  pendingFriendRequests: number;
+  pendingSeriesInvites: number;
+  streakAtRisk: boolean;
+  streakDays: number;
+  groups: NotifGroup[];
+};
+
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export type Task = {
@@ -29,13 +38,19 @@ interface StoreState {
   tasks: Task[];
   loading: boolean;
   error: string | null;
-  
+
   setTasks: (tasks: Task[]) => void;
   addTask: (task: Task) => void;
   updateTask: (task: Task) => void;
   deleteTask: (id: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+
+  /* Notification state (not persisted) */
+  notifData:      NotifData | null;
+  notifCount:     number;
+  setNotifData:   (data: NotifData | null) => void;
+  setNotifCount:  (count: number) => void;
 }
 
 export const useStore = create<StoreState>()(
@@ -51,14 +66,19 @@ export const useStore = create<StoreState>()(
       
       setTasks: (tasks) => set({ tasks }),
       addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
-      updateTask: (task) => set((state) => ({ 
-        tasks: state.tasks.map((t) => (t.id === task.id ? task : t)) 
+      updateTask: (task) => set((state) => ({
+        tasks: state.tasks.map((t) => (t.id === task.id ? task : t))
       })),
-      deleteTask: (id) => set((state) => ({ 
-        tasks: state.tasks.filter((t) => t.id !== id) 
+      deleteTask: (id) => set((state) => ({
+        tasks: state.tasks.filter((t) => t.id !== id)
       })),
       setLoading: (loading) => set({ loading }),
       setError: (error) => set({ error }),
+
+      notifData:     null,
+      notifCount:    0,
+      setNotifData:  (data) => set({ notifData: data }),
+      setNotifCount: (count) => set({ notifCount: count }),
     }),
     {
       name: 'gameforum-store', // nom de la clé dans le localStorage

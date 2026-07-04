@@ -37,6 +37,9 @@ model User {
   createdGroups          ChallengeGroup[]       @relation("GroupCreator")
   groupMemberships       ChallengeGroupMember[]
   groupMessages          GroupMessage[]
+  createdSeriesGroups    SeriesGroup[]          @relation("SeriesGroupCreator")
+  seriesGroupMemberships SeriesGroupMember[]
+  seriesGroupMessages    SeriesGroupMessage[]
 }
 
 model Friend {
@@ -94,11 +97,13 @@ model Challenge {
   xpReward     Int
   isDefault    Boolean         @default(false)
   isPublic     Boolean         @default(true)
+  seriesName   String?
   createdBy    Int?
   createdAt    DateTime        @default(now())
   creator      User?           @relation(fields: [createdBy], references: [id])
   participants UserChallenge[]
   groups       ChallengeGroup[]
+  @@index([seriesName])
 }
 
 model UserChallenge {
@@ -111,6 +116,7 @@ model UserChallenge {
   user        User      @relation(fields: [userId], references: [id])
   challenge   Challenge @relation(fields: [challengeId], references: [id])
   @@unique([userId, challengeId])
+  @@index([userId, status])
 }
 
 model Cosmetic {
@@ -133,6 +139,43 @@ model UserCosmetic {
   user        User     @relation(fields: [userId], references: [id])
   cosmetic    Cosmetic @relation(fields: [cosmeticId], references: [id])
   @@unique([userId, cosmeticId])
+}
+
+model SeriesGroup {
+  id          Int                   @id @default(autoincrement())
+  seriesName  String
+  createdBy   Int
+  createdAt   DateTime              @default(now())
+  completedAt DateTime?
+  creator     User                  @relation("SeriesGroupCreator", fields: [createdBy], references: [id])
+  members     SeriesGroupMember[]
+  messages    SeriesGroupMessage[]
+}
+
+model SeriesGroupMember {
+  id          Int         @id @default(autoincrement())
+  groupId     Int
+  userId      Int
+  status      String      @default("INVITED") // INVITED, JOINED
+  invitedAt   DateTime    @default(now())
+  joinedAt    DateTime?
+  confirmedAt DateTime?
+  group       SeriesGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+model SeriesGroupMessage {
+  id        Int         @id @default(autoincrement())
+  groupId   Int
+  userId    Int
+  content   String
+  createdAt DateTime    @default(now())
+  group     SeriesGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id])
+  @@index([groupId, createdAt])
 }
 
 model ChallengeGroup {

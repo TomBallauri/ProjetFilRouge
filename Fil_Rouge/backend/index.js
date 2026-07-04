@@ -461,11 +461,16 @@ app.get('/api/topics/:id/like', async (req, res) => {
 
 app.get('/api/likes', async (req, res) => {
   try {
+    const skip = Math.max(0, parseInt(req.query.skip) || 0);
+    const take = Math.min(50, Math.max(1, parseInt(req.query.limit) || 50));
     const likes = await prisma.like.findMany({
       include: {
         user: { select: { id: true, username: true } },
         topic: { select: { id: true, title: true } }
-      }
+      },
+      orderBy: { id: 'desc' },
+      skip,
+      take,
     });
     res.json(likes);
   } catch (error) {
@@ -488,6 +493,14 @@ app.get('/uploads/:filename', (req, res) => {
 const port = process.env.PORT || 3001;
 app.listen(port, () => {
   console.log(`Serveur backend lancé sur http://localhost:${port}`);
+  // Create performance indexes in background (idempotent — safe to run on every boot)
+  Promise.all([
+    prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Challenge_seriesName_idx" ON "Challenge"("seriesName")'),
+    prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "UserChallenge_userId_status_idx" ON "UserChallenge"("userId", "status")'),
+    prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "SeriesGroupMember_userId_idx" ON "SeriesGroupMember"("userId")'),
+    prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "SeriesGroupMember_groupId_idx" ON "SeriesGroupMember"("groupId")'),
+    prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "SeriesGroupMessage_groupId_createdAt_idx" ON "SeriesGroupMessage"("groupId", "createdAt")'),
+  ]).catch(() => {});
 });
 
 app.delete('/api/users/:id', async (req, res) => {
@@ -740,6 +753,32 @@ app.get('/api/challenges', async (req, res) => {
   }
 });
 
+// Tous les défis d'une série en un seul appel (non paginé) — utilisé par le frontend pour afficher
+// une série de façon cohérente sans dépendre de la pagination des listes "en cours"/"terminés".
+app.get('/api/challenges/by-series/:seriesName', async (req, res) => {
+  try {
+    const seriesName = decodeURIComponent(req.params.seriesName);
+    const authHeader = req.headers.authorization;
+    let currentUserId = null;
+    if (authHeader) {
+      try { currentUserId = jwt.verify(authHeader.split(' ')[1], SECRET).userId; } catch {}
+    }
+    const visibilityClause = currentUserId
+      ? { OR: [{ isPublic: true }, { createdBy: currentUserId }] }
+      : { isPublic: true };
+    const challenges = await prisma.challenge.findMany({
+      where: { seriesName, ...visibilityClause },
+      include: {
+        creator: { select: { id: true, username: true, avatar: true } },
+        _count: { select: { participants: true } }
+      }
+    });
+    res.json(challenges);
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur' });
+  }
+});
+
 app.get('/api/challenges/daily-suggestion', async (req, res) => {
   try {
     const daily = await getDailyChallenge();
@@ -875,13 +914,62 @@ app.get('/api/users/me/challenges', async (req, res) => {
         skip,
         take: limit,
       }),
-      prisma.userChallenge.count({ where: { userId: decoded.userId } }),
+      prisma.userChallenge.count({ where }),
       prisma.userChallenge.count({ where: { userId: decoded.userId, status: 'COMPLETED' } }),
       prisma.userChallenge.count({ where: { userId: decoded.userId, status: 'IN_PROGRESS' } }),
     ]);
     res.json({ challenges, total, totalCompleted, totalInProgress, hasMore: skip + challenges.length < total });
   } catch (error) {
     res.status(401).json({ error: 'Token invalide' });
+  }
+});
+
+// Dashboard: toutes les données utilisateur en un seul appel
+app.get('/api/users/me/dashboard', authMiddleware, async (req, res) => {
+  const userId = req.userId;
+  try {
+    await expireStaleInvites();
+    const [inProgress, completed, allStatuses, groups, pendingSeriesInvites] = await Promise.all([
+      prisma.userChallenge.findMany({
+        where: { userId, status: 'IN_PROGRESS' },
+        include: { challenge: true },
+        orderBy: { startedAt: 'desc' },
+        take: 10,
+      }),
+      prisma.userChallenge.findMany({
+        where: { userId, status: 'COMPLETED' },
+        include: { challenge: true },
+        orderBy: { startedAt: 'desc' },
+        take: 10,
+      }),
+      prisma.userChallenge.findMany({
+        where: { userId },
+        select: { challengeId: true, status: true },
+      }),
+      prisma.challengeGroup.findMany({
+        where: { members: { some: { userId } } },
+        include: GROUP_LIST_INCLUDE,
+        orderBy: { createdAt: 'desc' },
+      }),
+      seriesGroupReady() ? prisma.seriesGroup.findMany({
+        where: { members: { some: { userId, status: 'INVITED' } } },
+        include: {
+          creator: { select: { id: true, username: true, avatar: true } },
+          members: { include: { user: { select: { id: true, username: true, avatar: true } } } },
+        },
+      }) : Promise.resolve([]),
+    ]);
+    const inProgressTotal = allStatuses.filter(s => s.status === 'IN_PROGRESS').length;
+    const completedTotal  = allStatuses.filter(s => s.status === 'COMPLETED').length;
+    res.json({
+      challenges: allStatuses,
+      inProgress: { challenges: inProgress, total: inProgressTotal, hasMore: inProgressTotal > 10 },
+      completed:  { challenges: completed,  total: completedTotal,  hasMore: completedTotal  > 10 },
+      groups,
+      pendingSeriesInvites,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur' });
   }
 });
 
@@ -954,36 +1042,45 @@ app.post('/api/challenges/bulk-save', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
   const token = authHeader.split(' ')[1];
-  const { challenges } = req.body;
+  const { challenges, seriesName } = req.body;
   if (!challenges || !Array.isArray(challenges) || challenges.length === 0) {
     return res.status(400).json({ error: 'Défis requis' });
   }
   try {
     const decoded = jwt.verify(token, SECRET);
     const rewards = { EASY: { coins: 50, xp: 100 }, MEDIUM: { coins: 150, xp: 300 }, HARD: { coins: 350, xp: 700 }, EXPERT: { coins: 700, xp: 1500 } };
-    const created = await Promise.all(
-      challenges.map(({ title, description, difficulty, category, isPublic }) => {
-        const r = rewards[difficulty] || rewards.EASY;
-        return prisma.challenge.create({
-          data: {
-            title,
-            description,
-            difficulty,
-            category,
-            coinReward: r.coins,
-            xpReward: r.xp,
-            createdBy: decoded.userId,
-            isPublic: isPublic !== false,
-            participants: {
-              create: {
-                userId: decoded.userId,
-                status: 'IN_PROGRESS'
-              }
-            }
-          }
-        });
-      })
-    );
+    let resolvedSeries = seriesName && typeof seriesName === 'string' ? seriesName.trim().slice(0, 80) || null : null;
+
+    // Le nom de série est dérivé du prompt utilisateur : deux prompts similaires ("Me mettre au sport")
+    // tomberaient sinon sur le même nom et fusionneraient leur progression avec une série existante
+    // sans rapport (même complétée par quelqu'un d'autre). On garantit donc un nom toujours neuf.
+    if (resolvedSeries) {
+      const base = resolvedSeries;
+      for (let suffix = 2; await prisma.challenge.count({ where: { seriesName: resolvedSeries } }) > 0; suffix++) {
+        resolvedSeries = `${base} (${suffix})`.slice(0, 80);
+      }
+    }
+
+    const createOne = ({ title, description, difficulty, category, isPublic }, withSeries) => {
+      const r = rewards[difficulty] || rewards.EASY;
+      return prisma.challenge.create({
+        data: {
+          title, description, difficulty, category,
+          coinReward: r.coins, xpReward: r.xp,
+          createdBy: decoded.userId,
+          isPublic: isPublic !== false,
+          ...(withSeries && resolvedSeries ? { seriesName: resolvedSeries } : {}),
+          participants: { create: { userId: decoded.userId, status: 'IN_PROGRESS' } },
+        },
+      });
+    };
+    let created;
+    try {
+      created = await Promise.all(challenges.map(c => createOne(c, true)));
+    } catch {
+      // Prisma client not yet regenerated — retry without seriesName
+      created = await Promise.all(challenges.map(c => createOne(c, false)));
+    }
     res.json(created);
   } catch (error) {
     res.status(400).json({ error: 'Erreur lors de la sauvegarde des défis' });
@@ -1008,13 +1105,13 @@ app.post('/api/cosmetics/:id/buy', async (req, res) => {
   try {
     const decoded = jwt.verify(token, SECRET);
     const cosmeticId = Number(req.params.id);
-    const cosmetic = await prisma.cosmetic.findUnique({ where: { id: cosmeticId } });
+    const [cosmetic, user, existing] = await Promise.all([
+      prisma.cosmetic.findUnique({ where: { id: cosmeticId } }),
+      prisma.user.findUnique({ where: { id: decoded.userId } }),
+      prisma.userCosmetic.findUnique({ where: { userId_cosmeticId: { userId: decoded.userId, cosmeticId } } }),
+    ]);
     if (!cosmetic) return res.status(404).json({ error: "Cosmétique non trouvé" });
-    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
     if (user.coins < cosmetic.price) return res.status(400).json({ error: "Pas assez de coins" });
-    const existing = await prisma.userCosmetic.findUnique({
-      where: { userId_cosmeticId: { userId: decoded.userId, cosmeticId } }
-    });
     if (existing) return res.status(400).json({ error: "Cosmétique déjà acheté" });
     await prisma.userCosmetic.create({ data: { userId: decoded.userId, cosmeticId } });
     const updatedUser = await prisma.user.update({
@@ -1040,6 +1137,32 @@ app.get('/api/users/me/cosmetics', async (req, res) => {
     res.json(cosmetics);
   } catch (error) {
     res.status(401).json({ error: 'Token invalide' });
+  }
+});
+
+// Profil page: challenges + cosmétiques en une seule requête
+app.get('/api/users/me/profile-data', authMiddleware, async (req, res) => {
+  const userId = req.userId;
+  try {
+    const [challenges, total, totalCompleted, totalInProgress, cosmetics] = await Promise.all([
+      prisma.userChallenge.findMany({
+        where: { userId },
+        include: { challenge: true },
+        orderBy: { startedAt: 'desc' },
+        take: 10,
+      }),
+      prisma.userChallenge.count({ where: { userId } }),
+      prisma.userChallenge.count({ where: { userId, status: 'COMPLETED' } }),
+      prisma.userChallenge.count({ where: { userId, status: 'IN_PROGRESS' } }),
+      prisma.userCosmetic.findMany({ where: { userId }, include: { cosmetic: true } }),
+    ]);
+    res.json({
+      challenges, total, totalCompleted, totalInProgress,
+      hasMore: challenges.length === 10 && total > 10,
+      cosmetics,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur' });
   }
 });
 
@@ -1089,13 +1212,8 @@ app.post('/api/users/me/cosmetics/:id/equip', async (req, res) => {
       }
     } else {
       // Pour les autres types : déséquiper tous les cosmétiques du même type
-      const sameTypeCosmetics = await prisma.cosmetic.findMany({
-        where: { type: userCosmetic.cosmetic.type },
-        select: { id: true }
-      });
-      const sameTypeIds = sameTypeCosmetics.map(c => c.id);
       await prisma.userCosmetic.updateMany({
-        where: { userId: decoded.userId, cosmeticId: { in: sameTypeIds } },
+        where: { userId: decoded.userId, cosmetic: { type: userCosmetic.cosmetic.type } },
         data: { equipped: false }
       });
     }
@@ -1129,6 +1247,376 @@ app.post('/api/users/me/cosmetics/:id/unequip', async (req, res) => {
   }
 });
 
+// ─── GROUPES DE SÉRIE ─────────────────────────────────────────────────────────
+
+// Guard : renvoie false si le client Prisma n'a pas encore été régénéré
+const seriesGroupReady = () => !!prisma.seriesGroup;
+
+// Les invitations de groupe (série ou défi) expirent 24h après leur envoi
+const GROUP_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+const isInviteExpired = (invitedAt) => Date.now() - new Date(invitedAt).getTime() > GROUP_INVITE_TTL_MS;
+
+// Nettoyage paresseux : supprime les invitations INVITED devenues obsolètes avant de lire/écrire les groupes
+async function expireStaleInvites() {
+  const cutoff = new Date(Date.now() - GROUP_INVITE_TTL_MS);
+  await Promise.all([
+    seriesGroupReady()
+      ? prisma.seriesGroupMember.deleteMany({ where: { status: 'INVITED', invitedAt: { lt: cutoff } } })
+      : Promise.resolve(),
+    prisma.challengeGroupMember.deleteMany({ where: { status: 'INVITED', invitedAt: { lt: cutoff } } }),
+  ]);
+}
+
+const SERIES_GROUP_INCLUDE = {
+  creator: { select: { id: true, username: true, avatar: true } },
+  members: {
+    include: { user: { select: { id: true, username: true, avatar: true } } },
+    orderBy: { invitedAt: 'asc' }
+  }
+};
+
+// Helper : s'assure que tous les défis d'une série sont IN_PROGRESS pour un utilisateur
+async function ensureSeriesChallengesStarted(userId, seriesName) {
+  const challenges = await prisma.challenge.findMany({ where: { seriesName }, select: { id: true } });
+  if (!challenges.length) return;
+  // createMany + skipDuplicates = 2 queries instead of N+1; existing COMPLETED rows are skipped untouched
+  await prisma.userChallenge.createMany({
+    data: challenges.map(c => ({ userId, challengeId: c.id, status: 'IN_PROGRESS' })),
+    skipDuplicates: true,
+  });
+}
+
+// Démarrer tous les défis restants d'une série en une fois (sans passer par un groupe)
+app.post('/api/challenges/series/:seriesName/start-all', authMiddleware, async (req, res) => {
+  const seriesName = decodeURIComponent(req.params.seriesName);
+  try {
+    await ensureSeriesChallengesStarted(req.userId, seriesName);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur lors du démarrage de la série' });
+  }
+});
+
+// Créer un groupe de série
+app.post('/api/series-groups', authMiddleware, async (req, res) => {
+  if (!seriesGroupReady()) return res.status(503).json({ error: 'Migration en attente — relance le serveur.' });
+  const { seriesName, friendIds } = req.body;
+  if (!seriesName) return res.status(400).json({ error: 'seriesName requis' });
+  const inviteList = Array.isArray(friendIds) ? friendIds.map(Number).filter(Boolean) : [];
+  if (inviteList.length > 3) return res.status(400).json({ error: 'Maximum 3 amis invités.' });
+  try {
+    const existing = await prisma.seriesGroup.findFirst({
+      where: { seriesName, members: { some: { userId: req.userId } } }
+    });
+    if (existing) return res.status(400).json({ error: 'Tu as déjà un groupe pour cette série.' });
+    const group = await prisma.seriesGroup.create({
+      data: {
+        seriesName,
+        createdBy: req.userId,
+        members: {
+          create: [
+            { userId: req.userId, status: 'JOINED', joinedAt: new Date() },
+            ...inviteList.map(id => ({ userId: id, status: 'INVITED' }))
+          ]
+        }
+      },
+      include: SERIES_GROUP_INCLUDE
+    });
+    // Fire-and-forget: start challenges without blocking the response
+    ensureSeriesChallengesStarted(req.userId, seriesName).catch(() => {});
+    res.json(group);
+  } catch (error) {
+    res.status(500).json({ error: error?.message ?? 'Erreur lors de la création' });
+  }
+});
+
+// Récupérer le groupe d'une série (pour l'utilisateur courant) + progression des membres
+app.get('/api/series-groups/by-series/:seriesName', authMiddleware, async (req, res) => {
+  if (!seriesGroupReady()) return res.json(null);
+  const seriesName = decodeURIComponent(req.params.seriesName);
+  try {
+    const groups = await prisma.seriesGroup.findMany({
+      where: { seriesName, members: { some: { userId: req.userId } } },
+      include: SERIES_GROUP_INCLUDE
+    });
+    if (!groups.length) return res.json(null);
+    // Prefer the group with the most JOINED members (avoids returning a solo group when user was also invited to a richer one)
+    const group = groups.sort((a, b) => {
+      const aJ = a.members.filter(m => m.status === 'JOINED').length;
+      const bJ = b.members.filter(m => m.status === 'JOINED').length;
+      return bJ - aJ;
+    })[0];
+    // Progression de chaque membre dans la série
+    const memberIds = group.members.map(m => m.userId);
+    const [total, ...doneCounts] = await Promise.all([
+      prisma.challenge.count({ where: { seriesName } }),
+      ...memberIds.map(uid => prisma.userChallenge.count({
+        where: { userId: uid, status: 'COMPLETED', challenge: { seriesName } }
+      }))
+    ]);
+    const progress = memberIds.map((uid, i) => ({ userId: uid, done: doneCounts[i], total }));
+    res.json({ ...group, progress });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur' });
+  }
+});
+
+// Rejoindre (accepter invitation)
+app.post('/api/series-groups/:id/join', authMiddleware, async (req, res) => {
+  if (!seriesGroupReady()) return res.status(503).json({ error: 'Migration en attente.' });
+  const groupId = Number(req.params.id);
+  try {
+    // Parallel: check membership + get group info
+    const [member, group] = await Promise.all([
+      prisma.seriesGroupMember.findUnique({ where: { groupId_userId: { groupId, userId: req.userId } } }),
+      prisma.seriesGroup.findUnique({ where: { id: groupId } })
+    ]);
+    if (!member) return res.status(404).json({ error: 'Invitation introuvable' });
+    if (member.status !== 'INVITED') return res.status(400).json({ error: 'Déjà rejoint' });
+    if (!group) return res.status(404).json({ error: 'Groupe introuvable' });
+    if (isInviteExpired(member.invitedAt) || group.completedAt) {
+      await prisma.seriesGroupMember.delete({ where: { groupId_userId: { groupId, userId: req.userId } } });
+      return res.status(410).json({ error: 'Invitation expirée' });
+    }
+    await prisma.seriesGroupMember.update({
+      where: { groupId_userId: { groupId, userId: req.userId } },
+      data: { status: 'JOINED', joinedAt: new Date() }
+    });
+    // Parallel: fetch updated group + start challenges for the new member
+    const [updated] = await Promise.all([
+      prisma.seriesGroup.findUnique({ where: { id: groupId }, include: SERIES_GROUP_INCLUDE }),
+      ensureSeriesChallengesStarted(req.userId, group.seriesName)
+    ]);
+    const memberIds = updated.members.map(m => m.userId);
+    const sn = updated.seriesName;
+    const [total, ...doneCounts] = await Promise.all([
+      prisma.challenge.count({ where: { seriesName: sn } }),
+      ...memberIds.map(uid => prisma.userChallenge.count({
+        where: { userId: uid, status: 'COMPLETED', challenge: { seriesName: sn } }
+      }))
+    ]);
+    const progress = memberIds.map((uid, i) => ({ userId: uid, done: doneCounts[i], total }));
+    res.json({ ...updated, progress });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur' });
+  }
+});
+
+// Chaque membre confirme individuellement avoir terminé la série ; le groupe n'est
+// marqué "terminé" que lorsque TOUS les membres JOINED ont confirmé.
+app.post('/api/series-groups/:id/complete', authMiddleware, async (req, res) => {
+  if (!seriesGroupReady()) return res.status(503).json({ error: 'Migration en attente.' });
+  const groupId = Number(req.params.id);
+  try {
+    const [member, group] = await Promise.all([
+      prisma.seriesGroupMember.findUnique({ where: { groupId_userId: { groupId, userId: req.userId } } }),
+      prisma.seriesGroup.findUnique({ where: { id: groupId }, include: SERIES_GROUP_INCLUDE })
+    ]);
+    if (!member || member.status !== 'JOINED') return res.status(403).json({ error: 'Non membre du groupe' });
+    if (!group) return res.status(404).json({ error: 'Groupe introuvable' });
+
+    const joinedIds = group.members.filter(m => m.status === 'JOINED').map(m => m.userId);
+    const [total, ...doneCounts] = await Promise.all([
+      prisma.challenge.count({ where: { seriesName: group.seriesName } }),
+      ...joinedIds.map(uid => prisma.userChallenge.count({
+        where: { userId: uid, status: 'COMPLETED', challenge: { seriesName: group.seriesName } }
+      }))
+    ]);
+    const progress = joinedIds.map((uid, i) => ({ userId: uid, done: doneCounts[i], total }));
+    const myProgress = progress.find(p => p.userId === req.userId);
+    const myDone = !!myProgress && myProgress.total > 0 && myProgress.done === myProgress.total;
+    if (!myDone) return res.status(400).json({ error: "Tu n'as pas encore terminé tous les défis de la série." });
+
+    if (!member.confirmedAt) {
+      await prisma.seriesGroupMember.update({
+        where: { groupId_userId: { groupId, userId: req.userId } },
+        data: { confirmedAt: new Date() }
+      });
+    }
+
+    const refreshed = await prisma.seriesGroup.findUnique({ where: { id: groupId }, include: SERIES_GROUP_INCLUDE });
+    const allConfirmed = joinedIds.length > 0 && refreshed.members
+      .filter(m => m.status === 'JOINED')
+      .every(m => !!m.confirmedAt);
+
+    const updated = (refreshed.completedAt || !allConfirmed) ? refreshed : await prisma.seriesGroup.update({
+      where: { id: groupId },
+      data: { completedAt: new Date() },
+      include: SERIES_GROUP_INCLUDE
+    });
+    res.json({ ...updated, progress });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur' });
+  }
+});
+
+// Quitter un groupe de série
+app.delete('/api/series-groups/:id/leave', authMiddleware, async (req, res) => {
+  if (!seriesGroupReady()) return res.status(503).json({ error: 'Migration en attente.' });
+  const groupId = Number(req.params.id);
+  try {
+    await prisma.seriesGroupMember.delete({
+      where: { groupId_userId: { groupId, userId: req.userId } }
+    });
+    // Un groupe sans aucun membre est un zombie : il ne bloque plus la création
+    // d'un nouveau groupe pour la même série mais reste affiché ailleurs. Autant le supprimer.
+    const remaining = await prisma.seriesGroupMember.count({ where: { groupId } });
+    if (remaining === 0) await prisma.seriesGroup.delete({ where: { id: groupId } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur' });
+  }
+});
+
+// Mes groupes de série (invitations en attente incluses)
+app.get('/api/series-groups/mine', authMiddleware, async (req, res) => {
+  try {
+    await expireStaleInvites();
+    const groups = await prisma.seriesGroup.findMany({
+      where: { members: { some: { userId: req.userId } } },
+      include: SERIES_GROUP_INCLUDE,
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(groups);
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur' });
+  }
+});
+
+// Inviter des amis dans un groupe de série existant
+app.post('/api/series-groups/:id/invite', authMiddleware, async (req, res) => {
+  if (!seriesGroupReady()) return res.status(503).json({ error: 'Migration en attente.' });
+  const groupId = Number(req.params.id);
+  const inviteList = Array.isArray(req.body.friendIds) ? req.body.friendIds.map(Number).filter(Boolean) : [];
+  if (!inviteList.length) return res.status(400).json({ error: 'Aucun ami sélectionné' });
+  try {
+    const group = await prisma.seriesGroup.findUnique({ where: { id: groupId }, include: { members: true } });
+    if (!group) return res.status(404).json({ error: 'Groupe introuvable' });
+    if (!group.members.some(m => m.userId === req.userId)) return res.status(403).json({ error: 'Non membre' });
+    if (group.completedAt) return res.status(400).json({ error: 'Série déjà terminée.' });
+    const alreadyIn = new Set(group.members.map(m => m.userId));
+    const toInvite = inviteList.filter(id => !alreadyIn.has(id));
+    if (toInvite.length > 0) {
+      await prisma.seriesGroupMember.createMany({
+        data: toInvite.map(userId => ({ groupId, userId, status: 'INVITED' })),
+        skipDuplicates: true,
+      });
+    }
+    const updated = await prisma.seriesGroup.findUnique({ where: { id: groupId }, include: SERIES_GROUP_INCLUDE });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Erreur lors de l'invitation" });
+  }
+});
+
+// Exclure un membre (créateur uniquement)
+app.delete('/api/series-groups/:id/members/:userId', authMiddleware, async (req, res) => {
+  if (!seriesGroupReady()) return res.status(503).json({ error: 'Migration en attente.' });
+  const groupId = Number(req.params.id);
+  const targetUserId = Number(req.params.userId);
+  try {
+    const group = await prisma.seriesGroup.findUnique({ where: { id: groupId } });
+    if (!group) return res.status(404).json({ error: 'Groupe introuvable' });
+    if (group.createdBy !== req.userId) return res.status(403).json({ error: 'Seul le créateur peut exclure.' });
+    if (targetUserId === req.userId) return res.status(400).json({ error: 'Impossible de s\'exclure soi-même.' });
+    if (group.completedAt) return res.status(400).json({ error: 'Série déjà terminée.' });
+    await prisma.seriesGroupMember.delete({ where: { groupId_userId: { groupId, userId: targetUserId } } });
+    const updated = await prisma.seriesGroup.findUnique({ where: { id: groupId }, include: SERIES_GROUP_INCLUDE });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur lors de l\'exclusion' });
+  }
+});
+
+// Invitations en attente (status INVITED) pour l'utilisateur courant
+app.get('/api/series-groups/pending-invites', authMiddleware, async (req, res) => {
+  if (!seriesGroupReady()) return res.json([]);
+  try {
+    await expireStaleInvites();
+    const groups = await prisma.seriesGroup.findMany({
+      where: { members: { some: { userId: req.userId, status: 'INVITED' } } },
+      include: {
+        creator: { select: { id: true, username: true, avatar: true } },
+        members: { include: { user: { select: { id: true, username: true, avatar: true } } } },
+      },
+    });
+    res.json(groups);
+  } catch { res.status(500).json({ error: 'Erreur' }); }
+});
+
+// ─── TCHAT GROUPES DE SÉRIE ───────────────────────────────────────────────────
+
+const sgMsgReady = () => !!prisma.seriesGroupMessage;
+
+// Récupérer les messages du tchat
+// Détail d'un groupe + messages (pour la page de chat dédiée)
+app.get('/api/series-groups/:id', authMiddleware, async (req, res) => {
+  if (!seriesGroupReady()) return res.status(503).json({ error: 'Non disponible' });
+  const groupId = Number(req.params.id);
+  try {
+    await expireStaleInvites();
+    const [member, group] = await Promise.all([
+      prisma.seriesGroupMember.findUnique({ where: { groupId_userId: { groupId, userId: req.userId } } }),
+      prisma.seriesGroup.findUnique({
+        where: { id: groupId },
+        include: {
+          creator: { select: { id: true, username: true, avatar: true } },
+          members: {
+            include: { user: { select: { id: true, username: true, avatar: true } } },
+            orderBy: { invitedAt: 'asc' },
+          },
+          messages: {
+            include: { user: { select: { id: true, username: true, avatar: true } } },
+            orderBy: { createdAt: 'asc' },
+            take: 100,
+          },
+        },
+      }),
+    ]);
+    if (!member) return res.status(403).json({ error: 'Non membre' });
+    if (!group) return res.status(404).json({ error: 'Groupe introuvable' });
+    res.json(group);
+  } catch { res.status(500).json({ error: 'Erreur' }); }
+});
+
+app.get('/api/series-groups/:id/messages', authMiddleware, async (req, res) => {
+  if (!sgMsgReady()) return res.json([]);
+  const groupId = Number(req.params.id);
+  try {
+    // Parallel: membership check + message fetch
+    const [member, messages] = await Promise.all([
+      prisma.seriesGroupMember.findUnique({ where: { groupId_userId: { groupId, userId: req.userId } } }),
+      prisma.seriesGroupMessage.findMany({
+        where: { groupId },
+        include: { user: { select: { id: true, username: true, avatar: true } } },
+        orderBy: { createdAt: 'asc' },
+        take: 100,
+      })
+    ]);
+    if (!member) return res.status(403).json({ error: 'Non membre' });
+    res.json(messages);
+  } catch { res.status(500).json({ error: 'Erreur' }); }
+});
+
+// Envoyer un message dans le tchat
+app.post('/api/series-groups/:id/messages', authMiddleware, async (req, res) => {
+  if (!sgMsgReady()) return res.status(503).json({ error: 'Migration en attente' });
+  const groupId = Number(req.params.id);
+  const { content } = req.body;
+  if (!content?.trim()) return res.status(400).json({ error: 'Message vide' });
+  try {
+    const member = await prisma.seriesGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId: req.userId } }
+    });
+    if (!member || member.status === 'INVITED') return res.status(403).json({ error: 'Non autorisé' });
+    const message = await prisma.seriesGroupMessage.create({
+      data: { groupId, userId: req.userId, content: content.trim() },
+      include: { user: { select: { id: true, username: true, avatar: true } } },
+    });
+    res.json(message);
+  } catch { res.status(500).json({ error: 'Erreur' }); }
+});
+
 // ─── CLASSEMENT ───────────────────────────────────────────────────────────────
 
 const LEADERBOARD_SELECT = {
@@ -1156,12 +1644,15 @@ app.get('/api/leaderboard', async (req, res) => {
 
 app.get('/api/leaderboard/friends', authMiddleware, async (req, res) => {
   try {
-    const friendships = await prisma.friend.findMany({
-      where: { OR: [{ senderId: req.userId }, { receiverId: req.userId }], status: 'ACCEPTED' }
-    });
-    const friendIds = friendships.map(f => f.senderId === req.userId ? f.receiverId : f.senderId);
+    // Use a single query: fetch users who are accepted friends of req.userId (or req.userId themselves)
     const users = await prisma.user.findMany({
-      where: { id: { in: [...friendIds, req.userId] } },
+      where: {
+        OR: [
+          { id: req.userId },
+          { sentFriendRequests:     { some: { receiverId: req.userId, status: 'ACCEPTED' } } },
+          { receivedFriendRequests: { some: { senderId:   req.userId, status: 'ACCEPTED' } } },
+        ]
+      },
       select: LEADERBOARD_SELECT,
       orderBy: { currentStreak: 'desc' }
     });
@@ -1279,6 +1770,48 @@ app.get('/api/friends/status/:targetId', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+
+app.get('/api/notifications', authMiddleware, async (req, res) => {
+  const userId = req.userId;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  await expireStaleInvites();
+  const [friendRequests, seriesInvites, userInfo, seriesGroups] = await Promise.all([
+    prisma.friend.count({ where: { receiverId: userId, status: 'PENDING' } }),
+    seriesGroupReady()
+      ? prisma.seriesGroupMember.count({ where: { userId, status: 'INVITED' } })
+      : Promise.resolve(0),
+    prisma.user.findUnique({ where: { id: userId }, select: { currentStreak: true, lastStreakDate: true } }),
+    seriesGroupReady()
+      ? prisma.seriesGroup.findMany({
+          where: { members: { some: { userId, status: 'JOINED' } } },
+          select: {
+            id: true,
+            seriesName: true,
+            messages: { select: { id: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const streakAtRisk =
+    (userInfo?.currentStreak ?? 0) > 0 &&
+    (!userInfo?.lastStreakDate || new Date(userInfo.lastStreakDate) < today);
+
+  res.json({
+    pendingFriendRequests: friendRequests,
+    pendingSeriesInvites: seriesInvites,
+    streakAtRisk: !!streakAtRisk,
+    streakDays: userInfo?.currentStreak ?? 0,
+    groups: seriesGroups.map(g => ({
+      groupId: g.id,
+      seriesName: g.seriesName,
+      latestMessageId: g.messages[0]?.id ?? null,
+    })),
+  });
+});
+
 // ─── DÉFIS EN GROUPE ──────────────────────────────────────────────────────────
 
 const MSG_USER_SELECT = {
@@ -1294,13 +1827,18 @@ const MSG_USER_SELECT = {
   }
 };
 
-const GROUP_INCLUDE = {
+// Pour le listing (pas de messages — chargés séparément à l'ouverture du chat)
+const GROUP_LIST_INCLUDE = {
   challenge: { select: { id: true, title: true, description: true, difficulty: true, category: true, coinReward: true, xpReward: true } },
   creator: { select: { id: true, username: true, avatar: true } },
   members: {
     include: { user: { select: { id: true, username: true, avatar: true } } },
     orderBy: { invitedAt: 'asc' }
   },
+};
+
+const GROUP_INCLUDE = {
+  ...GROUP_LIST_INCLUDE,
   messages: {
     include: { user: { select: { id: true, username: true, avatar: true } } },
     orderBy: { createdAt: 'asc' },
@@ -1340,9 +1878,10 @@ app.post('/api/groups', authMiddleware, async (req, res) => {
 // Mes groupes (comme créateur ou membre)
 app.get('/api/groups', authMiddleware, async (req, res) => {
   try {
+    await expireStaleInvites();
     const groups = await prisma.challengeGroup.findMany({
       where: { members: { some: { userId: req.userId } } },
-      include: GROUP_INCLUDE,
+      include: GROUP_LIST_INCLUDE,
       orderBy: { createdAt: 'desc' }
     });
     res.json(groups);
@@ -1385,6 +1924,10 @@ app.post('/api/groups/:id/join', authMiddleware, async (req, res) => {
     });
     if (!member) return res.status(404).json({ error: 'Invitation introuvable' });
     if (member.status !== 'INVITED') return res.status(400).json({ error: 'Déjà rejoint' });
+    if (isInviteExpired(member.invitedAt)) {
+      await prisma.challengeGroupMember.delete({ where: { groupId_userId: { groupId, userId: req.userId } } });
+      return res.status(410).json({ error: 'Invitation expirée' });
+    }
     const updated = await prisma.challengeGroupMember.update({
       where: { groupId_userId: { groupId, userId: req.userId } },
       data: { status: 'JOINED', joinedAt: new Date() }

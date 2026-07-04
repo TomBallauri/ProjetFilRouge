@@ -128,10 +128,12 @@ const AIChallengeGenerator: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const toSave = challenges.filter((_, i) => selected.has(i)).map(c => ({ ...c, isPublic }));
+      const firstUserMsg = messages.find(m => m.role === 'user')?.content ?? '';
+      const seriesName = toSave.length > 1 ? firstUserMsg.slice(0, 60).trim() || undefined : undefined;
       const res = await fetch('/api/challenges/bulk-save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ challenges: toSave }),
+        body: JSON.stringify({ challenges: toSave, ...(seriesName ? { seriesName } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);

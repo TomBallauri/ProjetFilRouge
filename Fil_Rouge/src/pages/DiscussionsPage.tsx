@@ -318,7 +318,7 @@ const DiscussionsPage: React.FC = () => {
                     {/* Tags + badges */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                       {discussion.game && (
-                        <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: 'rgba(56,189,248,0.15)', color: '#38BDF8' }}>{discussion.game}</span>
+                        <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: 'rgba(56,189,248,0.15)', color: 'var(--q-sky-text)' }}>{discussion.game}</span>
                       )}
                       {discussion.category && (
                         <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)' }}>{discussion.category}</span>

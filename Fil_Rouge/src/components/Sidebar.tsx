@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useStore } from '../lib/store';
+import { useNotificationPolling } from '../hooks/useNotificationPolling';
 import { Home, Trophy, MessageSquare, Lock, ShoppingBag, Star, User, Users, Sparkles, Zap, Flame } from 'lucide-react';
 
 type TabItem = { path: string; label: string; icon: React.ReactNode; end: boolean };
@@ -37,9 +38,12 @@ const DIFF_ICONS: Record<string, typeof Zap> = {
 };
 
 const Sidebar: React.FC = () => {
-  const { darkMode, user } = useStore();
+  const { darkMode, user, notifCount } = useStore();
   const location = useLocation();
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
+
+  // Lance le polling global des notifications (résultat stocké dans le store)
+  useNotificationPolling();
 
   useEffect(() => {
     fetch('/api/challenges/daily-suggestion')
@@ -81,20 +85,35 @@ const Sidebar: React.FC = () => {
       {/* ── Desktop sidebar — always visible on md+ ── */}
       <aside className={`hidden md:flex flex-col w-56 shrink-0 border-r ${sidebarBg} sticky top-0 h-screen`}>
         <nav aria-label="Navigation principale" className="flex flex-col gap-1 pt-4 pb-4 flex-1">
-          {menuItems.map(item => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-xl mx-2 font-medium text-sm transition-all
-                ${isActive ? 'bg-blue-600 text-white shadow-sm' : inactiveClass}`
-              }
-            >
-              <span aria-hidden="true">{item.icon}</span>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+          {menuItems.map(item => {
+            const hasBadge = item.path === '/challenges' && notifCount > 0;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.end}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-3 rounded-xl mx-2 font-medium text-sm transition-all
+                  ${isActive ? 'bg-blue-600 text-white shadow-sm' : inactiveClass}`
+                }
+              >
+                <span aria-hidden="true" style={{ position: 'relative', display: 'inline-flex' }}>
+                  {item.icon}
+                  {hasBadge && (
+                    <span style={{
+                      position: 'absolute', top: -5, right: -7,
+                      minWidth: 16, height: 16, borderRadius: 999,
+                      background: '#EF4444', color: '#fff',
+                      fontSize: 9, fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 3px', border: '2px solid var(--q-chrome)',
+                    }}>{notifCount > 9 ? '9+' : notifCount}</span>
+                  )}
+                </span>
+                <span>{item.label}</span>
+              </NavLink>
+            );
+          })}
         </nav>
 
         {/* ── Suggestion du jour ── */}
@@ -102,8 +121,8 @@ const Sidebar: React.FC = () => {
           <div className="px-2 pb-4">
             <div className={`h-px mb-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
             <div className="flex items-center gap-1.5 px-2 mb-2">
-              <Sparkles size={13} className="text-amber-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+              <Sparkles size={13} style={{ color: 'var(--q-amber-text)' }} />
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--q-amber-text)' }}>
                 Suggestion du jour
               </span>
             </div>
@@ -132,13 +151,13 @@ const Sidebar: React.FC = () => {
 
                 <div className="flex items-center gap-1.5 flex-wrap mb-2">
                   <span
-                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold text-white"
+                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold text-gray-900"
                     style={{ background: DIFF_COLORS[dailyChallenge.difficulty] ?? '#94A3B8' }}
                   >
                     <DiffIcon size={10} aria-hidden="true" />
                     {DIFF_LABELS[dailyChallenge.difficulty] ?? dailyChallenge.difficulty}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-bold bg-amber-400 text-white">
+                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-bold bg-amber-400 text-gray-900">
                     <Sparkles size={10} aria-hidden="true" />
                     +50%
                   </span>
@@ -146,7 +165,7 @@ const Sidebar: React.FC = () => {
 
                 <p className="text-xs" style={{ color: darkMode ? '#9CA3AF' : '#6B7280' }}>
                   {dailyChallenge.coinReward} coins · {dailyChallenge.xpReward} XP
-                  <span className="block text-amber-500 font-medium">si réalisé aujourd'hui</span>
+                  <span className="block font-medium" style={{ color: 'var(--q-amber-text)' }}>si réalisé aujourd'hui</span>
                 </p>
               </div>
             </NavLink>
@@ -168,6 +187,7 @@ const Sidebar: React.FC = () => {
         }}>
           {mobileTabs.map(tab => {
             const active = isActiveTab(tab.path, tab.end);
+            const hasBadge = tab.path === '/challenges' && notifCount > 0;
             return (
               <NavLink
                 key={tab.path}
@@ -180,13 +200,23 @@ const Sidebar: React.FC = () => {
                   gap: 2, height: 44, borderRadius: 20, cursor: 'pointer',
                   background: active ? 'var(--q-accent)' : 'transparent',
                   color: active ? '#fff' : 'var(--q-text2)',
-                  boxShadow: active
-                    ? '0 4px 12px rgba(124,58,237,0.4)'
-                    : 'none',
-                  textDecoration: 'none',
+                  boxShadow: active ? '0 4px 12px rgba(124,58,237,0.4)' : 'none',
+                  textDecoration: 'none', position: 'relative',
                 }}
               >
-                <span aria-hidden="true">{tab.icon}</span>
+                <span aria-hidden="true" style={{ position: 'relative', display: 'inline-flex' }}>
+                  {tab.icon}
+                  {hasBadge && (
+                    <span style={{
+                      position: 'absolute', top: -4, right: -6,
+                      minWidth: 15, height: 15, borderRadius: 999,
+                      background: '#EF4444', color: '#fff',
+                      fontSize: 8, fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 3px',
+                    }}>{notifCount > 9 ? '9+' : notifCount}</span>
+                  )}
+                </span>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.2 }}>{tab.label}</span>
               </NavLink>
             );

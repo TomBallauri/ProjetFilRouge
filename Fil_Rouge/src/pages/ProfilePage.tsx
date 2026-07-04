@@ -138,21 +138,18 @@ const EditProfile: React.FC = () => {
     const token = localStorage.getItem('token');
     if (!token || !user) { setPageLoading(false); return; }
     setPageLoading(true);
-    Promise.all([
-      fetch('/api/users/me/challenges?limit=10', { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.json()).then(data => {
-          const list = Array.isArray(data) ? data : (data.challenges ?? []);
-          setUserChallenges(list);
-          if (!Array.isArray(data)) {
-            setChallengesTotal(data.total ?? list.length);
-            setTotalCompleted(data.totalCompleted ?? 0);
-            setTotalInProgress(data.totalInProgress ?? 0);
-            setChallengesHasMore(data.hasMore ?? false);
-          }
-        }).catch(() => {}),
-      fetch('/api/users/me/cosmetics', { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.json()).then(data => setOwnedCosmetics(Array.isArray(data) ? data : [])).catch(() => {}),
-    ]).finally(() => setPageLoading(false));
+    fetch('/api/users/me/profile-data', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => {
+        setUserChallenges(data.challenges ?? []);
+        setChallengesTotal(data.total ?? 0);
+        setTotalCompleted(data.totalCompleted ?? 0);
+        setTotalInProgress(data.totalInProgress ?? 0);
+        setChallengesHasMore(data.hasMore ?? false);
+        setOwnedCosmetics(data.cosmetics ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setPageLoading(false));
   }, [user]);
 
   const loadMoreChallenges = async () => {
@@ -169,62 +166,63 @@ const EditProfile: React.FC = () => {
     finally { setLoadingMoreChallenges(false); }
   };
 
-  const refreshCosmetics = async (token: string) => {
-    const data = await fetch('/api/users/me/cosmetics', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
-    setOwnedCosmetics(Array.isArray(data) ? data : []);
-    globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
-  };
-
-  const handleEquip = async (cosmeticId: number) => {
+  const handleEquip = (cosmeticId: number) => {
     const token = localStorage.getItem('token');
     if (!token) return;
     const cosmetic = ownedCosmetics.find(uc => uc.cosmeticId === cosmeticId);
-    if (cosmetic?.cosmetic.type === 'BADGE') {
+    if (!cosmetic) return;
+    if (cosmetic.cosmetic.type === 'BADGE') {
       const equippedBadges = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped).length;
       if (equippedBadges >= 3) {
         alert('Maximum 3 badges équipés. Déséquipez un badge d\'abord.');
         return;
       }
     }
-    setCosmeticLoading(cosmeticId);
-    try {
-      const res = await fetch(`/api/users/me/cosmetics/${cosmeticId}/equip`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert((err as { error?: string }).error ?? "Erreur lors de l'équipement");
-        return;
+    // Optimistic update — UI réagit immédiatement
+    const rollback = ownedCosmetics;
+    setOwnedCosmetics(prev => prev.map(uc => {
+      if (cosmetic.cosmetic.type === 'BADGE') {
+        return uc.cosmeticId === cosmeticId ? { ...uc, equipped: true } : uc;
       }
-      await refreshCosmetics(token);
-    } catch {
-      alert('Erreur réseau lors de l\'équipement');
-    } finally {
-      setCosmeticLoading(null);
-    }
+      if (uc.cosmetic.type === cosmetic.cosmetic.type) {
+        return { ...uc, equipped: uc.cosmeticId === cosmeticId };
+      }
+      return uc;
+    }));
+    setCosmeticLoading(cosmeticId);
+    fetch(`/api/users/me/cosmetics/${cosmeticId}/equip`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      .then(async res => {
+        if (!res.ok) {
+          setOwnedCosmetics(rollback);
+          const err = await res.json().catch(() => ({}));
+          alert((err as { error?: string }).error ?? "Erreur lors de l'équipement");
+        } else {
+          globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
+        }
+      })
+      .catch(() => setOwnedCosmetics(rollback))
+      .finally(() => setCosmeticLoading(null));
   };
 
-  const handleUnequip = async (cosmeticId: number) => {
+  const handleUnequip = (cosmeticId: number) => {
     const token = localStorage.getItem('token');
     if (!token) return;
+    const rollback = ownedCosmetics;
+    // Optimistic update
+    setOwnedCosmetics(prev => prev.map(uc => uc.cosmeticId === cosmeticId ? { ...uc, equipped: false } : uc));
     setCosmeticLoading(cosmeticId);
-    try {
-      const res = await fetch(`/api/users/me/cosmetics/${cosmeticId}/unequip`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert((err as { error?: string }).error ?? 'Erreur lors du déséquipement');
-        return;
-      }
-      await refreshCosmetics(token);
-    } catch {
-      alert('Erreur réseau lors du déséquipement');
-    } finally {
-      setCosmeticLoading(null);
-    }
+    fetch(`/api/users/me/cosmetics/${cosmeticId}/unequip`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      .then(async res => {
+        if (!res.ok) {
+          setOwnedCosmetics(rollback);
+          const err = await res.json().catch(() => ({}));
+          alert((err as { error?: string }).error ?? 'Erreur lors du déséquipement');
+        } else {
+          globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
+        }
+      })
+      .catch(() => setOwnedCosmetics(rollback))
+      .finally(() => setCosmeticLoading(null));
   };
 
   const validateEmail = (email: string) => {
@@ -461,10 +459,7 @@ const EditProfile: React.FC = () => {
           <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp"
             style={{ display: 'none' }} onChange={e => handleFileChange(e, 'banner')} />
         )}
-        {/* Decorative orbs */}
-        <div style={{ position: 'absolute', right: -40, top: 20, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', left: -30, bottom: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
-        {/* Back button */}
+{/* Back button */}
         {!isEditing && (
           <button onClick={() => navigate(-1)} className="q-press"
             style={{ position: 'absolute', top: 54, left: 18, width: 40, height: 40, borderRadius: 20,
@@ -548,6 +543,47 @@ const EditProfile: React.FC = () => {
               Niveau {user.level ?? 1}
             </span>
           </div>
+          {/* Bio */}
+          {isEditing ? (
+            <>
+              <label
+                htmlFor="profile-bio"
+                style={{ display: 'block', marginTop: 14, marginBottom: 4, fontSize: 12, fontWeight: 700, color: 'var(--q-text2)', letterSpacing: 0.5, textTransform: 'uppercase' }}
+              >
+                Bio
+              </label>
+              <textarea
+                id="profile-bio"
+                name="bio"
+                value={formData.bio}
+                onChange={handleInputChange}
+                maxLength={300}
+                aria-describedby="profile-bio-hint"
+                style={{
+                  width: '100%', maxWidth: 320, background: 'var(--q-chrome)',
+                  border: '2px solid var(--q-accent)', borderRadius: 12,
+                  padding: '10px 14px', fontSize: 15, lineHeight: 1.6,
+                  color: 'var(--q-text)', resize: 'none', outline: 'none',
+                  fontFamily: 'inherit', letterSpacing: 0.01,
+                }}
+                rows={3}
+                placeholder="Décris-toi en quelques mots…"
+              />
+              <p id="profile-bio-hint" style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 3 }}>
+                {formData.bio.length}/300 caractères
+              </p>
+            </>
+          ) : user.bio ? (
+            <p style={{
+              marginTop: 12, fontSize: 15, fontWeight: 400,
+              color: 'var(--q-text)',
+              lineHeight: 1.65, letterSpacing: 0.01,
+              maxWidth: 320, margin: '12px auto 0',
+              textAlign: 'center',
+            }}>
+              {user.bio}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -731,18 +767,6 @@ const EditProfile: React.FC = () => {
                     <Calendar size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
                     <span className="text-sm" style={{ color: 'var(--q-text2)' }}>Membre depuis {profileStats.memberSince}</span>
                   </div>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold mb-1.5" style={{ color: 'var(--q-text)' }}>Bio</p>
-                  {isEditing ? (
-                    <textarea name="bio" value={formData.bio} onChange={handleInputChange}
-                      className="w-full bg-transparent rounded-xl p-2 focus:outline-none text-sm"
-                      style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} rows={3} />
-                  ) : (
-                    <p className="text-sm" style={{ color: user.bio ? 'var(--q-text2)' : 'var(--q-text3)' }}>
-                      {user.bio ?? <em>Aucune bio renseignée</em>}
-                    </p>
-                  )}
                 </div>
                 {isEditing && (
                   <div>

@@ -155,6 +155,7 @@ const CreateChallenge: React.FC = () => {
   const { user, darkMode } = useStore();
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<ChallengeForm[]>([emptyChallenge()]);
+  const [seriesName, setSeriesName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -179,9 +180,10 @@ const CreateChallenge: React.FC = () => {
       const token = localStorage.getItem('token');
       const toSave = challenges.map(c => ({ ...c, isPublic }));
       const endpoint = challenges.length === 1 ? '/api/challenges' : '/api/challenges/bulk-save';
+      const trimmedSeries = seriesName.trim();
       const body = challenges.length === 1
         ? JSON.stringify({ ...toSave[0] })
-        : JSON.stringify({ challenges: toSave });
+        : JSON.stringify({ challenges: toSave, ...(trimmedSeries ? { seriesName: trimmedSeries } : {}) });
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -224,6 +226,29 @@ const CreateChallenge: React.FC = () => {
               onChange={f => updateChallenge(i, f)}
               onRemove={() => removeChallenge(i)} />
           ))}
+
+          {/* Nom de la série (optionnel, quand plusieurs défis) */}
+          {challenges.length > 1 && (
+            <div className={`rounded-xl border p-3 ${darkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+              <label htmlFor="series-name" className="block text-xs font-semibold mb-1.5 opacity-70">
+                Nom de la série <span className="opacity-50 font-normal">(optionnel)</span>
+              </label>
+              <input
+                id="series-name"
+                type="text"
+                maxLength={80}
+                value={seriesName}
+                onChange={e => setSeriesName(e.target.value)}
+                placeholder="Ex: Challenge 30 jours de sport"
+                className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm transition-colors ${
+                  darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
+                    : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:bg-white'
+                }`}
+              />
+              <p className="text-xs mt-1 opacity-40">Regroupe ces défis en une série accessible à tous</p>
+            </div>
+          )}
 
           {/* Bouton ajouter un défi */}
           <button type="button" onClick={addChallenge}

@@ -17,6 +17,7 @@ import ShopPage from './pages/ShopPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import UserProfilePage from './pages/UserProfilePage';
 import FriendsPage from './pages/FriendsPage';
+import GroupChatPage from './pages/GroupChatPage';
 import { useStore } from './lib/store';
 
 function App() {
@@ -67,6 +68,7 @@ function App() {
           <Route path="leaderboard" element={<LeaderboardPage />} />
           <Route path="user/:id" element={<UserProfilePage />} />
           <Route path="friends" element={<FriendsPage />} />
+          <Route path="groups/:groupId" element={<GroupChatPage />} />
         </Route>
       </Routes>
     </div>

@@ -127,12 +127,7 @@ const UserProfilePage: React.FC = () => {
             : { background: 'var(--q-vibrant-hero)' }),
         }}
       >
-        {/* Orbs (shown when no image) */}
-        {!bannerUrl && <>
-          <div style={{ position: 'absolute', right: -40, top: 20, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', left: -30, bottom: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
-        </>}
-        {/* Back button */}
+{/* Back button */}
         <button onClick={() => navigate(-1)} className="q-press"
           style={{ position: 'absolute', top: 54, left: 18, width: 40, height: 40, borderRadius: 20,
             background: 'rgba(255,255,255,0.85)', border: 'none', cursor: 'pointer',

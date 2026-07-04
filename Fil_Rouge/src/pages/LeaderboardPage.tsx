@@ -43,11 +43,11 @@ const PODIUM_SLOTS = [
   { rank: 1, idx: 0 },
   { rank: 3, idx: 2 },
 ];
-const BAR_H: Record<number, number> = { 1: 90, 2: 65, 3: 50 };
-const RANK_BADGE: Record<number, { bg: string; color: string }> = {
-  1: { bg: '#FACC15', color: '#fff' },
-  2: { bg: '#fff',    color: '#A78BFA' },
-  3: { bg: '#fff',    color: '#FB923C' },
+const BAR_H: Record<number, number> = { 1: 100, 2: 76, 3: 60 };
+const MEDAL_COLOR: Record<number, { bg: string; border: string; color: string }> = {
+  1: { bg: '#fff', border: '#FACC15', color: '#92400E' },
+  2: { bg: '#fff', border: '#A78BFA', color: '#7C3AED' },
+  3: { bg: '#fff', border: '#FB923C', color: '#9A3412' },
 };
 
 const token = () => localStorage.getItem('token') ?? '';
@@ -80,12 +80,12 @@ const LeaderboardPage: React.FC = () => {
     }
   }, [scope, friendsFetched]);
 
-  const users      = scope === 'amis' ? friendUsers : globalUsers;
-  const isLoading  = loading || (scope === 'amis' && friendsLoading);
-  const myRank     = user ? users.findIndex(u => u.id === user.id) + 1 : 0;
-  const myStreak   = user ? (users.find(u => u.id === user.id)?.currentStreak ?? 0) : 0;
-  const top3       = users.slice(0, 3);
-  const rest       = users.slice(3);
+  const users     = scope === 'amis' ? friendUsers : globalUsers;
+  const isLoading = loading || (scope === 'amis' && friendsLoading);
+  const myRank    = user ? users.findIndex(u => u.id === user.id) + 1 : 0;
+  const myStreak  = user ? (users.find(u => u.id === user.id)?.currentStreak ?? 0) : 0;
+  const top3      = users.slice(0, 3);
+  const rest      = users.slice(3);
 
   const goToProfile = (u: LeaderboardUser) => {
     if (u.id === user?.id) navigate('/profile');
@@ -163,7 +163,7 @@ const LeaderboardPage: React.FC = () => {
           <div style={{ marginBottom: 12, opacity: 0.3 }}>
             {scope === 'amis'
               ? <Users size={48} style={{ margin: '0 auto', color: 'var(--q-text3)' }} aria-hidden="true" />
-              : <Globe  size={48} style={{ margin: '0 auto', color: 'var(--q-text3)' }} aria-hidden="true" />}
+              : <Globe size={48} style={{ margin: '0 auto', color: 'var(--q-text3)' }} aria-hidden="true" />}
           </div>
           <p style={{ fontSize: 14, color: 'var(--q-text3)', fontWeight: 600 }}>
             {scope === 'amis' ? 'Ajoute des amis pour les voir ici !' : "Aucun joueur classé pour l'instant."}
@@ -177,22 +177,22 @@ const LeaderboardPage: React.FC = () => {
           {top3.length >= 3 && (
             <div style={{ padding: '8px 0 0' }}>
               <div style={{
-                background: 'linear-gradient(135deg, #FACC15 0%, #FB923C 50%, #EC4899 100%)',
-                borderRadius: 28, padding: '24px 12px 0',
+                background: 'var(--q-vibrant-gold)',
+                borderRadius: 28, padding: '24px 16px 0',
                 position: 'relative', overflow: 'hidden',
-                boxShadow: '0 16px 36px -8px rgba(251,146,60,0.55)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                boxShadow: '0 1px 0 rgba(255,255,255,0.35) inset, 0 14px 32px -10px rgba(250,204,21,0.55)',
               }}>
-                {/* Decorative blobs */}
-                <div style={{ position: 'absolute', right: -40, top: -40, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', left: -30, bottom: 20, width: 130, height: 130, borderRadius: '50%', background: 'rgba(255,255,255,0.10)', pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', right: 60, bottom: -20, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
+                {/* Decorative orbs */}
+                <div style={{ position: 'absolute', right: -30, top: -30, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', left: -20, bottom: -30, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
 
                 {/* 3 columns */}
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 6, position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 10, position: 'relative', zIndex: 1 }}>
                   {PODIUM_SLOTS.map(({ rank, idx }) => {
                     const u = top3[idx];
                     if (!u) return null;
-                    const badge = RANK_BADGE[rank];
+                    const medal = MEDAL_COLOR[rank];
                     const avatarSize = rank === 1 ? 'lg' : 'md';
                     return (
                       <button key={u.id} onClick={() => goToProfile(u)}
@@ -207,12 +207,12 @@ const LeaderboardPage: React.FC = () => {
                             className={rank === 1 ? 'ring-4 ring-white/60' : 'ring-2 ring-white/40'}
                           />
                           <div style={{
-                            position: 'absolute', bottom: -4, right: -4,
-                            width: 20, height: 20, borderRadius: 10,
-                            background: badge.bg, color: badge.color,
-                            fontSize: 10, fontWeight: 900,
+                            position: 'absolute', bottom: -3, right: -3,
+                            width: 24, height: 24, borderRadius: 12,
+                            background: medal.bg, color: medal.color,
+                            fontSize: 11, fontWeight: 800,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            border: '2px solid rgba(255,255,255,0.8)',
+                            border: `2.5px solid ${medal.border}`,
                             fontFamily: 'var(--q-display)',
                           }}>{rank}</div>
                         </div>
@@ -220,7 +220,7 @@ const LeaderboardPage: React.FC = () => {
                         {/* Name */}
                         <div style={{
                           fontSize: rank === 1 ? 13 : 11, fontWeight: 700, color: '#fff',
-                          textAlign: 'center', maxWidth: 72,
+                          textAlign: 'center', maxWidth: 80,
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           marginBottom: 2,
                         }}>
@@ -242,10 +242,10 @@ const LeaderboardPage: React.FC = () => {
                         {/* Step bar */}
                         <div style={{
                           width: '100%', height: BAR_H[rank],
-                          background: 'rgba(255,255,255,0.28)',
-                          borderRadius: '14px 14px 0 0',
-                          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-                          paddingTop: 10,
+                          background: 'rgba(255,255,255,0.25)',
+                          borderRadius: '16px 16px 4px 4px',
+                          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -3px 0 rgba(0,0,0,0.08)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontFamily: 'var(--q-display)', fontSize: rank === 1 ? 28 : 22,
                           fontWeight: 800, color: 'rgba(255,255,255,0.9)',
                         }}>
@@ -273,23 +273,23 @@ const LeaderboardPage: React.FC = () => {
                   boxShadow: 'var(--q-shadow)',
                 }}>
                   {listUsers.map((u, i) => {
-                    const rank  = i + rankOffset;
-                    const isMe  = user?.id === u.id;
+                    const rank = i + rankOffset;
+                    const isMe = user?.id === u.id;
                     return (
                       <button key={u.id} onClick={() => goToProfile(u)}
                         aria-label={`${u.username}${isMe ? ' (vous)' : ''}, rang ${rank}`}
                         style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                          padding: '13px 16px',
+                          padding: '12px 14px',
                           borderTop: i > 0 ? '1px solid var(--q-line)' : 'none',
-                          background: isMe ? 'rgba(124,58,237,0.07)' : 'transparent',
+                          background: isMe ? 'var(--q-accent-soft)' : 'transparent',
                           border: 'none', cursor: 'pointer', textAlign: 'left',
                         }}>
 
                         {/* Rank */}
                         <span style={{
-                          width: 22, textAlign: 'center', flexShrink: 0,
-                          fontSize: 13, fontWeight: 700,
+                          width: 26, textAlign: 'center', flexShrink: 0,
+                          fontSize: 12, fontWeight: 700,
                           color: rank <= 3 ? '#FB923C' : 'var(--q-text3)',
                           fontFamily: 'var(--q-mono)',
                         }}>{rank}</span>
@@ -335,6 +335,53 @@ const LeaderboardPage: React.FC = () => {
               </div>
             );
           })()}
+
+          {/* ── Guild card ── */}
+          <div style={{ padding: '18px 0 0' }}>
+            <div style={{
+              padding: 16, borderRadius: 22,
+              background: 'var(--q-vibrant-rose)',
+              position: 'relative', overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,0.25)',
+              boxShadow: '0 1px 0 rgba(255,255,255,0.35) inset, 0 14px 32px -10px rgba(236,72,153,0.55)',
+            }}>
+              {/* Decorative orbs */}
+              <div style={{ position: 'absolute', right: -30, top: -30, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', left: -10, bottom: -30, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.10)', pointerEvents: 'none' }} />
+
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 12,
+                  background: 'rgba(255,255,255,0.95)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Users size={18} color="#EC4899" aria-hidden="true" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontFamily: 'var(--q-display)', color: '#fff', letterSpacing: -0.2, fontWeight: 700 }}>
+                    Ma Guilde
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>
+                    Rejoins une guilde pour participer
+                  </div>
+                </div>
+                <ChevronRight size={16} color="#fff" aria-hidden="true" />
+              </div>
+
+              <div style={{ position: 'relative', marginTop: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
+                  Défi collectif en cours
+                </div>
+                <div style={{ fontSize: 13, color: '#fff', fontWeight: 600, marginBottom: 6 }}>
+                  Atteindre 50 000 XP avant la fin de saison
+                </div>
+                {/* Progress bar */}
+                <div style={{ width: '100%', height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.25)', overflow: 'hidden' }}>
+                  <div style={{ width: '0%', height: '100%', borderRadius: 999, background: '#fff' }} />
+                </div>
+              </div>
+            </div>
+          </div>
         </>
       )}
     </div>

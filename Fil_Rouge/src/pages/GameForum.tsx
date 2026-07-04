@@ -144,7 +144,7 @@ const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
 
 const GameForum: React.FC = () => {
   usePageTitle('Accueil');
-  const { user } = useStore();
+  const { user, notifData, notifCount, setNotifCount } = useStore();
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<UserChallenge[]>([]);
   const [recentTopics, setRecentTopics] = useState<Topic[]>([]);
@@ -155,10 +155,7 @@ const GameForum: React.FC = () => {
   const [loadingTopics, setLoadingTopics] = useState(true);
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
-  const notifPrefs = (() => {
-    try { return JSON.parse(localStorage.getItem('notifToggles') ?? 'null') ?? { defis: true, messages: true, updates: false }; }
-    catch { return { defis: true, messages: true, updates: false }; }
-  })();
+  const [panelUnreadGroups, setPanelUnreadGroups] = useState<{ groupId: number; seriesName: string }[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -314,58 +311,113 @@ const GameForum: React.FC = () => {
             <CircleDollarSign size={14} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString('fr')}
           </Link>
           <div style={{ position: 'relative' }}>
-            <button className="q-press" aria-label="Notifications" onClick={() => setNotifPanelOpen(o => !o)} style={{
+            <button className="q-press" aria-label="Notifications" onClick={() => {
+              const willOpen = !notifPanelOpen;
+              setNotifPanelOpen(willOpen);
+              if (willOpen && notifData) {
+                // Read once, use twice
+                const currentSeen = JSON.parse(localStorage.getItem('notif_seen') ?? '{}');
+                // Snapshot unread groups BEFORE marking as seen so the panel can display them
+                setPanelUnreadGroups(
+                  notifData.groups.filter(g =>
+                    g.latestMessageId && g.latestMessageId > ((currentSeen.groups?.[String(g.groupId)]) ?? 0)
+                  )
+                );
+                // Mark group messages as seen — friend/invite counts persist until acted on
+                const seenGroups: Record<string, number> = {};
+                notifData.groups.forEach(g => { seenGroups[String(g.groupId)] = g.latestMessageId ?? 0; });
+                localStorage.setItem('notif_seen', JSON.stringify({ ...currentSeen, groups: seenGroups }));
+                // Immediate badge update — next poll will reconfirm
+                setNotifCount(notifData.pendingFriendRequests + notifData.pendingSeriesInvites);
+              }
+            }} style={{
               width: 40, height: 40, borderRadius: 20, flexShrink: 0,
               border: '1px solid rgba(250,204,21,0.35)',
-              background: 'var(--q-chrome)', color: '#CA8A04',
+              background: 'var(--q-chrome)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 4px 12px -2px rgba(250,204,21,0.35)',
               cursor: 'pointer',
             }}>
-              <Bell size={18} color="#CA8A04" aria-hidden="true" />
+              <Bell size={18} style={{ color: 'var(--q-amber-text)' }} aria-hidden="true" />
             </button>
-            {notifPrefs.defis && inProgress.length > 0 && (
-              <span aria-label={`${inProgress.length} défi${inProgress.length > 1 ? 's' : ''} en cours`} style={{
+            {notifCount > 0 && (
+              <span aria-label={`${notifCount} notification${notifCount > 1 ? 's' : ''}`} style={{
                 position: 'absolute', top: -4, right: -4,
                 width: 18, height: 18, borderRadius: '50%',
-                background: 'linear-gradient(135deg,#FB923C,#EC4899)',
+                background: '#EF4444',
                 color: '#fff', fontSize: 10, fontWeight: 800,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 border: '2px solid var(--q-chrome)',
-              }}>{inProgress.length}</span>
+                pointerEvents: 'none',
+              }}>{notifCount > 9 ? '9+' : notifCount}</span>
             )}
             {notifPanelOpen && (
-              <div style={{
+              <div role="dialog" aria-label="Notifications" style={{
                 position: 'absolute', top: 48, right: 0, zIndex: 200,
-                width: 280, borderRadius: 18,
+                width: 290, borderRadius: 18,
                 background: 'var(--q-chrome)', border: '1px solid var(--q-line)',
                 boxShadow: '0 16px 40px -8px rgba(0,0,0,0.4)',
                 overflow: 'hidden',
               }}>
                 <div style={{ padding: '12px 14px 8px', borderBottom: '1px solid var(--q-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--q-text)' }}>Notifications</span>
-                  <button onClick={() => setNotifPanelOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', padding: 0 }}>✕</button>
+                  <button onClick={() => setNotifPanelOpen(false)} aria-label="Fermer" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', padding: 0, fontSize: 16, lineHeight: 1 }}>✕</button>
                 </div>
-                {notifPrefs.defis && inProgress.length > 0 ? (
-                  inProgress.slice(0, 4).map(uc => (
-                    <button key={uc.id} onClick={() => { setNotifPanelOpen(false); navigate('/challenges'); }}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
-                      <Flame size={14} color="#FB923C" aria-hidden="true" />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uc.challenge.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--q-text3)' }}>Défi en cours</div>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div style={{ padding: '16px 14px', fontSize: 13, color: 'var(--q-text3)', textAlign: 'center' }}>
-                    Aucune notification active
+
+                {/* Streak at risk */}
+                {notifData?.streakAtRisk && (
+                  <button onClick={() => { setNotifPanelOpen(false); navigate('/challenges'); }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(251,146,60,0.08)', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
+                    <Flame size={16} color="#FB923C" aria-hidden="true" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--q-text)' }}>Ta streak est en danger !</div>
+                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>{notifData.streakDays}j de serie — fais un defi aujourd'hui pour ne pas la perdre.</div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Unread group messages — snapshot taken at panel open */}
+                {panelUnreadGroups.map(g => (
+                  <button key={g.groupId} onClick={() => { setNotifPanelOpen(false); navigate(`/groups/${g.groupId}`); }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
+                    <MessageSquare size={15} color="var(--q-accent)" aria-hidden="true" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.seriesName}</div>
+                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>Nouveaux messages dans le groupe</div>
+                    </div>
+                  </button>
+                ))}
+
+                {/* Pending friend requests */}
+                {(notifData?.pendingFriendRequests ?? 0) > 0 && (
+                  <button onClick={() => { setNotifPanelOpen(false); navigate('/friends'); }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
+                    <Users size={15} color="var(--q-accent)" aria-hidden="true" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--q-text)' }}>{notifData!.pendingFriendRequests} demande{notifData!.pendingFriendRequests > 1 ? 's' : ''} d'ami</div>
+                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>En attente de ta reponse</div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Pending series invites */}
+                {(notifData?.pendingSeriesInvites ?? 0) > 0 && (
+                  <button onClick={() => { setNotifPanelOpen(false); navigate('/challenges'); }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
+                    <Trophy size={15} color="var(--q-accent)" aria-hidden="true" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--q-text)' }}>{notifData!.pendingSeriesInvites} invitation{notifData!.pendingSeriesInvites > 1 ? 's' : ''} de groupe</div>
+                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>Rejoins une serie en groupe</div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Empty state */}
+                {!notifData?.streakAtRisk && (notifData?.pendingFriendRequests ?? 0) === 0 && (notifData?.pendingSeriesInvites ?? 0) === 0 && panelUnreadGroups.length === 0 && (
+                  <div style={{ padding: '20px 14px', fontSize: 13, color: 'var(--q-text3)', textAlign: 'center' }}>
+                    Tout est a jour !
                   </div>
                 )}
-                <button onClick={() => { setNotifPanelOpen(false); navigate('/profile'); }}
-                  style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--q-accent)', fontWeight: 600, textAlign: 'center' }}>
-                  Gérer les notifications →
-                </button>
               </div>
             )}
           </div>
