@@ -740,8 +740,8 @@ const GameForum: React.FC = () => {
                     <div className="text-xs font-bold text-white truncate max-w-full" style={{ opacity: rank === 1 ? 1 : 0.85 }}>
                       {u.username}
                     </div>
-                    <div className="text-[10px] mb-2" style={{ color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--q-mono)' }}>
-                      {(u.xp ?? 0).toLocaleString('fr')}
+                    <div className="text-[10px] mb-2 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--q-mono)' }}>
+                      <Flame size={9} aria-hidden="true" /> {u.currentStreak}j
                     </div>
                     <div className="w-full flex items-center justify-center font-black"
                       style={{ height: PODIUM_BAR_H[rank], background: 'rgba(255,255,255,0.25)',

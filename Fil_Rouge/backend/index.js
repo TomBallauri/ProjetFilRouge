@@ -933,7 +933,7 @@ app.get('/api/users/:id/profile', async (req, res) => {
         id: true, username: true, avatar: true, banner: true, bio: true,
         xp: true, level: true, createdAt: true,
         cosmetics: { where: { equipped: true }, include: { cosmetic: true } },
-        _count: { select: { challenges: true } }
+        _count: { select: { challenges: { where: { status: 'COMPLETED' } } } }
       }
     });
     if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
