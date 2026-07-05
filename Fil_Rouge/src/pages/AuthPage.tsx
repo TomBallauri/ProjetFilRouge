@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useStore } from '../lib/store';
 import { Eye, EyeOff, Mail, Lock, User, Zap } from 'lucide-react';
 import BackButton from '../components/BackButton';
+import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordPolicy';
 
 type AuthMode = 'login' | 'register';
 
 
 const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const resetSuccess = !!(location.state as { resetSuccess?: boolean } | null)?.resetSuccess;
   const { setUser, darkMode } = useStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,8 +22,12 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    if (mode === 'register' && !isStrongPassword(password)) {
+      setError(`Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}`);
+      return;
+    }
+    setLoading(true);
     try {
       const url = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
       const body = mode === 'register'
@@ -70,6 +77,9 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
   const errorBg     = dk ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.07)';
   const errorBorder = dk ? 'rgba(239,68,68,0.30)' : 'rgba(239,68,68,0.25)';
   const errorColor  = dk ? '#FCA5A5' : '#DC2626';
+  const successBg     = dk ? 'rgba(52,211,153,0.12)' : 'rgba(52,211,153,0.08)';
+  const successBorder = dk ? 'rgba(52,211,153,0.30)' : 'rgba(52,211,153,0.25)';
+  const successColor  = dk ? '#6EE7B7' : '#059669';
 
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
@@ -176,7 +186,27 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
                   {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                 </button>
               </div>
+              {!isLogin && (
+                <p style={{ fontSize: 11, color: labelColor, marginTop: 6, lineHeight: 1.4 }}>
+                  {PASSWORD_REQUIREMENTS_TEXT}
+                </p>
+              )}
+              {isLogin && (
+                <div style={{ textAlign: 'right', marginTop: 6 }}>
+                  <Link to="/forgot-password" style={{ color: linkColor, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                    Mot de passe oublié ?
+                  </Link>
+                </div>
+              )}
             </div>
+
+            {/* Reset success */}
+            {isLogin && resetSuccess && (
+              <div role="status" style={{ padding: '10px 14px', borderRadius: 12, background: successBg,
+                border: `1px solid ${successBorder}`, color: successColor, fontSize: 13 }}>
+                Mot de passe mis à jour. Tu peux te connecter.
+              </div>
+            )}
 
             {/* Error */}
             {error && (

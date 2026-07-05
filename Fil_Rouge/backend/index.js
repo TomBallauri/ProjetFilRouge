@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import Groq from 'groq-sdk';
+import nodemailer from 'nodemailer';
 import { StreakService } from './services/StreakService.js';
 import { RewardCalculator, GroupBonus, LevelProgression } from './services/RewardCalculator.js';
 
@@ -25,6 +26,20 @@ app.use((req, res, next) => {
 });
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 const DEFAULT_AVATAR = '/default-avatar.svg';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
+const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+// Règle de mot de passe fort, identique côté frontend (src/lib/passwordPolicy.ts) :
+// 8 caractères minimum, une majuscule, une minuscule, un chiffre, un caractère spécial.
+const STRONG_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+const PASSWORD_REQUIREMENTS_TEXT = '8 caractères minimum, avec au moins une majuscule, une minuscule, un chiffre et un caractère spécial.';
+const isStrongPassword = (password) => STRONG_PASSWORD_RE.test(password);
+
+const mailer = nodemailer.createTransport({
+  service: 'gmail',
+  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+});
 
 // Alias conservé le temps de la migration : toute la logique de streak vit
 // désormais dans services/StreakService.js (voir docs/architecture-reutilisable.md).
@@ -35,6 +50,7 @@ async function updateStreak(userId) {
 app.post('/api/auth/register', async (req, res) => {
   const { username, email, password, avatar } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis.' });
+  if (!isStrongPassword(password)) return res.status(400).json({ error: `Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}` });
   try {
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
@@ -63,6 +79,63 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token, user: { ...user, avatar: user.avatar || DEFAULT_AVATAR } });
 });
 
+// Ne révèle jamais si l'email existe ou non (évite l'énumération de comptes) —
+// la réponse est identique que l'email soit connu ou pas.
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email requis.' });
+  const genericMessage = { message: 'Si un compte existe avec cet email, un lien de réinitialisation vient de lui être envoyé.' };
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.json(genericMessage);
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashResetToken(rawToken),
+        expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+      },
+    });
+
+    const resetUrl = `${FRONTEND_URL}/reset-password?token=${rawToken}`;
+    await mailer.sendMail({
+      from: `"U-Quail" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Réinitialise ton mot de passe U-Quail',
+      html: `<p>Tu as demandé à réinitialiser ton mot de passe.</p>
+             <p><a href="${resetUrl}">Clique ici pour choisir un nouveau mot de passe</a> (valable 1 heure).</p>
+             <p>Si tu n'es pas à l'origine de cette demande, ignore simplement cet email.</p>`,
+    });
+    res.json(genericMessage);
+  } catch (error) {
+    console.error('[forgot-password]', error);
+    res.json(genericMessage);
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Token et nouveau mot de passe requis.' });
+  if (!isStrongPassword(password)) return res.status(400).json({ error: `Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}` });
+  try {
+    const tokenHash = hashResetToken(token);
+    const record = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+    if (!record || record.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Lien invalide ou expiré.' });
+    }
+    const hashed = await bcrypt.hash(password, 10);
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: record.userId }, data: { password: hashed } }),
+      prisma.passwordResetToken.deleteMany({ where: { userId: record.userId } }),
+    ]);
+    res.json({ message: 'Mot de passe mis à jour. Tu peux te connecter.' });
+  } catch (error) {
+    console.error('[reset-password]', error);
+    res.status(500).json({ error: 'Erreur lors de la réinitialisation.' });
+  }
+});
+
 app.get('/api/users', isAdmin, async (req, res) => {
   const users = await prisma.user.findMany({
     select: {
@@ -72,14 +145,6 @@ app.get('/api/users', isAdmin, async (req, res) => {
     orderBy: { id: 'asc' },
   });
   res.json(users);
-});
-
-app.post('/users', async (req, res) => {
-  const { email, name, password } = req.body;
-  const user = await prisma.user.create({
-    data: { email, name, password }
-  });
-  res.json(user);
 });
 
 app.get('/api/users/me', async (req, res) => {
@@ -143,6 +208,7 @@ app.put('/api/users/me/password', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
     const valid = await bcrypt.compare(currentPassword, user.password);
     if (!valid) return res.status(400).json({ error: 'Mot de passe actuel incorrect' });
+    if (!isStrongPassword(newPassword)) return res.status(400).json({ error: `Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}` });
     const hashed = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: userId },

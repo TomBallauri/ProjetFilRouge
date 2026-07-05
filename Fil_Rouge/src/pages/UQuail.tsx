@@ -154,7 +154,7 @@ const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
 
 // ── Main ───────────────────────────────────────────────────────────────────
 
-const QuailU: React.FC = () => {
+const UQuail: React.FC = () => {
   usePageTitle('Accueil');
   const { user, notifData, notifCount, setNotifCount } = useStore();
   const navigate = useNavigate();
@@ -864,4 +864,4 @@ const QuailU: React.FC = () => {
   );
 };
 
-export default QuailU;
+export default UQuail;

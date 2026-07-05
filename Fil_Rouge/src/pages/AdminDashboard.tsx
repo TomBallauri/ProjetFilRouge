@@ -638,12 +638,12 @@ const AdminDashboard: React.FC = () => {
                     ...c, type: v,
                     // Seuls les cadres et bannières affichent une image (voir ShopPage) —
                     // on efface l'image si elle ne servirait plus à rien pour ce type.
-                    imageUrl: (v === 'AVATAR_FRAME' || v === 'BANNER') ? c.imageUrl : '',
+                    imageUrl: (v === 'AVATAR_FRAME' || v === 'BANNER') ? c?.imageUrl : '',
                   }))} />
               )}</Field>
               <Field label="Rareté">{id => (
                 <Select id={id} value={editingCosmetic.rarity ?? 'COMMON'} options={RARITIES}
-                  onChange={v => setEditingCosmetic(c => ({ ...c, rarity: v, price: RARITY_BASE_PRICE[v] ?? c.price }))} />
+                  onChange={v => setEditingCosmetic(c => ({ ...c, rarity: v, price: RARITY_BASE_PRICE[v] ?? c?.price }))} />
               )}</Field>
             </div>
             <Field label="Prix">{id => (

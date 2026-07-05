@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import AdminDashboard from './pages/AdminDashboard';
-import QuailU from './pages/QuailU';
+import UQuail from './pages/UQuail';
 import TasksPage from './pages/TasksPage';
 import ProfilePage from './pages/ProfilePage';
 import AuthPage from './pages/AuthPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChallengePage from './pages/ChallengePage';
 import CreateChallenge from './pages/CreateChallenge';
 import AIChallengeGenerator from './pages/AIChallengeGenerator';
@@ -47,9 +49,11 @@ function App() {
       <Routes>
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/register" element={<AuthPage mode="register" />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/" element={<Layout />}>
-          <Route index element={<QuailU />} />
+          <Route index element={<UQuail />} />
           <Route path="tasks" element={<TasksPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<div className="p-4">Settings (Coming Soon)</div>} />

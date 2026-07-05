@@ -6,6 +6,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 import PageLoader from '../components/PageLoader';
+import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordPolicy';
 
 type OwnedCosmetic = EquippedCosmetic & { id: number; purchasedAt: string };
 
@@ -252,6 +253,10 @@ const EditProfile: React.FC = () => {
     }
     if (!passwordData.currentPassword || !passwordData.newPassword) {
       alert("Veuillez remplir tous les champs.");
+      return;
+    }
+    if (!isStrongPassword(passwordData.newPassword)) {
+      alert(`Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}`);
       return;
     }
     try {
@@ -750,6 +755,9 @@ const EditProfile: React.FC = () => {
                           <input type="password" name={field} value={passwordData[field]} onChange={handlePasswordChange}
                             className="w-full px-3 py-2 rounded-xl bg-transparent focus:outline-none text-sm"
                             style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} />
+                          {field === 'newPassword' && (
+                            <p className="text-xs mt-1" style={{ color: 'var(--q-text2)' }}>{PASSWORD_REQUIREMENTS_TEXT}</p>
+                          )}
                         </div>
                       ))}
                       <button onClick={handlePasswordSave}
