@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import AdminDashboard from './pages/AdminDashboard';
-import GameForum from './pages/GameForum';
+import QuailU from './pages/QuailU';
 import TasksPage from './pages/TasksPage';
 import ProfilePage from './pages/ProfilePage';
 import AuthPage from './pages/AuthPage';
@@ -49,7 +49,7 @@ function App() {
         <Route path="/register" element={<AuthPage mode="register" />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/" element={<Layout />}>
-          <Route index element={<GameForum />} />
+          <Route index element={<QuailU />} />
           <Route path="tasks" element={<TasksPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<div className="p-4">Settings (Coming Soon)</div>} />

@@ -154,7 +154,7 @@ const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
 
 // ── Main ───────────────────────────────────────────────────────────────────
 
-const GameForum: React.FC = () => {
+const QuailU: React.FC = () => {
   usePageTitle('Accueil');
   const { user, notifData, notifCount, setNotifCount } = useStore();
   const navigate = useNavigate();
@@ -864,4 +864,4 @@ const GameForum: React.FC = () => {
   );
 };
 
-export default GameForum;
+export default QuailU;
