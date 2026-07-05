@@ -49,7 +49,13 @@ const EditProfile: React.FC = () => {
   usePageTitle('Profil');
   const { user, setUser, darkMode, toggleDarkMode } = useStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const navigate = useNavigate();
+
+  const showNotif = (msg: string, type: 'success' | 'error') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3500);
+  };
 
   const [formData, setFormData] = useState({
     username: user?.username || '',
@@ -248,15 +254,15 @@ const EditProfile: React.FC = () => {
 
   const handlePasswordSave = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert("Les mots de passe ne correspondent pas.");
+      showNotif("Les mots de passe ne correspondent pas.", 'error');
       return;
     }
     if (!passwordData.currentPassword || !passwordData.newPassword) {
-      alert("Veuillez remplir tous les champs.");
+      showNotif("Veuillez remplir tous les champs.", 'error');
       return;
     }
     if (!isStrongPassword(passwordData.newPassword)) {
-      alert(`Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}`);
+      showNotif(`Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}`, 'error');
       return;
     }
     try {
@@ -274,13 +280,14 @@ const EditProfile: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "Erreur lors du changement de mot de passe");
+        showNotif(data.error || "Erreur lors du changement de mot de passe", 'error');
         return;
       }
-      alert("Mot de passe mis à jour avec succès !");
+      showNotif("Mot de passe mis à jour avec succès !", 'success');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setIsEditing(false);
     } catch (err) {
-      alert("Erreur réseau lors du changement de mot de passe");
+      showNotif("Erreur réseau lors du changement de mot de passe", 'error');
     }
   };
 
@@ -1088,6 +1095,14 @@ const EditProfile: React.FC = () => {
           <LogOut size={16} /> Se déconnecter
         </button>
       </div>
+
+      <div aria-live="polite" aria-atomic="true" className="sr-only">{notification?.msg}</div>
+      {notification && (
+        <output className={`fixed top-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-50 px-5 py-3 rounded-2xl shadow-lg text-white font-bold text-sm ${notification.type === 'success' ? '' : 'bg-red-500'}`}
+          style={notification.type === 'success' ? { background: 'linear-gradient(135deg,#34D399,#38BDF8)', boxShadow: '0 8px 24px rgba(52,211,153,0.45)' } : {}}>
+          {notification.msg}
+        </output>
+      )}
     </div>
   );
 };
