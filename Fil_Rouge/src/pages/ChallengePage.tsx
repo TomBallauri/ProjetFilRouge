@@ -515,7 +515,7 @@ const SeriesDropdown: React.FC<{
   const token = () => localStorage.getItem('token') ?? '';
 
   const sorted = [...challenges].sort((a, b) => {
-    const n = (t: string) => parseInt(t.match(/\d+/)?.[0] ?? '0', 10);
+    const n = (t: string) => Number.parseInt(/\d+/.exec(t)?.[0] ?? '0', 10);
     return n(a.title) - n(b.title);
   });
   const doneCount = sorted.filter(c => getUserStatus(c.id) === 'COMPLETED').length;
@@ -2079,7 +2079,8 @@ const ChallengePage: React.FC = () => {
       {inviteModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setInviteModal(null); }}>
+          onClick={e => { if (e.target === e.currentTarget) setInviteModal(null); }}
+          onKeyDown={e => { if (e.key === 'Escape') setInviteModal(null); }}>
           <div className="w-full max-w-sm rounded-3xl p-5 flex flex-col gap-4"
             style={{ background: 'var(--q-chrome)', boxShadow: '0 24px 48px -12px rgba(0,0,0,0.55)', border: '1px solid var(--q-line)' }}>
             <div className="flex items-center justify-between">
@@ -2161,7 +2162,8 @@ const ChallengePage: React.FC = () => {
       {inviteExistingGroup && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setInviteExistingGroup(null); }}>
+          onClick={e => { if (e.target === e.currentTarget) setInviteExistingGroup(null); }}
+          onKeyDown={e => { if (e.key === 'Escape') setInviteExistingGroup(null); }}>
           <div className="w-full max-w-sm rounded-3xl p-5 flex flex-col gap-4"
             style={{ background: 'var(--q-chrome)', boxShadow: '0 24px 48px -12px rgba(0,0,0,0.55)', border: '1px solid var(--q-line)' }}>
             <div className="flex items-center justify-between">
