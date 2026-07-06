@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types/User';
 
-export type NotifGroup = { groupId: number; seriesName: string; latestMessageId: number | null };
+export type NotifGroup = { groupId: number; seriesName: string; latestMessageId: number | null; latestMessageUserId: number | null };
 export type NotifData = {
   pendingFriendRequests: number;
   pendingSeriesInvites: number;

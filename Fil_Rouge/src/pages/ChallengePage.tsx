@@ -75,9 +75,10 @@ const CONFETTI_COLORS = ['#A78BFA','#EC4899','#FACC15','#34D399','#38BDF8','#FB9
 interface CelebrationProps {
   coins: number; xp: number; isDailyBonus: boolean;
   multiplier?: number; streakUp?: number; onDismiss: () => void;
+  groupSize?: number; groupBonusMultiplier?: number;
 }
 
-const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonus, multiplier, streakUp, onDismiss }) => {
+const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonus, multiplier, streakUp, onDismiss, groupSize, groupBonusMultiplier }) => {
   const [displayCoins, setDisplayCoins] = useState(0);
   const [displayXp, setDisplayXp]       = useState(0);
   const [streakPhase, setStreakPhase]   = useState<'before' | 'exiting' | 'after'>('before');
@@ -283,6 +284,16 @@ const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonu
             <span className="flex items-center gap-1.5 font-black text-sm text-amber-900 px-5 py-2 rounded-full"
               style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)', boxShadow: '0 6px 20px rgba(251,146,60,0.5)' }}>
               <Sparkles size={14} aria-hidden="true" /> ×{multiplier} bonus journalier
+            </span>
+          </div>
+        )}
+
+        {/* Group bonus chip */}
+        {!!groupSize && groupSize > 1 && !!groupBonusMultiplier && (
+          <div style={{ animation: 'reward-item-pop 0.4s 0.94s cubic-bezier(0.34,1.56,0.64,1) both' }}>
+            <span className="flex items-center gap-1.5 font-black text-sm text-white px-5 py-2 rounded-full"
+              style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)', boxShadow: '0 6px 20px rgba(167,139,250,0.5)' }}>
+              <Users size={14} aria-hidden="true" /> ×{groupBonusMultiplier.toFixed(1)} bonus de groupe ({groupSize} joueurs)
             </span>
           </div>
         )}
@@ -504,7 +515,7 @@ const SeriesDropdown: React.FC<{
   const token = () => localStorage.getItem('token') ?? '';
 
   const sorted = [...challenges].sort((a, b) => {
-    const n = (t: string) => parseInt(t.match(/\d+/)?.[0] ?? '0', 10);
+    const n = (t: string) => Number.parseInt(/\d+/.exec(t)?.[0] ?? '0', 10);
     return n(a.title) - n(b.title);
   });
   const doneCount = sorted.filter(c => getUserStatus(c.id) === 'COMPLETED').length;
@@ -1106,7 +1117,7 @@ const SeriesDropdown: React.FC<{
                     </div>
 
                     {/* Messages */}
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="q-hidescroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {messages.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--q-text3)', fontSize: 13 }}>
                           <MessageCircle size={32} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.3 }} />
@@ -1122,7 +1133,8 @@ const SeriesDropdown: React.FC<{
                               {!isMe && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-text3)', marginBottom: 3 }}>{msg.user.username}</div>}
                               <div style={{
                                 padding: '9px 13px', borderRadius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                                background: isMe ? 'var(--q-accent)' : 'var(--q-bg)',
+                                background: isMe ? 'var(--q-accent)' : 'var(--q-bg-flat)',
+                                border: isMe ? 'none' : '1px solid var(--q-line)',
                                 color: isMe ? '#fff' : 'var(--q-text)',
                                 fontSize: 13, lineHeight: 1.5, wordBreak: 'break-word',
                               }}>
@@ -1149,7 +1161,7 @@ const SeriesDropdown: React.FC<{
                         autoFocus
                         style={{
                           flex: 1, padding: '11px 14px', borderRadius: 14,
-                          border: '1px solid var(--q-line)', background: 'var(--q-bg)',
+                          border: '1px solid var(--q-line)', background: 'var(--q-bg-flat)',
                           color: 'var(--q-text)', fontSize: 14, outline: 'none',
                         }}
                       />
@@ -1233,7 +1245,7 @@ const ChallengePage: React.FC = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const [rewardPopup, setRewardPopup] = useState<{ coins: number; xp: number; isDailyBonus: boolean; multiplier?: number; streakUp?: number } | null>(null);
+  const [rewardPopup, setRewardPopup] = useState<{ coins: number; xp: number; isDailyBonus: boolean; multiplier?: number; streakUp?: number; groupSize?: number; groupBonusMultiplier?: number } | null>(null);
   const [inProgressOpen, setInProgressOpen] = useState(true);
   const [availableOpen, setAvailableOpen] = useState(true);
   const [completedOpen, setCompletedOpen] = useState(false);
@@ -1677,6 +1689,8 @@ const ChallengePage: React.FC = () => {
         isDailyBonus: !!data.isDailyBonus,
         multiplier: data.dailyMultiplier,
         streakUp: newStreak > prevStreak ? newStreak : undefined,
+        groupSize: data.groupSize,
+        groupBonusMultiplier: data.groupBonusMultiplier,
       });
       setTimeout(() => setRewardPopup(null), 4500);
     } finally { setActionLoading(null); }
@@ -1690,6 +1704,14 @@ const ChallengePage: React.FC = () => {
       );
 
   const available = filtered.filter(c => getUserStatus(c.id) === null);
+
+  // Le backend pagine désormais par "groupe" (une série entière = 1 objet, comme un défi
+  // solo) : on doit donc lui donner le nombre de groupes déjà chargés, pas le nombre brut
+  // de lignes Challenge (qui compterait une série de 5 jours comme 5).
+  const loadedChallengeGroupCount = new Set(challenges.map(c => c.seriesName ?? `solo-${c.id}`)).size;
+  // Même logique pour "En cours"/"Terminés", paginés séparément via /api/users/me/challenges.
+  const loadedInProgressGroupCount = new Set(inProgressItems.map(uc => uc.challenge.seriesName ?? `solo-${uc.challenge.id}`)).size;
+  const loadedCompletedGroupCount = new Set(completedItems.map(uc => uc.challenge.seriesName ?? `solo-${uc.challenge.id}`)).size;
 
   // Quand le filtre journalier est actif, on n'affiche que le défi du jour dans sa section
   const displayedInProgress = isDailyFilter && dailyChallenge
@@ -1763,7 +1785,12 @@ const ChallengePage: React.FC = () => {
   for (const uc of displayedCompleted) {
     const n = isDailyFilter ? null : uc.challenge.seriesName;
     if (n && resolvedSeriesNames.has(n)) continue;
-    if (n && !seriesMap.has(n) && !inProgressSeriesMap.has(n)) {
+    if (n && activeSeriesGroupNames.has(n)) {
+      // Groupe pas encore validé par tous les membres : reste "En cours" même si
+      // l'utilisateur a personnellement fini tous ses défis de la série.
+      if (!inProgressSeriesMap.has(n)) inProgressSeriesMap.set(n, []);
+      inProgressSeriesMap.get(n)!.push(uc.challenge);
+    } else if (n && !seriesMap.has(n) && !inProgressSeriesMap.has(n)) {
       if (!completedSeriesMap.has(n)) completedSeriesMap.set(n, []);
       completedSeriesMap.get(n)!.push(uc.challenge);
     } else {
@@ -1931,8 +1958,8 @@ const ChallengePage: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between p-4"
               style={{ borderBottom: '1px solid var(--q-line)', flexShrink: 0 }}>
-              <h2 className="font-bold text-base" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
-                💬 Tchat du groupe
+              <h2 className="font-bold text-base flex items-center gap-1.5" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
+                <MessageCircle size={16} aria-hidden="true" /> Tchat du groupe
               </h2>
               <button onClick={() => { setChatGroupId(null); setChatMessages([]); }}
                 aria-label="Fermer le tchat"
@@ -1994,8 +2021,8 @@ const ChallengePage: React.FC = () => {
                         )}
                         <div className="p-3 text-sm break-words"
                           style={{
-                            background: isMe ? 'var(--q-accent)' : 'linear-gradient(135deg,rgba(124,58,237,0.14),rgba(167,139,250,0.08))',
-                            border: isMe ? 'none' : '1px solid rgba(124,58,237,0.22)',
+                            background: isMe ? 'var(--q-accent)' : 'var(--q-chrome)',
+                            border: isMe ? 'none' : '1px solid var(--q-line)',
                             color: isMe ? '#fff' : 'var(--q-text)',
                             borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                             wordBreak: 'break-word',
@@ -2052,7 +2079,8 @@ const ChallengePage: React.FC = () => {
       {inviteModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setInviteModal(null); }}>
+          onClick={e => { if (e.target === e.currentTarget) setInviteModal(null); }}
+          onKeyDown={e => { if (e.key === 'Escape') setInviteModal(null); }}>
           <div className="w-full max-w-sm rounded-3xl p-5 flex flex-col gap-4"
             style={{ background: 'var(--q-chrome)', boxShadow: '0 24px 48px -12px rgba(0,0,0,0.55)', border: '1px solid var(--q-line)' }}>
             <div className="flex items-center justify-between">
@@ -2134,7 +2162,8 @@ const ChallengePage: React.FC = () => {
       {inviteExistingGroup && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setInviteExistingGroup(null); }}>
+          onClick={e => { if (e.target === e.currentTarget) setInviteExistingGroup(null); }}
+          onKeyDown={e => { if (e.key === 'Escape') setInviteExistingGroup(null); }}>
           <div className="w-full max-w-sm rounded-3xl p-5 flex flex-col gap-4"
             style={{ background: 'var(--q-chrome)', boxShadow: '0 24px 48px -12px rgba(0,0,0,0.55)', border: '1px solid var(--q-line)' }}>
             <div className="flex items-center justify-between">
@@ -2229,6 +2258,8 @@ const ChallengePage: React.FC = () => {
           isDailyBonus={rewardPopup.isDailyBonus}
           multiplier={rewardPopup.multiplier}
           streakUp={rewardPopup.streakUp}
+          groupSize={rewardPopup.groupSize}
+          groupBonusMultiplier={rewardPopup.groupBonusMultiplier}
           onDismiss={() => setRewardPopup(null)}
         />
       )}
@@ -2525,7 +2556,7 @@ const ChallengePage: React.FC = () => {
                     </div>
                   )}
                   {!isDailyFilter && inProgressHasMore && (
-                    <button onClick={() => fetchInProgressItems(inProgressItems.length)} disabled={loadingMoreInProgress}
+                    <button onClick={() => fetchInProgressItems(loadedInProgressGroupCount)} disabled={loadingMoreInProgress}
                       className="q-press mt-4 w-full py-2.5 rounded-2xl border-2 border-dashed text-sm font-bold transition-opacity hover:opacity-70 disabled:opacity-40"
                       style={{ borderColor: '#38BDF8', color: '#38BDF8' }}>
                       {loadingMoreInProgress ? 'Chargement…' : 'Charger plus'}
@@ -2565,7 +2596,7 @@ const ChallengePage: React.FC = () => {
                     </div>
                   )}
                   {!isDailyFilter && hasMore && (
-                    <button onClick={() => fetchChallenges(challenges.length)} disabled={loadingMore}
+                    <button onClick={() => fetchChallenges(loadedChallengeGroupCount)} disabled={loadingMore}
                       className="q-press mt-4 w-full py-2.5 rounded-2xl border-2 border-dashed text-sm font-bold transition-opacity hover:opacity-70 disabled:opacity-40"
                       style={{ borderColor: 'var(--q-accent)', color: 'var(--q-accent)' }}>
                       {loadingMore ? 'Chargement…' : 'Charger plus'}
@@ -2604,7 +2635,7 @@ const ChallengePage: React.FC = () => {
                     </div>
                   )}
                   {!isDailyFilter && completedHasMore && (
-                    <button onClick={() => fetchCompletedItems(completedItems.length)} disabled={loadingMoreCompleted}
+                    <button onClick={() => fetchCompletedItems(loadedCompletedGroupCount)} disabled={loadingMoreCompleted}
                       className="q-press mt-4 w-full py-2.5 rounded-2xl border-2 border-dashed text-sm font-bold transition-opacity hover:opacity-70 disabled:opacity-40"
                       style={{ borderColor: '#34D399', color: '#34D399' }}>
                       {loadingMoreCompleted ? 'Chargement…' : 'Charger plus'}

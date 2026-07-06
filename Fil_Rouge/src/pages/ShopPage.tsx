@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, CheckCircle, SlidersHorizontal, Search, X, CircleDollarSign } from 'lucide-react';
+import { ShoppingBag, CheckCircle, SlidersHorizontal, Search, X, CircleDollarSign, Frame, PanelTop, Award, Tag, Package } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import BackButton from '../components/BackButton';
 import { usePageTitle } from '../hooks/usePageTitle';
 import PageLoader from '../components/PageLoader';
@@ -26,22 +27,20 @@ const RARITY: Record<string, { label: string; color: string; bg: string; border:
   LEGENDARY: { label: 'Légendaire', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20',   border: 'border-yellow-400',                    glow: 'hover:shadow-yellow-200 dark:hover:shadow-yellow-900' },
 };
 
-const TYPE: Record<string, { label: string; emoji: string }> = {
-  AVATAR_FRAME: { label: "Cadre d'avatar", emoji: '🖼️' },
-  BANNER:       { label: 'Bannière',        emoji: '🏳️' },
-  BADGE:        { label: 'Badge',           emoji: '🏅' },
-  TITLE:        { label: 'Titre',           emoji: '📛' },
+const TYPE: Record<string, { label: string; icon: LucideIcon }> = {
+  AVATAR_FRAME: { label: "Cadre d'avatar", icon: Frame },
+  BANNER:       { label: 'Bannière',        icon: PanelTop },
+  BADGE:        { label: 'Badge',           icon: Award },
+  TITLE:        { label: 'Titre',           icon: Tag },
 };
 
 const RARITIES = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY'];
 const TYPES    = ['AVATAR_FRAME', 'BANNER', 'BADGE', 'TITLE'];
 
-const BACKEND_URL = 'http://localhost:3001';
 function resolveUrl(url?: string): string {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('/uploads/')) return `${BACKEND_URL}${url}`;
-  return url;
+  // /uploads/... est proxifié vers le backend (vite en dev, vercel.json en prod) —
+  // pas besoin de préfixer une origine en dur.
+  return url ?? '';
 }
 
 function applyFilters(cosmetics: Cosmetic[], search: string, type: string, rarity: string): Cosmetic[] {
@@ -103,15 +102,15 @@ const CosmeticPreview: React.FC<{ cosmetic: Cosmetic }> = ({ cosmetic }) => {
 
   if (cosmetic.type === 'BADGE') {
     return (
-      <div className={`w-16 h-16 mx-auto my-2 rounded-full flex items-center justify-center text-4xl ${r.bg}`}>
-        🏅
+      <div className={`w-16 h-16 mx-auto my-2 rounded-full flex items-center justify-center ${r.bg}`}>
+        <Award size={28} aria-hidden="true" />
       </div>
     );
   }
 
   return (
-    <div className={`w-16 h-16 mx-auto my-2 rounded-full flex items-center justify-center text-2xl ${r.bg}`}>
-      🎁
+    <div className={`w-16 h-16 mx-auto my-2 rounded-full flex items-center justify-center ${r.bg}`}>
+      <Package size={22} aria-hidden="true" />
     </div>
   );
 };
@@ -130,7 +129,7 @@ type CosmeticCardProps = {
 
 const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, canAfford, isLoading, user, darkMode, card, onBuy, onLogin }) => {
   const r = RARITY[cosmetic.rarity] ?? RARITY.COMMON;
-  const t = TYPE[cosmetic.type] ?? { label: cosmetic.type, emoji: '🎁' };
+  const t = TYPE[cosmetic.type] ?? { label: cosmetic.type, icon: Package };
 
   const actionZone = () => {
     if (alreadyOwned) return (
@@ -156,7 +155,7 @@ const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, can
     <div className={`${card} border-2 ${r.border} ${r.glow} rounded-xl p-3 flex flex-col gap-2 hover:shadow-lg transition-all duration-200`}>
       <div className="flex items-center justify-between">
         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.bg} ${r.color}`}>{r.label}</span>
-        <span className="text-base">{t.emoji}</span>
+        <t.icon size={16} aria-hidden="true" />
       </div>
       <CosmeticPreview cosmetic={cosmetic} />
       <div className="text-center">
@@ -305,12 +304,15 @@ const ShopPage: React.FC = () => {
                 className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterType ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                 Tous
               </button>
-              {TYPES.map(t => (
-                <button key={t} onClick={() => setFilterType(t === filterType ? '' : t)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterType === t ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                  {TYPE[t]?.emoji} {TYPE[t]?.label}
-                </button>
-              ))}
+              {TYPES.map(t => {
+                const TypeIcon = TYPE[t]?.icon ?? Package;
+                return (
+                  <button key={t} onClick={() => setFilterType(t === filterType ? '' : t)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterType === t ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    <TypeIcon size={13} aria-hidden="true" /> {TYPE[t]?.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div>

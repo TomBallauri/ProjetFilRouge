@@ -78,6 +78,11 @@ const FriendsPage: React.FC = () => {
     fetchAll();
   };
 
+  const removeFriend = async (id: number, username: string) => {
+    if (!globalThis.confirm(`Retirer ${username} de tes amis ?`)) return;
+    await declineOrRemove(id);
+  };
+
   const sendRequest = async (targetId: number) => {
     setPendingIds(prev => new Set(prev).add(targetId));
     try {
@@ -356,7 +361,7 @@ const FriendsPage: React.FC = () => {
                     </div>
                   </div>
                 </button>
-                <button onClick={() => declineOrRemove(friendshipId)}
+                <button onClick={() => removeFriend(friendshipId, f.username)}
                   aria-label={`Retirer ${f.username} de mes amis`}
                   style={{ background: 'none', border: 'none', cursor: 'pointer',
                     color: 'var(--q-text3)', padding: 6, borderRadius: 10,

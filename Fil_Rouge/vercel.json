@@ -3,6 +3,14 @@
     {
       "source": "/api/:path*",
       "destination": "https://projetfilrouge.onrender.com/api/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "https://projetfilrouge.onrender.com/uploads/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

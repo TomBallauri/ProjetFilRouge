@@ -10,36 +10,50 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model UploadedFile {
+  id        String   @id
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model User {
-  id         Int      @id @default(autoincrement())
-  username   String   @unique
-  email      String   @unique
-  password   String
-  isAdmin    Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  bio        String?
-  avatar     String?
-  banner     String?
-  coins      Int      @default(0)
-  xp         Int      @default(0)
-  level      Int      @default(1)
-  currentStreak  Int       @default(0)
-  longestStreak  Int       @default(0)
-  lastStreakDate DateTime?
-  topics     Topic[]
-  posts      Post[]          @relation("UserPosts")
-  likes      Like[]
-  challenges        UserChallenge[]
-  cosmetics         UserCosmetic[]
-  createdChallenges Challenge[]
-  sentFriendRequests     Friend[] @relation("SentRequests")
-  receivedFriendRequests Friend[] @relation("ReceivedRequests")
+  id                     Int                    @id @default(autoincrement())
+  username               String                 @unique
+  email                  String                 @unique
+  password               String
+  isAdmin                Boolean                @default(false)
+  createdAt              DateTime               @default(now())
+  bio                    String?
+  avatar                 String?
+  banner                 String?
+  coins                  Int                    @default(0)
+  xp                     Int                    @default(0)
+  level                  Int                    @default(1)
+  currentStreak          Int                    @default(0)
+  longestStreak          Int                    @default(0)
+  lastStreakDate         DateTime?
+  challenges             UserChallenge[]
+  cosmetics              UserCosmetic[]
+  createdChallenges      Challenge[]
+  sentFriendRequests     Friend[]               @relation("SentRequests")
+  receivedFriendRequests Friend[]               @relation("ReceivedRequests")
   createdGroups          ChallengeGroup[]       @relation("GroupCreator")
   groupMemberships       ChallengeGroupMember[]
   groupMessages          GroupMessage[]
   createdSeriesGroups    SeriesGroup[]          @relation("SeriesGroupCreator")
   seriesGroupMemberships SeriesGroupMember[]
   seriesGroupMessages    SeriesGroupMessage[]
+  passwordResetTokens    PasswordResetToken[]
 }
 
 model Friend {
@@ -48,61 +62,29 @@ model Friend {
   receiverId Int
   status     String   @default("PENDING") // PENDING, ACCEPTED
   createdAt  DateTime @default(now())
-  sender     User     @relation("SentRequests",    fields: [senderId],   references: [id])
+  sender     User     @relation("SentRequests", fields: [senderId], references: [id])
   receiver   User     @relation("ReceivedRequests", fields: [receiverId], references: [id])
+
   @@unique([senderId, receiverId])
 }
 
-model Topic {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String
-  game      String
-  category  String
-  tags      String?
-  createdAt DateTime @default(now())
-  createdBy Int
-  user      User     @relation(fields: [createdBy], references: [id])
-  posts     Post[]   @relation("TopicPosts")
-  likes     Int      @default(0)
-  likedBy   Like[]
-}
-
-model Post {
-  id        Int      @id @default(autoincrement())
-  content   String
-  topicId   Int
-  createdBy Int
-  createdAt DateTime @default(now())
-  user      User     @relation("UserPosts", fields: [createdBy], references: [id])
-  topic     Topic    @relation("TopicPosts", fields: [topicId], references: [id], onDelete: Cascade)
-}
-
-model Like {
-  id      Int   @id @default(autoincrement())
-  userId  Int
-  topicId Int
-  user    User  @relation(fields: [userId], references: [id])
-  topic   Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  @@unique([userId, topicId])
-}
-
 model Challenge {
-  id           Int             @id @default(autoincrement())
+  id           Int              @id @default(autoincrement())
   title        String
   description  String
-  difficulty   String          // EASY, MEDIUM, HARD, EXPERT
-  category     String          // GAMING, SPORT, CUISINE, FITNESS, CREATIVITY, KNOWLEDGE, SOCIAL
+  difficulty   String // EASY, MEDIUM, HARD, EXPERT
+  category     String // GAMING, SPORT, CUISINE, FITNESS, CREATIVITY, KNOWLEDGE, SOCIAL
   coinReward   Int
   xpReward     Int
-  isDefault    Boolean         @default(false)
-  isPublic     Boolean         @default(true)
+  isDefault    Boolean          @default(false)
+  isPublic     Boolean          @default(true)
   seriesName   String?
   createdBy    Int?
-  createdAt    DateTime        @default(now())
-  creator      User?           @relation(fields: [createdBy], references: [id])
+  createdAt    DateTime         @default(now())
+  creator      User?            @relation(fields: [createdBy], references: [id])
   participants UserChallenge[]
   groups       ChallengeGroup[]
+
   @@index([seriesName])
 }
 
@@ -115,18 +97,19 @@ model UserChallenge {
   completedAt DateTime?
   user        User      @relation(fields: [userId], references: [id])
   challenge   Challenge @relation(fields: [challengeId], references: [id])
+
   @@unique([userId, challengeId])
   @@index([userId, status])
 }
 
 model Cosmetic {
-  id          Int          @id @default(autoincrement())
+  id          Int            @id @default(autoincrement())
   name        String
   description String
-  type        String       // AVATAR_FRAME, BANNER, BADGE, TITLE
+  type        String // AVATAR_FRAME, BANNER, BADGE, TITLE
   imageUrl    String?
   price       Int
-  rarity      String       // COMMON, RARE, EPIC, LEGENDARY
+  rarity      String // COMMON, RARE, EPIC, LEGENDARY
   owners      UserCosmetic[]
 }
 
@@ -137,17 +120,18 @@ model UserCosmetic {
   purchasedAt DateTime @default(now())
   equipped    Boolean  @default(false)
   user        User     @relation(fields: [userId], references: [id])
-  cosmetic    Cosmetic @relation(fields: [cosmeticId], references: [id])
+  cosmetic    Cosmetic @relation(fields: [cosmeticId], references: [id], onDelete: Cascade)
+
   @@unique([userId, cosmeticId])
 }
 
 model SeriesGroup {
-  id          Int                   @id @default(autoincrement())
+  id          Int                  @id @default(autoincrement())
   seriesName  String
   createdBy   Int
-  createdAt   DateTime              @default(now())
+  createdAt   DateTime             @default(now())
   completedAt DateTime?
-  creator     User                  @relation("SeriesGroupCreator", fields: [createdBy], references: [id])
+  creator     User                 @relation("SeriesGroupCreator", fields: [createdBy], references: [id])
   members     SeriesGroupMember[]
   messages    SeriesGroupMessage[]
 }
@@ -162,6 +146,7 @@ model SeriesGroupMember {
   confirmedAt DateTime?
   group       SeriesGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user        User        @relation(fields: [userId], references: [id])
+
   @@unique([groupId, userId])
   @@index([userId])
   @@index([groupId])
@@ -175,16 +160,17 @@ model SeriesGroupMessage {
   createdAt DateTime    @default(now())
   group     SeriesGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [userId], references: [id])
+
   @@index([groupId, createdAt])
 }
 
 model ChallengeGroup {
-  id          Int                   @id @default(autoincrement())
+  id          Int                    @id @default(autoincrement())
   challengeId Int
   createdBy   Int
-  createdAt   DateTime              @default(now())
-  challenge   Challenge             @relation(fields: [challengeId], references: [id])
-  creator     User                  @relation("GroupCreator", fields: [createdBy], references: [id])
+  createdAt   DateTime               @default(now())
+  challenge   Challenge              @relation(fields: [challengeId], references: [id])
+  creator     User                   @relation("GroupCreator", fields: [createdBy], references: [id])
   members     ChallengeGroupMember[]
   messages    GroupMessage[]
 }
@@ -199,6 +185,7 @@ model ChallengeGroupMember {
   completedAt DateTime?
   group       ChallengeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user        User           @relation(fields: [userId], references: [id])
+
   @@unique([groupId, userId])
 }
 

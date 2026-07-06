@@ -1,11 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, MessageSquare, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut, ChevronLeft } from 'lucide-react';
+import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut, ChevronLeft, Lock } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 import PageLoader from '../components/PageLoader';
+import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordPolicy';
 
 type OwnedCosmetic = EquippedCosmetic & { id: number; purchasedAt: string };
 
@@ -31,6 +32,7 @@ type UserChallenge = {
     difficulty: string;
     coinReward: number;
     xpReward: number;
+    seriesName?: string | null;
   };
 };
 
@@ -42,13 +44,18 @@ const fmt = (n: number): string => {
 
 const MAX_SIZE_MB = 5;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const BACKEND_URL = "http://localhost:3001";
 
 const EditProfile: React.FC = () => {
   usePageTitle('Profil');
   const { user, setUser, darkMode, toggleDarkMode } = useStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const navigate = useNavigate();
+
+  const showNotif = (msg: string, type: 'success' | 'error') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3500);
+  };
 
   const [formData, setFormData] = useState({
     username: user?.username || '',
@@ -94,7 +101,6 @@ const EditProfile: React.FC = () => {
     memberSince: user ? new Date(user.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : ''
   };
 
-  const [recentActivities, setRecentActivities] = useState<{ id: number; title: string; content: string; date: string }[]>([]);
   const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
   const [challengesTotal, setChallengesTotal] = useState(0);
   const [totalCompleted, setTotalCompleted] = useState(0);
@@ -113,7 +119,7 @@ const EditProfile: React.FC = () => {
   const [reduceMotion, setReduceMotion] = useState(() => localStorage.getItem('reduceMotion') === 'true');
   const [language, setLanguage] = useState(() => localStorage.getItem('appLanguage') ?? 'Français');
   const [openProfileSections, setOpenProfileSections] = useState({
-    cosmetics: true, info: true, defis: true, topics: true,
+    cosmetics: true, info: true, defis: true,
   });
   const toggleProfileSection = (key: keyof typeof openProfileSections) =>
     setOpenProfileSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -248,11 +254,15 @@ const EditProfile: React.FC = () => {
 
   const handlePasswordSave = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert("Les mots de passe ne correspondent pas.");
+      showNotif("Les mots de passe ne correspondent pas.", 'error');
       return;
     }
     if (!passwordData.currentPassword || !passwordData.newPassword) {
-      alert("Veuillez remplir tous les champs.");
+      showNotif("Veuillez remplir tous les champs.", 'error');
+      return;
+    }
+    if (!isStrongPassword(passwordData.newPassword)) {
+      showNotif(`Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}`, 'error');
       return;
     }
     try {
@@ -270,13 +280,14 @@ const EditProfile: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "Erreur lors du changement de mot de passe");
+        showNotif(data.error || "Erreur lors du changement de mot de passe", 'error');
         return;
       }
-      alert("Mot de passe mis à jour avec succès !");
+      showNotif("Mot de passe mis à jour avec succès !", 'success');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setIsEditing(false);
     } catch (err) {
-      alert("Erreur réseau lors du changement de mot de passe");
+      showNotif("Erreur réseau lors du changement de mot de passe", 'error');
     }
   };
 
@@ -307,11 +318,12 @@ const EditProfile: React.FC = () => {
     form.append('type', type);
     const res = await fetch('/api/upload', {
       method: 'POST',
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       body: form,
     });
     if (!res.ok) throw new Error('Erreur upload');
     const data = await res.json();
-    return `${BACKEND_URL}${data.url}`;
+    return data.url;
   };
 
   const handleSave = async () => {
@@ -347,50 +359,9 @@ const EditProfile: React.FC = () => {
     }
   };
 
-  const getFullImageUrl = (url: string | undefined | null) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    if (url.startsWith('/uploads/')) return `${BACKEND_URL}${url}`;
-    return url;
-  };
-
-  useEffect(() => {
-    const fetchUserTopics = async () => {
-      if (!user) return;
-      try {
-        // Récupère tous les topics créés par le user (createdBy)
-        const res = await fetch(`/api/users/${user.id}/topics`);
-        if (!res.ok) return;
-        const topics = await res.json();
-        setRecentActivities(
-          topics.map((topic: any) => ({
-            id: topic.id,
-            title: topic.title,
-            content: topic.content ? topic.content.slice(0, 80) + (topic.content.length > 80 ? "..." : "") : "",
-            date: new Date(topic.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
-          }))
-        );
-      } catch {}
-    };
-    fetchUserTopics();
-  }, [user]);
-  
-  const handleDeleteTopic = async (topicId: number) => {
-    if (!window.confirm("Supprimer ce topic ? Cette action est irréversible.")) return;
-    try {
-      const res = await fetch(`/api/topics/${topicId}/${user?.id}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        setRecentActivities(acts => acts.filter(a => a.id !== topicId));
-        alert("Topic supprimé !");
-      } else {
-        alert("Erreur lors de la suppression.");
-      }
-    } catch {
-      alert("Erreur réseau lors de la suppression.");
-    }
-  };
+  // /uploads/... est proxifié vers le backend (vite en dev, vercel.json en prod) —
+  // pas besoin de préfixer une origine en dur.
+  const getFullImageUrl = (url: string | undefined | null) => url ?? '';
 
   const equippedFrame  = getEquipped(ownedCosmetics, 'AVATAR_FRAME');
   const equippedTitle  = getEquipped(ownedCosmetics, 'TITLE');
@@ -433,10 +404,21 @@ const EditProfile: React.FC = () => {
   const cosmeticsLabel = ownedCosmetics.length === 0
     ? 'Aucun cosmétique possédé'
     : `${ownedCosmetics.length} cosmétique${cosmeticSuffix} possédé${cosmeticSuffix}`;
-  const topicSuffix = recentActivities.length > 1 ? 's' : '';
-  const topicsLabel = recentActivities.length === 0
-    ? 'Aucun topic créé'
-    : `${recentActivities.length} topic${topicSuffix} créé${topicSuffix}`;
+
+  const seriesDayNumber = (title: string) => {
+    const m = /^Jour\s+(\d+)/i.exec(title);
+    return m ? parseInt(m[1], 10) : null;
+  };
+  // Au sein d'une même série, on affiche les jours en ordre croissant (1, 2, 3…) —
+  // le tri par date de création n'est pas fiable car les défis IA sont créés en lot.
+  const sortedUserChallenges = [...userChallenges].sort((a, b) => {
+    if (a.challenge.seriesName && a.challenge.seriesName === b.challenge.seriesName) {
+      const da = seriesDayNumber(a.challenge.title);
+      const db = seriesDayNumber(b.challenge.title);
+      if (da !== null && db !== null) return da - db;
+    }
+    return 0;
+  });
 
   return (
     <div style={{ paddingBottom: 100, color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
@@ -780,6 +762,9 @@ const EditProfile: React.FC = () => {
                           <input type="password" name={field} value={passwordData[field]} onChange={handlePasswordChange}
                             className="w-full px-3 py-2 rounded-xl bg-transparent focus:outline-none text-sm"
                             style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} />
+                          {field === 'newPassword' && (
+                            <p className="text-xs mt-1" style={{ color: 'var(--q-text2)' }}>{PASSWORD_REQUIREMENTS_TEXT}</p>
+                          )}
                         </div>
                       ))}
                       <button onClick={handlePasswordSave}
@@ -888,7 +873,7 @@ const EditProfile: React.FC = () => {
               </button>
               {openProfileSections.defis && (
                 <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
-                  {userChallenges.slice(0, 5).map((uc, i) => (
+                  {sortedUserChallenges.slice(0, 5).map((uc, i) => (
                     <div key={uc.id} className="px-4 py-3 flex items-center justify-between gap-3"
                       style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none' }}>
                       <div className="min-w-0">
@@ -952,58 +937,6 @@ const EditProfile: React.FC = () => {
           </div>
         </>
       )}
-
-      {/* ── Topics ── */}
-      <div style={{ padding: '0 18px', marginTop: 8 }}>
-          <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-            <button onClick={() => toggleProfileSection('topics')}
-              className="q-press w-full flex items-center gap-3 p-4 text-left"
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)' }}>
-                <MessageSquare size={18} color="#fff" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Mes topics récents</p>
-                <p className="text-xs" style={{ color: 'var(--q-text2)' }}>
-                  {topicsLabel}
-                </p>
-              </div>
-              <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
-                transform: openProfileSections.topics ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease' }} />
-            </button>
-            {openProfileSections.topics && (
-              <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
-                {recentActivities.length === 0 && (
-                  <div className="px-4 py-3 text-sm" style={{ color: 'var(--q-text3)' }}>Aucun topic créé récemment.</div>
-                )}
-                {recentActivities.map((activity, i) => (
-                  <div key={activity.id} className="px-4 py-3 flex justify-between items-center gap-2 transition-opacity hover:opacity-80"
-                    style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none' }}>
-                    <button className="flex-1 text-left min-w-0" onClick={() => navigate(`/tchat/${activity.id}`)} type="button">
-                      <p className="font-semibold text-sm truncate" style={{ color: 'var(--q-text)' }}>{activity.title}</p>
-                      {activity.content && <p className="text-xs italic truncate" style={{ color: 'var(--q-text3)' }}>{activity.content}</p>}
-                      <p className="text-xs" style={{ color: 'var(--q-text3)' }}>{activity.date}</p>
-                    </button>
-                    <button className="q-press flex items-center justify-center rounded-full w-8 h-8 flex-shrink-0"
-                      style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}
-                      onClick={e => { e.stopPropagation(); navigate(`/tchat/${activity.id}`, { state: { openEdit: true } }); }}
-                      title="Modifier" type="button">
-                      <Edit size={14} />
-                    </button>
-                    <button className="q-press flex items-center justify-center rounded-full w-8 h-8 flex-shrink-0"
-                      style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}
-                      onClick={e => { e.stopPropagation(); handleDeleteTopic(activity.id); }}
-                      title="Supprimer" type="button">
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
 
       {/* ── Paramètres ── */}
       <div style={{ padding: '22px 22px 10px' }}>
@@ -1137,6 +1070,20 @@ const EditProfile: React.FC = () => {
 
       </div>
 
+      {/* ── Dashboard admin (visible uniquement pour les admins) ── */}
+      {user?.isAdmin && (
+        <div style={{ padding: '8px 18px 0' }}>
+          <button
+            onClick={() => navigate('/admin')}
+            className="q-press w-full flex items-center justify-center gap-2"
+            style={{ height: 48, borderRadius: 18, border: '1px solid var(--q-accent)',
+              background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)',
+              fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            <Lock size={16} /> Dashboard admin
+          </button>
+        </div>
+      )}
+
       {/* ── Déconnexion ── */}
       <div style={{ padding: '8px 18px 40px' }}>
         <button
@@ -1148,6 +1095,14 @@ const EditProfile: React.FC = () => {
           <LogOut size={16} /> Se déconnecter
         </button>
       </div>
+
+      <div aria-live="polite" aria-atomic="true" className="sr-only">{notification?.msg}</div>
+      {notification && (
+        <output className={`fixed top-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-50 px-5 py-3 rounded-2xl shadow-lg text-white font-bold text-sm ${notification.type === 'success' ? '' : 'bg-red-500'}`}
+          style={notification.type === 'success' ? { background: 'linear-gradient(135deg,#34D399,#38BDF8)', boxShadow: '0 8px 24px rgba(52,211,153,0.45)' } : {}}>
+          {notification.msg}
+        </output>
+      )}
     </div>
   );
 };

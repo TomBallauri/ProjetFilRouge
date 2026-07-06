@@ -2,14 +2,12 @@ import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import AdminDashboard from './pages/AdminDashboard';
-import GameForum from './pages/GameForum';
+import UQuail from './pages/UQuail';
 import TasksPage from './pages/TasksPage';
-import TrendsPage from './pages/TrendsPage';
 import ProfilePage from './pages/ProfilePage';
-import EditProfile from './pages/EditProfile';
-import DiscussionsPage from './pages/DiscussionsPage';
 import AuthPage from './pages/AuthPage';
-import ForumTchat from './pages/ForumTchat';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChallengePage from './pages/ChallengePage';
 import CreateChallenge from './pages/CreateChallenge';
 import AIChallengeGenerator from './pages/AIChallengeGenerator';
@@ -51,15 +49,13 @@ function App() {
       <Routes>
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/register" element={<AuthPage mode="register" />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/" element={<Layout />}>
-          <Route index element={<GameForum />} />
-          <Route path="discussions" element={<DiscussionsPage />} />
-          <Route path="/tchat/:id" element={<ForumTchat />} />
+          <Route index element={<UQuail />} />
           <Route path="tasks" element={<TasksPage />} />
-          <Route path="trends" element={<TrendsPage />} />
           <Route path="profile" element={<ProfilePage />} />
-          <Route path="edit" element={<EditProfile />} />
           <Route path="settings" element={<div className="p-4">Settings (Coming Soon)</div>} />
           <Route path="challenges" element={<ChallengePage />} />
           <Route path="challenges/create" element={<CreateChallenge />} />

@@ -12,11 +12,11 @@ function fireToast(message: string, type: string, link?: string) {
 
 // ── per-poll diff helpers ───────────────────────────────────────────────────
 
-function detectNewMessages(prev: NotifData, curr: NotifData) {
+function detectNewMessages(prev: NotifData, curr: NotifData, myUserId?: number) {
   const prevMap = new Map(prev.groups.map(g => [g.groupId, g.latestMessageId]));
   for (const g of curr.groups) {
     const prevId = prevMap.get(g.groupId);
-    if (g.latestMessageId && prevId !== undefined && g.latestMessageId !== prevId)
+    if (g.latestMessageId && prevId !== undefined && g.latestMessageId !== prevId && g.latestMessageUserId !== myUserId)
       fireToast(`Nouveau message dans "${g.seriesName}"`, 'message', `/groups/${g.groupId}`);
   }
 }
@@ -68,13 +68,14 @@ function warnStreakIfNeeded(data: NotifData, prevAtRisk: boolean | null) {
 
 // ── badge count ─────────────────────────────────────────────────────────────
 
-function computeBadge(data: NotifData): number {
+function computeBadge(data: NotifData, myUserId?: number): number {
   // Friend requests and invites: always actionable — count until user acts.
   // Streak: shown in panel + toast, not in badge (amber bell is the visual cue).
-  // Group messages: use "seen" tracking.
+  // Group messages: use "seen" tracking — but never count your own message as unread.
   const seen = JSON.parse(localStorage.getItem('notif_seen') ?? '{}');
   const unreadGroups = data.groups.filter(g =>
-    g.latestMessageId && g.latestMessageId > ((seen.groups?.[String(g.groupId)]) ?? 0)
+    g.latestMessageId && g.latestMessageUserId !== myUserId &&
+    g.latestMessageId > ((seen.groups?.[String(g.groupId)]) ?? 0)
   ).length;
   return data.pendingFriendRequests + data.pendingSeriesInvites + unreadGroups;
 }
@@ -105,7 +106,7 @@ export function useNotificationPolling() {
             if (data.pendingSeriesInvites > prev.pendingSeriesInvites)
               fireToast("Tu as été invité dans un groupe série !", 'invite', '/challenges');
             detectRemovedGroups(prev.groups, currIds);
-            detectNewMessages(prev, data);
+            detectNewMessages(prev, data, user?.id);
             warnStreakIfNeeded(data, prev.streakAtRisk);
           }
 
@@ -115,7 +116,7 @@ export function useNotificationPolling() {
           firstLoad.current = false;
           prevRef.current   = data;
           setNotifData(data);
-          setNotifCount(computeBadge(data));
+          setNotifCount(computeBadge(data, user?.id));
         })
         .catch(() => {});
     };
