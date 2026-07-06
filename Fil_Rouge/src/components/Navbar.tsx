@@ -59,9 +59,8 @@ const Navbar: React.FC = () => {
         {/* Logo */}
         <Link to="/" className="text-lg md:text-xl font-bold flex items-center gap-1.5 ml-12 md:ml-0 shrink-0"
           style={{ fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
-          <Joystick size={22} className="shrink-0 text-violet-500" aria-hidden="true" />
-          <span className="hidden sm:inline" style={{ color: 'var(--q-accent)' }}>Game</span>
-          <span className="hidden sm:inline">Forum</span>
+          <span className="hidden sm:inline" style={{ color: 'var(--q-accent)' }}>U-</span>
+          <span className="hidden sm:inline">Quail</span>
         </Link>
 
         {/* Droite */}
