@@ -376,11 +376,11 @@ app.get('/api/users/search', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/users/:id', async (req, res) => {
+// Authentification requise : sans ça, un scan d'ids permettrait à n'importe qui de lister
+// tous les comptes (même en ne renvoyant que des champs non sensibles).
+app.get('/api/users/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   try {
-    // Endpoint accessible sans authentification : on ne sélectionne jamais le mot de passe
-    // (ni les autres champs sensibles) pour éviter qu'un scan d'ids ne dump toute la base.
     const user = await prisma.user.findUnique({
       where: { id: Number(id) || id },
       select: {
