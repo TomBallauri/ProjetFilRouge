@@ -13,6 +13,11 @@ import { StreakService } from './services/StreakService.js';
 import { RewardCalculator, GroupBonus, LevelProgression } from './services/RewardCalculator.js';
 
 const app = express();
+// Render (et Vercel en amont) mettent l'app derrière un proxy : sans ça, express-rate-limit
+// refuse de démarrer dès qu'il voit un header Forwarded/X-Forwarded-For non approuvé, et
+// req.ip ne reflète pas la vraie IP du client. On ne fait confiance qu'au premier hop (le
+// load balancer de Render), pas à une chaîne arbitraire fournie par le client.
+app.set('trust proxy', 1);
 const prisma = new PrismaClient();
 const streakService = new StreakService(prisma);
 

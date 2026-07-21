@@ -163,7 +163,7 @@ const EditProfile: React.FC = () => {
     if (cosmetic.cosmetic.type === 'BADGE') {
       const equippedBadges = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped).length;
       if (equippedBadges >= 3) {
-        alert('Maximum 3 badges équipés. Déséquipez un badge d\'abord.');
+        showNotif('Maximum 3 badges équipés. Déséquipez un badge d\'abord.', 'error');
         return;
       }
     }
@@ -184,7 +184,7 @@ const EditProfile: React.FC = () => {
         if (!res.ok) {
           setOwnedCosmetics(rollback);
           const err = await res.json().catch(() => ({}));
-          alert((err as { error?: string }).error ?? "Erreur lors de l'équipement");
+          showNotif((err as { error?: string }).error ?? "Erreur lors de l'équipement", 'error');
         } else {
           globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
         }
@@ -205,7 +205,7 @@ const EditProfile: React.FC = () => {
         if (!res.ok) {
           setOwnedCosmetics(rollback);
           const err = await res.json().catch(() => ({}));
-          alert((err as { error?: string }).error ?? 'Erreur lors du déséquipement');
+          showNotif((err as { error?: string }).error ?? 'Erreur lors du déséquipement', 'error');
         } else {
           globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
         }
@@ -299,11 +299,11 @@ const EditProfile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Format non supporté. JPEG, PNG ou WebP uniquement.');
+      showNotif('Format non supporté. JPEG, PNG ou WebP uniquement.', 'error');
       return;
     }
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      alert('Image trop lourde (max 5 Mo)');
+      showNotif('Image trop lourde (max 5 Mo)', 'error');
       return;
     }
     const url = URL.createObjectURL(file);
@@ -359,7 +359,7 @@ const EditProfile: React.FC = () => {
       setAvatarFile(null);
       setBannerFile(null);
     } catch (err) {
-      alert('Erreur lors de la sauvegarde du profil');
+      showNotif('Erreur lors de la sauvegarde du profil', 'error');
     }
   };
 
