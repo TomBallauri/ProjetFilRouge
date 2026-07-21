@@ -28,6 +28,7 @@ type UserChallenge = {
   completedAt?: string;
   challenge: {
     title: string;
+    description: string;
     category: string;
     difficulty: string;
     coinReward: number;
@@ -428,7 +429,7 @@ const EditProfile: React.FC = () => {
 
       {/* ── Banner ── */}
       <div
-        className={`-mx-3 md:-mx-6 -mt-4 md:-mt-6 ${!hasBannerImage ? bannerClass : ''}`}
+        className={`-mx-4 md:-mx-6 -mt-4 md:-mt-6 ${!hasBannerImage ? bannerClass : ''}`}
         style={{
           height: 190,
           position: 'relative',
@@ -903,7 +904,12 @@ const EditProfile: React.FC = () => {
                       style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none' }}>
                       <div className="min-w-0">
                         <p className="font-semibold text-sm truncate" style={{ color: 'var(--q-text)' }}>{uc.challenge.title}</p>
-                        <p className="text-xs flex items-center gap-1" style={{ color: 'var(--q-text3)' }}><CircleDollarSign size={10} className="inline flex-shrink-0" /> {uc.challenge.coinReward} · <Zap size={10} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP</p>
+                        {uc.challenge.description && (
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--q-text2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {uc.challenge.description}
+                          </p>
+                        )}
+                        <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--q-text3)' }}><CircleDollarSign size={10} className="inline flex-shrink-0" /> {uc.challenge.coinReward} · <Zap size={10} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP</p>
                       </div>
                       {uc.status === 'COMPLETED' ? (
                         <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded-full"
@@ -941,8 +947,20 @@ const EditProfile: React.FC = () => {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--q-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{uc.challenge.title}</div>
-                      <div style={{ fontSize: 12, color: 'var(--q-text2)', marginTop: 1 }}>
-                        {ok ? `terminé · +${uc.challenge.xpReward} XP` : 'en cours'}
+                      {uc.challenge.description && (
+                        <div style={{ fontSize: 12, color: 'var(--q-text2)', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {uc.challenge.description}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 12, color: 'var(--q-text3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {ok ? (
+                          <>
+                            <span>terminé ·</span>
+                            <CircleDollarSign size={11} className="inline flex-shrink-0" /> {uc.challenge.coinReward}
+                            <span>·</span>
+                            <Zap size={11} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP
+                          </>
+                        ) : 'en cours'}
                       </div>
                     </div>
                     <ChevronRight size={14} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />

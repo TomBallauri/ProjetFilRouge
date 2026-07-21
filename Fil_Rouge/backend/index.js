@@ -260,6 +260,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 app.post('/api/users/me/email/request-change', emailChangeLimiter, async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  // Ne jamais révéler si l'adresse est déjà prise (même logique que forgot-password) —
+  // sinon n'importe qui peut sonder /request-change pour savoir si un email a un compte U-Quail.
+  const genericMessage = { message: 'Si cette adresse est disponible, un email de confirmation vient de lui être envoyé.' };
   try {
     const decoded = jwt.verify(authHeader.split(' ')[1], SECRET);
     const { newEmail } = req.body;
@@ -267,7 +270,7 @@ app.post('/api/users/me/email/request-change', emailChangeLimiter, async (req, r
       return res.status(400).json({ error: 'Adresse email invalide.' });
     }
     const existing = await prisma.user.findUnique({ where: { email: newEmail } });
-    if (existing) return res.status(400).json({ error: 'Cette adresse email est déjà utilisée.' });
+    if (existing) return res.json(genericMessage);
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     await prisma.emailChangeToken.create({

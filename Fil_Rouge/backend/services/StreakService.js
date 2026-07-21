@@ -49,9 +49,10 @@ export class StreakService {
     if (diffDays === 0) return { user, streakUpdated: false, milestone: null };
 
     const oldStreak = user.currentStreak;
-    // continue si fait hier, sinon 1 pour la toute première activité (pas de
-    // streak à perdre), ou 0 si une streak existante vient d'être perdue.
-    const newStreak = diffDays === 1 ? oldStreak + 1 : (last ? 0 : 1);
+    // Continue la streak si fait hier ; sinon on repart de 1 aujourd'hui — que ce soit la
+    // toute première activité ou la reprise après une streak perdue, le jour où l'utilisateur
+    // agit compte toujours comme le jour 1 de la nouvelle streak (jamais 0).
+    const newStreak = diffDays === 1 ? oldStreak + 1 : 1;
     const longestStreak = Math.max(user.longestStreak, newStreak);
     const milestone = StreakService.milestoneFor(oldStreak, newStreak);
 

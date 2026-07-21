@@ -2,8 +2,13 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../lib/store';
 import type { NotifData } from '../lib/store';
 
-const LS_GROUPS       = 'notif_groups';
-const LS_STREAK_DATE  = 'streak_warned_date';
+// Clés localStorage préfixées par userId : sans ça, se connecter à un autre compte sur le
+// même navigateur relit l'état (groupes, notifs vues, rappel de streak) du compte précédent
+// et déclenche de faux toasts ("tu as été retiré du groupe...") pour des groupes qui
+// n'appartiennent même pas au compte actuellement connecté.
+const lsGroupsKey      = (userId: number) => `notif_groups_${userId}`;
+const lsStreakDateKey  = (userId: number) => `streak_warned_date_${userId}`;
+const lsSeenKey        = (userId: number) => `notif_seen_${userId}`;
 type SavedGroup = { id: number; name: string };
 
 function fireToast(message: string, type: string, link?: string) {
@@ -30,30 +35,32 @@ function detectRemovedGroups(prevGroups: NotifData['groups'], currIds: Set<numbe
 
 // ── kick detection via localStorage (catches kicks between sessions) ────────
 
-function syncGroupsCache(data: NotifData, isFirstPoll: boolean) {
+function syncGroupsCache(data: NotifData, isFirstPoll: boolean, userId: number) {
+  const key = lsGroupsKey(userId);
   if (isFirstPoll) {
-    const saved: SavedGroup[] = JSON.parse(localStorage.getItem(LS_GROUPS) ?? '[]');
+    const saved: SavedGroup[] = JSON.parse(localStorage.getItem(key) ?? '[]');
     const currIds = new Set(data.groups.map(g => g.groupId));
     for (const sg of saved) {
       if (!currIds.has(sg.id))
         fireToast(`Tu as été retiré du groupe "${sg.name}".`, 'excluded');
     }
   }
-  localStorage.setItem(LS_GROUPS, JSON.stringify(
+  localStorage.setItem(key, JSON.stringify(
     data.groups.map(g => ({ id: g.groupId, name: g.seriesName }))
   ));
 }
 
 // ── streak reminder ─────────────────────────────────────────────────────────
 
-function warnStreakIfNeeded(data: NotifData, prevAtRisk: boolean | null) {
+function warnStreakIfNeeded(data: NotifData, prevAtRisk: boolean | null, userId: number) {
   if (!data.streakAtRisk || data.streakDays === 0) return;
 
   if (prevAtRisk === null) {
     // First load: warn once per calendar day
+    const key = lsStreakDateKey(userId);
     const today = new Date().toDateString();
-    if (localStorage.getItem(LS_STREAK_DATE) === today) return;
-    localStorage.setItem(LS_STREAK_DATE, today);
+    if (localStorage.getItem(key) === today) return;
+    localStorage.setItem(key, today);
   } else if (prevAtRisk) {
     // Already at risk last poll — don't spam
     return;
@@ -68,11 +75,11 @@ function warnStreakIfNeeded(data: NotifData, prevAtRisk: boolean | null) {
 
 // ── badge count ─────────────────────────────────────────────────────────────
 
-function computeBadge(data: NotifData, myUserId?: number): number {
+function computeBadge(data: NotifData, myUserId: number): number {
   // Friend requests and invites: always actionable — count until user acts.
   // Streak: shown in panel + toast, not in badge (amber bell is the visual cue).
   // Group messages: use "seen" tracking — but never count your own message as unread.
-  const seen = JSON.parse(localStorage.getItem('notif_seen') ?? '{}');
+  const seen = JSON.parse(localStorage.getItem(lsSeenKey(myUserId)) ?? '{}');
   const unreadGroups = data.groups.filter(g =>
     g.latestMessageId && g.latestMessageUserId !== myUserId &&
     g.latestMessageId > ((seen.groups?.[String(g.groupId)]) ?? 0)
@@ -91,6 +98,13 @@ export function useNotificationPolling() {
     const token = localStorage.getItem('token');
     if (!token || !user) return;
 
+    // Repart de zéro à chaque changement de compte (même sans rechargement de page) — sinon
+    // le premier poll du nouvel utilisateur se compare aux données en mémoire du précédent
+    // et déclenche de faux toasts ("retiré du groupe", "nouvelle demande d'ami"...).
+    prevRef.current   = null;
+    firstLoad.current = true;
+    const userId = user.id;
+
     const load = () => {
       fetch('/api/notifications', { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.ok ? r.json() : null)
@@ -106,17 +120,17 @@ export function useNotificationPolling() {
             if (data.pendingSeriesInvites > prev.pendingSeriesInvites)
               fireToast("Tu as été invité dans un groupe série !", 'invite', '/challenges');
             detectRemovedGroups(prev.groups, currIds);
-            detectNewMessages(prev, data, user?.id);
-            warnStreakIfNeeded(data, prev.streakAtRisk);
+            detectNewMessages(prev, data, userId);
+            warnStreakIfNeeded(data, prev.streakAtRisk, userId);
           }
 
-          syncGroupsCache(data, isFirst);
-          if (isFirst) warnStreakIfNeeded(data, null);
+          syncGroupsCache(data, isFirst, userId);
+          if (isFirst) warnStreakIfNeeded(data, null, userId);
 
           firstLoad.current = false;
           prevRef.current   = data;
           setNotifData(data);
-          setNotifCount(computeBadge(data, user?.id));
+          setNotifCount(computeBadge(data, userId));
         })
         .catch(() => {});
     };

@@ -335,9 +335,12 @@ const UQuail: React.FC = () => {
             <button className="q-press" aria-label="Notifications" onClick={() => {
               const willOpen = !notifPanelOpen;
               setNotifPanelOpen(willOpen);
-              if (willOpen && notifData) {
+              if (willOpen && notifData && user) {
+                // Clé préfixée par userId — sinon la lecture "vu" d'un compte contamine
+                // le compte suivant connecté sur le même navigateur (voir useNotificationPolling.ts).
+                const seenKey = `notif_seen_${user.id}`;
                 // Read once, use twice
-                const currentSeen = JSON.parse(localStorage.getItem('notif_seen') ?? '{}');
+                const currentSeen = JSON.parse(localStorage.getItem(seenKey) ?? '{}');
                 // Snapshot unread groups BEFORE marking as seen so the panel can display them
                 setPanelUnreadGroups(
                   notifData.groups.filter(g =>
@@ -348,7 +351,7 @@ const UQuail: React.FC = () => {
                 // Mark group messages as seen — friend/invite counts persist until acted on
                 const seenGroups: Record<string, number> = {};
                 notifData.groups.forEach(g => { seenGroups[String(g.groupId)] = g.latestMessageId ?? 0; });
-                localStorage.setItem('notif_seen', JSON.stringify({ ...currentSeen, groups: seenGroups }));
+                localStorage.setItem(seenKey, JSON.stringify({ ...currentSeen, groups: seenGroups }));
                 // Immediate badge update — next poll will reconfirm
                 setNotifCount(notifData.pendingFriendRequests + notifData.pendingSeriesInvites);
               }
