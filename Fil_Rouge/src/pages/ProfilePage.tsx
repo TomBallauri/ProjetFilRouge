@@ -47,7 +47,10 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const EditProfile: React.FC = () => {
   usePageTitle('Profil');
-  const { user, setUser, darkMode, toggleDarkMode } = useStore();
+  const {
+    user, setUser, darkMode, toggleDarkMode,
+    notifToggles, setNotifToggles, reduceMotion, setReduceMotion, language, setLanguage,
+  } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const navigate = useNavigate();
@@ -113,33 +116,11 @@ const EditProfile: React.FC = () => {
   const [pageLoading, setPageLoading] = useState(true);
 
   const [openSection, setOpenSection] = useState<string | null>('appearance');
-  const [notifToggles, setNotifToggles] = useState<{ defis: boolean; messages: boolean; updates: boolean }>(() => {
-    try { return JSON.parse(localStorage.getItem('notifToggles') ?? 'null') ?? { defis: true, messages: true, updates: false }; }
-    catch { return { defis: true, messages: true, updates: false }; }
-  });
-  const [reduceMotion, setReduceMotion] = useState(() => localStorage.getItem('reduceMotion') === 'true');
-  const [language, setLanguage] = useState(() => localStorage.getItem('appLanguage') ?? 'Français');
   const [openProfileSections, setOpenProfileSections] = useState({
     cosmetics: true, info: true, defis: true,
   });
   const toggleProfileSection = (key: keyof typeof openProfileSections) =>
     setOpenProfileSections(prev => ({ ...prev, [key]: !prev[key] }));
-
-  useEffect(() => {
-    localStorage.setItem('reduceMotion', String(reduceMotion));
-    if (reduceMotion) document.documentElement.classList.add('reduce-motion');
-    else document.documentElement.classList.remove('reduce-motion');
-  }, [reduceMotion]);
-
-  useEffect(() => {
-    localStorage.setItem('notifToggles', JSON.stringify(notifToggles));
-  }, [notifToggles]);
-
-  useEffect(() => {
-    localStorage.setItem('appLanguage', language);
-    const langMap: Record<string, string> = { 'Français': 'fr', 'English': 'en', 'Español': 'es', 'Deutsch': 'de' };
-    document.documentElement.lang = langMap[language] ?? 'fr';
-  }, [language]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');

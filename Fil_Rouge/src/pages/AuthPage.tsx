@@ -12,7 +12,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const resetSuccess = !!(location.state as { resetSuccess?: boolean } | null)?.resetSuccess;
-  const { setUser, darkMode } = useStore();
+  const { setUser, darkMode, applyServerSettings } = useStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -43,6 +43,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
       if (!response.ok) throw new Error(data.error || (mode === 'register' ? "Échec de l'inscription" : 'Échec de la connexion'));
       if (data.token) localStorage.setItem('token', data.token);
       setUser(data.user);
+      applyServerSettings(data.user?.settings);
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Une erreur est survenue.');

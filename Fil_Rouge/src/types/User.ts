@@ -1,3 +1,12 @@
+export interface UserSettings {
+  darkMode?: boolean;
+  notifDefis?: boolean;
+  notifMessages?: boolean;
+  notifUpdates?: boolean;
+  reduceMotion?: boolean;
+  language?: string;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -16,4 +25,5 @@ export interface User {
   reputation?: number;
   currentStreak?: number;
   recentActivities?: { content: string; date: string }[];
+  settings?: UserSettings;
 }

@@ -230,6 +230,29 @@ app.put('/api/users/me', async (req, res) => {
   }
 });
 
+// Préférences UI (mode sombre, notifications, langue...) liées au compte plutôt qu'au
+// navigateur, pour qu'elles suivent l'utilisateur d'un appareil à l'autre.
+const ALLOWED_SETTINGS_KEYS = ['darkMode', 'notifDefis', 'notifMessages', 'notifUpdates', 'reduceMotion', 'language'];
+app.put('/api/users/me/settings', authMiddleware, async (req, res) => {
+  try {
+    const patch = {};
+    for (const key of ALLOWED_SETTINGS_KEYS) {
+      if (key in req.body) patch[key] = req.body[key];
+    }
+    const current = await prisma.user.findUnique({ where: { id: req.userId }, select: { settings: true } });
+    const merged = { ...(current?.settings ?? {}), ...patch };
+    const updated = await prisma.user.update({
+      where: { id: req.userId },
+      data: { settings: merged },
+      select: { settings: true },
+    });
+    res.json({ settings: updated.settings });
+  } catch (err) {
+    console.error('[users/me/settings]', err);
+    res.status(400).json({ error: 'Erreur lors de la sauvegarde des préférences.' });
+  }
+});
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Étape 1 : demander le changement — envoie un lien de confirmation à la NOUVELLE adresse.

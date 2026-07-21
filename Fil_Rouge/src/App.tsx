@@ -20,7 +20,7 @@ import GroupChatPage from './pages/GroupChatPage';
 import { useStore } from './lib/store';
 
 function App() {
-  const { darkMode, setUser } = useStore();
+  const { darkMode, setUser, applyServerSettings } = useStore();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -38,12 +38,17 @@ function App() {
           return;
         }
         const data = await res.json();
-        if (data?.user) setUser(data.user);
+        if (data?.user) {
+          setUser(data.user);
+          // Les préférences liées au compte (mode sombre, notifs...) priment sur celles du
+          // navigateur, pour retrouver ses réglages même depuis un nouvel appareil.
+          applyServerSettings(data.user.settings);
+        }
       })
       .catch(() => {
         // Ignore network errors and keep persisted state until API is reachable.
       });
-  }, [setUser]);
+  }, [setUser, applyServerSettings]);
 
   return (
     <div className={darkMode ? 'dark' : ''}>
