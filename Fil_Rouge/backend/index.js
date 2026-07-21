@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import Groq from 'groq-sdk';
 import nodemailer from 'nodemailer';
+import rateLimit from 'express-rate-limit';
 import { StreakService } from './services/StreakService.js';
 import { RewardCalculator, GroupBonus, LevelProgression } from './services/RewardCalculator.js';
 
@@ -24,11 +25,56 @@ app.use((req, res, next) => {
   if (req.body === undefined) req.body = {};
   next();
 });
-const SECRET = process.env.JWT_SECRET || 'supersecret';
+// Pas de valeur par défaut : un secret connu publiquement (ex-'supersecret') permettrait
+// de forger n'importe quel token (y compris admin) si la variable d'env est mal configurée.
+const SECRET = process.env.JWT_SECRET;
+if (!SECRET) {
+  throw new Error('JWT_SECRET est manquant. Défini-le dans les variables d\'environnement avant de démarrer le serveur.');
+}
 const DEFAULT_AVATAR = '/default-avatar.svg';
+// Ne jamais renvoyer le hash du mot de passe au client, même pour son propre compte.
+const sanitizeUser = (user) => {
+  const { password, ...safe } = user;
+  return { ...safe, avatar: safe.avatar || DEFAULT_AVATAR };
+};
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
-const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+const EMAIL_CHANGE_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+// Hash bcrypt fixe utilisé comme comparaison factice en login quand l'email n'existe pas
+// (voir /api/auth/login) — pas de mot de passe réel associé, juste un hash valide à comparer.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
+
+// Anti brute-force / spam sur les routes d'auth : login (credential stuffing), register
+// (création de comptes en masse) et forgot-password (chaque appel envoie un vrai email).
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de tentatives de connexion. Réessaie dans quelques minutes.' },
+});
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de comptes créés depuis cette adresse. Réessaie plus tard.' },
+});
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de demandes de réinitialisation. Réessaie plus tard.' },
+});
+const emailChangeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de demandes de changement d\'email. Réessaie plus tard.' },
+});
 
 // Règle de mot de passe fort, identique côté frontend (src/lib/passwordPolicy.ts) :
 // 8 caractères minimum, une majuscule, une minuscule, un chiffre, un caractère spécial.
@@ -47,7 +93,7 @@ async function updateStreak(userId) {
   return streakService.updateForUser(userId);
 }
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', registerLimiter, async (req, res) => {
   const { username, email, password, avatar } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis.' });
   if (!isStrongPassword(password)) return res.status(400).json({ error: `Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}` });
@@ -62,26 +108,29 @@ app.post('/api/auth/register', async (req, res) => {
       }
     });
     const token = jwt.sign({ userId: user.id }, SECRET, { expiresIn: '1d' });
-    res.json({ message: 'Utilisateur créé', token, user });
+    res.json({ message: 'Utilisateur créé', token, user: sanitizeUser(user) });
   } catch (error) {
     res.status(400).json({ error: 'Utilisateur ou email déjà pris.' });
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis.' });
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.password))) {
+  // bcrypt.compare tourne même si l'email est inconnu (contre un hash factice) : sinon le
+  // temps de réponse trahit quels emails sont enregistrés (oracle de timing).
+  const valid = await bcrypt.compare(password, user?.password ?? DUMMY_PASSWORD_HASH);
+  if (!user || !valid) {
     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   }
   const token = jwt.sign({ userId: user.id }, SECRET, { expiresIn: '1d' });
-  res.json({ token, user: { ...user, avatar: user.avatar || DEFAULT_AVATAR } });
+  res.json({ token, user: sanitizeUser(user) });
 });
 
 // Ne révèle jamais si l'email existe ou non (évite l'énumération de comptes) —
 // la réponse est identique que l'email soit connu ou pas.
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', forgotPasswordLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email requis.' });
   const genericMessage = { message: 'Si un compte existe avec cet email, un lien de réinitialisation vient de lui être envoyé.' };
@@ -93,7 +142,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     await prisma.passwordResetToken.create({
       data: {
         userId: user.id,
-        tokenHash: hashResetToken(rawToken),
+        tokenHash: hashToken(rawToken),
         expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
       },
     });
@@ -119,7 +168,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   if (!token || !password) return res.status(400).json({ error: 'Token et nouveau mot de passe requis.' });
   if (!isStrongPassword(password)) return res.status(400).json({ error: `Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}` });
   try {
-    const tokenHash = hashResetToken(token);
+    const tokenHash = hashToken(token);
     const record = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
     if (!record || record.expiresAt < new Date()) {
       return res.status(400).json({ error: 'Lien invalide ou expiré.' });
@@ -155,12 +204,14 @@ app.get('/api/users/me', async (req, res) => {
     const decoded = jwt.verify(token, SECRET);
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
     if (!user) return res.status(404).json({ user: null });
-    res.json({ user: { ...user, avatar: user.avatar || DEFAULT_AVATAR } });
+    res.json({ user: sanitizeUser(user) });
   } catch (err) {
     return res.status(401).json({ user: null });
   }
 });
 
+// L'email ne se change plus ici : voir /api/users/me/email/request-change +
+// /api/auth/confirm-email-change, qui exigent une preuve de possession de la nouvelle adresse.
 app.put('/api/users/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
@@ -168,14 +219,82 @@ app.put('/api/users/me', async (req, res) => {
   try {
     const decoded = jwt.verify(token, SECRET);
     const userId = decoded.userId;
-    const { username, email, bio, avatar, banner } = req.body;
+    const { username, bio, avatar, banner } = req.body;
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { username, email, bio, avatar, banner }
+      data: { username, bio, avatar, banner }
     });
-    res.json({ user: { ...updatedUser, avatar: updatedUser.avatar || DEFAULT_AVATAR } });
+    res.json({ user: sanitizeUser(updatedUser) });
   } catch (err) {
     return res.status(401).json({ error: 'Token invalide' });
+  }
+});
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Étape 1 : demander le changement — envoie un lien de confirmation à la NOUVELLE adresse.
+// L'email du compte n'est pas modifié tant que le lien n'a pas été cliqué.
+app.post('/api/users/me/email/request-change', emailChangeLimiter, async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  try {
+    const decoded = jwt.verify(authHeader.split(' ')[1], SECRET);
+    const { newEmail } = req.body;
+    if (!newEmail || !EMAIL_RE.test(newEmail)) {
+      return res.status(400).json({ error: 'Adresse email invalide.' });
+    }
+    const existing = await prisma.user.findUnique({ where: { email: newEmail } });
+    if (existing) return res.status(400).json({ error: 'Cette adresse email est déjà utilisée.' });
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    await prisma.emailChangeToken.create({
+      data: {
+        userId: decoded.userId,
+        newEmail,
+        tokenHash: hashToken(rawToken),
+        expiresAt: new Date(Date.now() + EMAIL_CHANGE_TOKEN_TTL_MS),
+      },
+    });
+    const confirmUrl = `${FRONTEND_URL}/confirm-email-change?token=${rawToken}`;
+    await mailer.sendMail({
+      from: `"U-Quail" <${process.env.GMAIL_USER}>`,
+      to: newEmail,
+      subject: 'Confirme ta nouvelle adresse email U-Quail',
+      html: `<p>Tu as demandé à changer l'adresse email de ton compte U-Quail pour celle-ci.</p>
+             <p><a href="${confirmUrl}">Clique ici pour confirmer ce changement</a> (valable 1 heure).</p>
+             <p>Si tu n'es pas à l'origine de cette demande, ignore simplement cet email.</p>`,
+    });
+    res.json({ message: 'Un email de confirmation a été envoyé à la nouvelle adresse.' });
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) return res.status(401).json({ error: 'Token invalide' });
+    console.error('[email/request-change]', err);
+    res.status(500).json({ error: "Erreur lors de la demande de changement d'email." });
+  }
+});
+
+// Étape 2 : confirmation via le lien reçu par email — applique enfin le changement.
+app.post('/api/auth/confirm-email-change', async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'Token requis.' });
+  try {
+    const tokenHash = hashToken(token);
+    const record = await prisma.emailChangeToken.findUnique({ where: { tokenHash } });
+    if (!record || record.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Lien invalide ou expiré.' });
+    }
+    const existing = await prisma.user.findUnique({ where: { email: record.newEmail } });
+    if (existing) {
+      await prisma.emailChangeToken.deleteMany({ where: { userId: record.userId } });
+      return res.status(400).json({ error: 'Cette adresse email est déjà utilisée.' });
+    }
+    const [updatedUser] = await prisma.$transaction([
+      prisma.user.update({ where: { id: record.userId }, data: { email: record.newEmail } }),
+      prisma.emailChangeToken.deleteMany({ where: { userId: record.userId } }),
+    ]);
+    res.json({ message: 'Adresse email mise à jour.', user: sanitizeUser(updatedUser) });
+  } catch (error) {
+    console.error('[confirm-email-change]', error);
+    res.status(500).json({ error: 'Erreur lors de la confirmation.' });
   }
 });
 
@@ -190,7 +309,7 @@ app.put('/api/users/:id', isAdmin, async (req, res) => {
       where: { id: targetId },
       data: { username, email, bio, avatar, banner, isAdmin: makeAdmin, coins, xp, level, currentStreak }
     });
-    res.json({ user: updatedUser });
+    res.json({ user: sanitizeUser(updatedUser) });
   } catch (err) {
     res.status(400).json({ error: "Impossible de mettre à jour l'utilisateur" });
   }
@@ -260,8 +379,14 @@ app.get('/api/users/search', authMiddleware, async (req, res) => {
 app.get('/api/users/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    // Endpoint accessible sans authentification : on ne sélectionne jamais le mot de passe
+    // (ni les autres champs sensibles) pour éviter qu'un scan d'ids ne dump toute la base.
     const user = await prisma.user.findUnique({
-      where: { id: Number(id) || id }
+      where: { id: Number(id) || id },
+      select: {
+        id: true, username: true, avatar: true, banner: true, bio: true,
+        xp: true, level: true, currentStreak: true, createdAt: true,
+      }
     });
     if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
     res.json({ user });
@@ -273,11 +398,14 @@ app.get('/api/users/:id', async (req, res) => {
 // Stockage en mémoire (pas sur disque) : le disque de Render est éphémère et
 // perd son contenu à chaque redémarrage/redéploiement. Les fichiers sont
 // persistés dans PostgreSQL (modèle UploadedFile) plutôt que sur le filesystem.
+// Whitelist stricte de types raster : un SVG accepté ("image/*") peut embarquer du <script>
+// et l'exécuter si son URL /uploads/:id est ouverte directement (hors <img>) — XSS stocké.
+const ALLOWED_UPLOAD_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
+    if (!ALLOWED_UPLOAD_TYPES.has(file.mimetype)) return cb(new Error('Format non supporté. JPEG, PNG ou WebP uniquement.'));
     cb(null, true);
   },
 });
@@ -641,7 +769,7 @@ app.post('/api/challenges/:id/complete', async (req, res) => {
       isDailyBonus, dailyMultiplier,
       groupSize, groupBonusMultiplier: groupBonus.multiplier,
       streak: { current: freshUser.currentStreak, milestone: streakResult?.milestone ?? null },
-      user: updatedUser
+      user: sanitizeUser(updatedUser)
     });
   } catch (error) {
     res.status(400).json({ error: "Erreur lors de la complétion du défi" });
@@ -940,7 +1068,7 @@ app.post('/api/cosmetics/:id/buy', async (req, res) => {
       where: { id: decoded.userId },
       data: { coins: { decrement: cosmetic.price } }
     });
-    res.json({ message: "Cosmétique acheté !", user: updatedUser });
+    res.json({ message: "Cosmétique acheté !", user: sanitizeUser(updatedUser) });
   } catch (error) {
     res.status(400).json({ error: "Erreur lors de l'achat" });
   }

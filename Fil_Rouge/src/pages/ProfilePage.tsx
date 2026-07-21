@@ -59,7 +59,6 @@ const EditProfile: React.FC = () => {
 
   const [formData, setFormData] = useState({
     username: user?.username || '',
-    email: user?.email || '',
     bio: user?.bio || '',
     avatar: user?.avatar || '',
     banner: user?.banner || ''
@@ -70,7 +69,10 @@ const EditProfile: React.FC = () => {
     newPassword: '',
     confirmPassword: ''
   });
-  const [emailError, setEmailError] = useState('');
+  const [newEmailInput, setNewEmailInput] = useState('');
+  const [emailChangeSending, setEmailChangeSending] = useState(false);
+  const [emailChangeSent, setEmailChangeSent] = useState(false);
+  const [emailChangeError, setEmailChangeError] = useState('');
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
@@ -85,7 +87,6 @@ const EditProfile: React.FC = () => {
     if (user) {
       setFormData({
         username: user.username || '',
-        email: user.email || '',
         bio: user.bio || '',
         avatar: user.avatar || '',
         banner: user.banner || ''
@@ -241,12 +242,6 @@ const EditProfile: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    setFormData(prev => ({ ...prev, email: value }));
-    setEmailError(validateEmail(value) ? '' : 'Adresse email invalide.');
-  };
-
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setPasswordData(prev => ({ ...prev, [name]: value }));
@@ -288,6 +283,33 @@ const EditProfile: React.FC = () => {
       setIsEditing(false);
     } catch (err) {
       showNotif("Erreur réseau lors du changement de mot de passe", 'error');
+    }
+  };
+
+  const handleRequestEmailChange = async () => {
+    setEmailChangeError('');
+    if (!validateEmail(newEmailInput)) {
+      setEmailChangeError('Adresse email invalide.');
+      return;
+    }
+    setEmailChangeSending(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/users/me/email/request-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ newEmail: newEmailInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmailChangeError(data.error || "Erreur lors de la demande de changement d'email.");
+        return;
+      }
+      setEmailChangeSent(true);
+    } catch {
+      setEmailChangeError("Erreur réseau lors de la demande de changement d'email.");
+    } finally {
+      setEmailChangeSending(false);
     }
   };
 
@@ -734,22 +756,44 @@ const EditProfile: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="flex items-center gap-2">
                     <Mail size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
-                    {isEditing ? (
-                      <div className="flex-1">
-                        <input type="email" name="email" value={formData.email} onChange={handleEmailChange}
-                          className="bg-transparent focus:outline-none w-full text-sm"
-                          style={{ borderBottom: '2px solid var(--q-accent)', color: 'var(--q-text)' }} />
-                        {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
-                      </div>
-                    ) : (
-                      <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{user.email}</span>
-                    )}
+                    <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{user.email}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
                     <span className="text-sm" style={{ color: 'var(--q-text2)' }}>Membre depuis {profileStats.memberSince}</span>
                   </div>
                 </div>
+                {isEditing && (
+                  <div>
+                    <p className="text-sm font-semibold mb-2" style={{ color: 'var(--q-text)' }}>Changer d'email</p>
+                    <div className="rounded-2xl p-4 space-y-3" style={{ background: 'var(--q-accent-soft)', border: '1px solid var(--q-line)' }}>
+                      {emailChangeSent ? (
+                        <p className="text-sm" style={{ color: 'var(--q-text)' }}>
+                          Un email de confirmation a été envoyé à <strong>{newEmailInput}</strong>. Clique sur le lien qu'il contient pour valider le changement.
+                        </p>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--q-text2)' }}>
+                              Nouvelle adresse email
+                            </label>
+                            <input type="email" value={newEmailInput}
+                              onChange={e => { setNewEmailInput(e.target.value); setEmailChangeError(''); }}
+                              placeholder={user.email}
+                              className="w-full px-3 py-2 rounded-xl bg-transparent focus:outline-none text-sm"
+                              style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} />
+                            {emailChangeError && <p className="text-red-500 text-xs mt-1">{emailChangeError}</p>}
+                          </div>
+                          <button onClick={handleRequestEmailChange} disabled={emailChangeSending}
+                            className="q-press px-4 py-2 rounded-xl text-sm font-bold text-white"
+                            style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', opacity: emailChangeSending ? 0.7 : 1 }}>
+                            {emailChangeSending ? 'Envoi...' : 'Envoyer le lien de confirmation'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {isEditing && (
                   <div>
                     <p className="text-sm font-semibold mb-2" style={{ color: 'var(--q-text)' }}>Modifier le mot de passe</p>

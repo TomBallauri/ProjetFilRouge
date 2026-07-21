@@ -8,6 +8,7 @@ import ProfilePage from './pages/ProfilePage';
 import AuthPage from './pages/AuthPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import ConfirmEmailChangePage from './pages/ConfirmEmailChangePage';
 import ChallengePage from './pages/ChallengePage';
 import CreateChallenge from './pages/CreateChallenge';
 import AIChallengeGenerator from './pages/AIChallengeGenerator';
@@ -51,6 +52,7 @@ function App() {
         <Route path="/register" element={<AuthPage mode="register" />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<UQuail />} />

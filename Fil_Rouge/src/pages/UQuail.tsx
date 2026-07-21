@@ -26,6 +26,7 @@ type UserChallenge = {
     difficulty: string;
     coinReward: number;
     xpReward: number;
+    seriesName?: string | null;
   };
 };
 

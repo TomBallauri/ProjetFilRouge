@@ -7,7 +7,7 @@ const Footer: React.FC = () => {
   return (
     <footer className="w-full py-4 bg-gray-900 text-center mt-8">
       <span className={darkMode ? 'text-blue-400' : 'text-gray-700'}>
-        © {new Date().getFullYear()} Projet Fil Rouge — Tous droits réservés.
+        © {new Date().getFullYear()} U-Quail — Tous droits réservés.
       </span>
     </footer>
   );
