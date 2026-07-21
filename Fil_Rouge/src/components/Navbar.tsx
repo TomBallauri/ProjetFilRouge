@@ -107,6 +107,7 @@ const Navbar: React.FC = () => {
           {/* Avatar / menu profil */}
           <div className="relative" ref={dropdownRef}>
             <button className="q-press flex items-center justify-center rounded-full transition-opacity hover:opacity-80"
+              data-tour="nav-avatar"
               onClick={() => setDropdownOpen(o => !o)} aria-label="Profil" aria-expanded={dropdownOpen} aria-haspopup="menu">
               {user ? (
                 <UserAvatar avatar={user.avatar} username={user.username ?? ''} cosmetics={navCosmetics} size="sm" />

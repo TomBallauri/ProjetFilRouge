@@ -72,6 +72,13 @@ const Sidebar: React.FC = () => {
   const isActiveTab = (path: string, end: boolean): boolean =>
     end ? location.pathname === path : location.pathname.startsWith(path);
 
+  // Points d'ancrage pour le tutoriel de bienvenue (voir OnboardingTour) — desktop et mobile
+  // partagent le même id, le composant de tour choisit celui qui est réellement visible.
+  const TOUR_IDS: Record<string, string> = {
+    '/': 'nav-accueil', '/challenges': 'nav-defis', '/friends': 'nav-amis',
+    '/shop': 'nav-boutique', '/profile': 'nav-profil', '/leaderboard': 'nav-classement',
+  };
+
   const sidebarBg = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
   const inactiveClass = darkMode
     ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
@@ -91,6 +98,7 @@ const Sidebar: React.FC = () => {
                 key={item.path}
                 to={item.path}
                 end={item.end}
+                data-tour={TOUR_IDS[item.path]}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-3 rounded-xl mx-2 font-medium text-sm transition-all
                   ${isActive ? 'bg-blue-600 text-white shadow-sm' : inactiveClass}`
@@ -192,6 +200,7 @@ const Sidebar: React.FC = () => {
                 key={tab.path}
                 to={tab.path}
                 end={tab.end}
+                data-tour={TOUR_IDS[tab.path]}
                 className="q-press"
                 style={{
                   flex: 1,

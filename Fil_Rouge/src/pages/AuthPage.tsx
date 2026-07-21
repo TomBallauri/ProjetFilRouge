@@ -44,7 +44,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
       if (data.token) localStorage.setItem('token', data.token);
       setUser(data.user);
       applyServerSettings(data.user?.settings);
-      navigate('/');
+      navigate('/', mode === 'register' ? { state: { showOnboarding: true } } : undefined);
     } catch (err: any) {
       setError(err.message || 'Une erreur est survenue.');
     } finally {

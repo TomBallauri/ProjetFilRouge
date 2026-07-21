@@ -2277,6 +2277,7 @@ const ChallengePage: React.FC = () => {
           </div>
         </div>
         <button onClick={() => navigate('/challenges/create')}
+          data-tour="create-challenge"
           aria-label="Créer un défi"
           className="q-press flex items-center gap-1.5 px-4 py-2 rounded-full text-white font-bold text-sm transition-opacity hover:opacity-85"
           style={{ background: 'var(--q-vibrant-lavender)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
@@ -2287,7 +2288,7 @@ const ChallengePage: React.FC = () => {
 
       {/* Stats utilisateur */}
       {user && (
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+        <div data-tour="page-defis" className="flex gap-2 mb-4 overflow-x-auto pb-1">
           <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
             style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)', boxShadow: '0 4px 12px rgba(251,146,60,0.40)' }}>
             <CircleDollarSign size={13} aria-hidden="true" />
@@ -2568,7 +2569,7 @@ const ChallengePage: React.FC = () => {
           )}
 
           {available.length > 0 && (
-            <section>
+            <section data-tour="page-defis-available">
               <SectionHeader icon={<Trophy size={16} style={{ color: '#FACC15' }} />} label="Disponibles" count={available.length}
                 grad="linear-gradient(135deg,#FACC15,#FB923C)" onClick={() => setAvailableOpen(o => !o)} isOpen={availableOpen} />
               {availableOpen && (

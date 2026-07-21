@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut, ChevronLeft, Lock } from 'lucide-react';
+import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut, ChevronLeft, Lock, HelpCircle } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
@@ -51,6 +51,7 @@ const EditProfile: React.FC = () => {
   const {
     user, setUser, darkMode, toggleDarkMode,
     notifToggles, setNotifToggles, reduceMotion, setReduceMotion, language, setLanguage,
+    openTour,
   } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -524,7 +525,7 @@ const EditProfile: React.FC = () => {
           <div style={{ fontSize: 12, color: 'var(--q-text2)', fontWeight: 500, marginTop: 4 }}>
             @{user.username} · membre depuis {profileStats.memberSince}
           </div>
-          <div style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--q-accent-soft)', padding: '6px 14px', borderRadius: 999 }}>
+          <div data-tour="profile-level" style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--q-accent-soft)', padding: '6px 14px', borderRadius: 999 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-accent-deep)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
               Niveau {user.level ?? 1}
             </span>
@@ -587,7 +588,7 @@ const EditProfile: React.FC = () => {
             </button>
           </div>
         ) : (
-          <button onClick={() => setIsEditing(true)} className="q-press"
+          <button data-tour="profile-edit" onClick={() => setIsEditing(true)} className="q-press"
             style={{ height: 36, padding: '0 20px', borderRadius: 18, border: 'none', background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
             Modifier le profil
           </button>
@@ -808,7 +809,7 @@ const EditProfile: React.FC = () => {
 
       {/* ── Cosmétiques ── */}
       <div style={{ padding: '0 18px', marginTop: 8 }}>
-          <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+          <div data-tour="profile-cosmetics" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
             <button onClick={() => toggleProfileSection('cosmetics')}
               className="q-press w-full flex items-center gap-3 p-4 text-left"
               style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
@@ -936,7 +937,7 @@ const EditProfile: React.FC = () => {
           <div style={{ padding: '22px 22px 10px' }}>
             <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--q-display)', letterSpacing: -0.2, color: 'var(--q-text)' }}>Historique</h2>
           </div>
-          <div style={{ padding: '0 18px' }}>
+          <div data-tour="profile-history" style={{ padding: '0 18px' }}>
             <div style={{ borderRadius: 22, overflow: 'hidden', background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
               {userChallenges.map((uc, i, a) => {
                 const ok = uc.status === 'COMPLETED';
@@ -982,15 +983,32 @@ const EditProfile: React.FC = () => {
       )}
 
       {/* ── Paramètres ── */}
-      <div style={{ padding: '22px 22px 10px' }}>
+      <div data-tour="profile-settings" style={{ padding: '22px 22px 10px' }}>
         <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--q-display)', letterSpacing: -0.2, color: 'var(--q-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Settings size={20} style={{ color: 'var(--q-accent)' }} /> Paramètres
         </h2>
       </div>
       <div style={{ padding: '0 18px 40px', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
+        {/* Aide */}
+        {/* Le tuto commence sur l'accueil (cloche de notifs, XP, streak...) — le relancer
+            depuis une autre page le laisserait bloqué à chercher des éléments qui n'existent
+            pas ici, donc on ramène d'abord sur "/" avant de l'ouvrir. */}
+        <button onClick={() => { navigate('/'); openTour(); }} className="q-press rounded-2xl overflow-hidden w-full flex items-center gap-3 p-4 text-left"
+          style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)', cursor: 'pointer' }}>
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#00DDFF,#2B1FD0)' }}>
+            <HelpCircle size={18} color="#fff" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Revoir le tutoriel</p>
+            <p className="text-xs" style={{ color: 'var(--q-text2)' }}>Un petit rappel du fonctionnement de l'appli</p>
+          </div>
+          <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+        </button>
+
         {/* Apparence */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+        <div data-tour="settings-appearance" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
           <button onClick={() => setOpenSection(openSection === 'appearance' ? null : 'appearance')}
             className="q-press w-full flex items-center gap-3 p-4 text-left"
             style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
@@ -1027,7 +1045,7 @@ const EditProfile: React.FC = () => {
         </div>
 
         {/* Notifications */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+        <div data-tour="settings-notifications" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
           <button onClick={() => setOpenSection(openSection === 'notifications' ? null : 'notifications')}
             className="q-press w-full flex items-center gap-3 p-4 text-left"
             style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
@@ -1070,7 +1088,7 @@ const EditProfile: React.FC = () => {
         </div>
 
         {/* Accessibilité */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+        <div data-tour="settings-accessibility" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
           <button onClick={() => setOpenSection(openSection === 'accessibility' ? null : 'accessibility')}
             className="q-press w-full flex items-center gap-3 p-4 text-left"
             style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>

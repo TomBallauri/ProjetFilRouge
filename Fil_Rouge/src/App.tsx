@@ -23,6 +23,12 @@ function App() {
   const { darkMode, setUser, applyServerSettings } = useStore();
 
   useEffect(() => {
+    // Répliqué sur <html> pour que les composants montés hors de l'arbre React (driver.js
+    // pour le tutoriel, portails futurs...) héritent aussi des variables --q-* du bon thème.
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, [darkMode]);
+
+  useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
 

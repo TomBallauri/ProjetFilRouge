@@ -100,7 +100,7 @@ function ChallengeCard({
       </div>
 
       {/* Titre */}
-      <div>
+      <div data-tour="create-title">
         <label className="block text-xs font-semibold mb-1 opacity-70">Titre</label>
         <input type="text" maxLength={80} value={data.title}
           onChange={e => onChange({ ...data, title: e.target.value })}
@@ -109,7 +109,7 @@ function ChallengeCard({
       </div>
 
       {/* Description */}
-      <div>
+      <div data-tour="create-description">
         <label className="block text-xs font-semibold mb-1 opacity-70">Description</label>
         <textarea rows={2} maxLength={500} value={data.description}
           onChange={e => onChange({ ...data, description: e.target.value })}
@@ -119,7 +119,7 @@ function ChallengeCard({
       </div>
 
       {/* Catégorie */}
-      <div>
+      <div data-tour="create-category">
         <p className="text-xs font-semibold mb-2 opacity-70">Catégorie</p>
         <div className="grid grid-cols-4 gap-2">
           {Object.keys(CAT_META).map(v => (
@@ -212,6 +212,7 @@ const CreateChallenge: React.FC = () => {
             Créer {challenges.length > 1 ? `${challenges.length} défis` : 'un défi'}
           </h1>
           <button onClick={() => navigate('/challenges/ai-create')}
+            data-tour="create-ai"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 transition-opacity">
             <Sparkles size={13} /> IA
           </button>

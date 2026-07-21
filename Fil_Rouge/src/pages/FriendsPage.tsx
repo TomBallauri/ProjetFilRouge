@@ -32,6 +32,9 @@ type SearchUser = {
 
 const token = () => localStorage.getItem('token') ?? '';
 
+// Points d'ancrage pour le tutoriel de bienvenue (voir OnboardingTour).
+const TOUR_ID_BY_TAB: Record<string, string> = { search: 'friends-search', requests: 'friends-requests' };
+
 const FriendsPage: React.FC = () => {
   const { user } = useStore();
   const navigate = useNavigate();
@@ -175,8 +178,10 @@ const FriendsPage: React.FC = () => {
           boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
           {tabs.map(({ id, label }) => {
             const on = tab === id;
+            const tourId = TOUR_ID_BY_TAB[id];
             return (
               <button key={id} onClick={() => setTab(id)}
+                data-tour={tourId}
                 aria-pressed={on}
                 style={{ flex: 1, height: 36, border: 'none', borderRadius: 14,
                   background: on ? 'var(--q-accent)' : 'transparent',
@@ -197,7 +202,7 @@ const FriendsPage: React.FC = () => {
       {tab === 'search' && (
         <div style={{ marginTop: 12 }}>
           {/* Input */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+          <div data-tour="friends-search-input" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
             borderRadius: 18, background: 'var(--q-chrome)', border: '1px solid var(--q-line)',
             boxShadow: 'var(--q-shadow)', marginBottom: 14 }}>
             <Search size={16} aria-hidden="true" style={{ color: 'var(--q-text3)', flexShrink: 0 }} />

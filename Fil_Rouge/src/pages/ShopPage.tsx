@@ -257,7 +257,7 @@ const ShopPage: React.FC = () => {
           </div>
         </div>
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6,
+          <div data-tour="page-boutique" style={{ display: 'flex', alignItems: 'center', gap: 6,
             background: 'linear-gradient(135deg,#FACC15,#FB923C)',
             color: '#fff',
             padding: '7px 12px', borderRadius: 999, fontWeight: 700, fontSize: 13,
@@ -344,7 +344,7 @@ const ShopPage: React.FC = () => {
           <p>Aucun article disponible.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div data-tour="shop-items" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {filtered.map(cosmetic => (
             <CosmeticCard
               key={cosmetic.id}

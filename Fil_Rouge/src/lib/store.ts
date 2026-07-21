@@ -83,6 +83,11 @@ interface StoreState {
   notifCount:     number;
   setNotifData:   (data: NotifData | null) => void;
   setNotifCount:  (count: number) => void;
+
+  /* Tutoriel de bienvenue (not persisted — ré-ouvrable depuis le profil) */
+  tourOpen: boolean;
+  openTour: () => void;
+  closeTour: () => void;
 }
 
 export const useStore = create<StoreState>()(
@@ -164,6 +169,10 @@ export const useStore = create<StoreState>()(
       notifCount:    0,
       setNotifData:  (data) => set({ notifData: data }),
       setNotifCount: (count) => set({ notifCount: count }),
+
+      tourOpen: false,
+      openTour: () => set({ tourOpen: true }),
+      closeTour: () => set({ tourOpen: false }),
     }),
     {
       name: 'gameforum-store', // nom de la clé dans le localStorage

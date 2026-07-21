@@ -1,0 +1,92 @@
+/* Reskin de driver.js (voir OnboardingTour.tsx) pour matcher le design du site,
+   thème clair/sombre inclus via les variables --q-*. */
+
+.q-tour-popover.driver-popover {
+  background: var(--q-chrome);
+  color: var(--q-text);
+  border: 1px solid var(--q-line);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  font-family: "Quicksand", ui-rounded, system-ui, sans-serif;
+  padding: 18px;
+  max-width: 300px;
+}
+
+.q-tour-popover .driver-popover-title {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 18px;
+  color: var(--q-text);
+  margin: 0 0 6px;
+  padding-right: 20px;
+}
+
+.q-tour-popover .driver-popover-description {
+  font-size: 13px;
+  color: var(--q-text2);
+  line-height: 1.55;
+}
+
+.q-tour-popover .driver-popover-progress-text {
+  color: var(--q-text3);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.q-tour-popover .driver-popover-close-btn {
+  color: var(--q-text3);
+}
+.q-tour-popover .driver-popover-close-btn:hover,
+.q-tour-popover .driver-popover-close-btn:focus {
+  color: var(--q-text);
+}
+
+.q-tour-popover .driver-popover-footer-btn {
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-weight: 700;
+  font-size: 13px;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--q-text2);
+}
+
+.q-tour-popover .driver-popover-next-btn,
+.q-tour-popover .driver-popover-footer-btn[data-testid="next-button"] {
+  background: linear-gradient(135deg, #00ddff 0%, #067dba 35%, #2b1fd0 65%, #b71aeb 100%);
+  color: #fff;
+  text-shadow: none;
+}
+.q-tour-popover .driver-popover-next-btn:hover,
+.q-tour-popover .driver-popover-next-btn:focus {
+  background: linear-gradient(135deg, #00ddff 0%, #067dba 35%, #2b1fd0 65%, #b71aeb 100%);
+}
+
+.q-tour-popover .driver-popover-prev-btn {
+  border: 1px solid var(--q-line);
+  color: var(--q-text);
+}
+
+.q-tour-popover .driver-popover-arrow-side-left { border-left-color: var(--q-chrome); }
+.q-tour-popover .driver-popover-arrow-side-right { border-right-color: var(--q-chrome); }
+.q-tour-popover .driver-popover-arrow-side-top { border-top-color: var(--q-chrome); }
+.q-tour-popover .driver-popover-arrow-side-bottom { border-bottom-color: var(--q-chrome); }
+
+.driver-overlay { z-index: 199 !important; }
+.q-tour-popover { z-index: 200 !important; }
+
+/* Anneau blanc qui pulse autour de l'élément à cliquer (voir OnboardingTour.tsx) —
+   contourne l'élément plutôt qu'un simple point, plus clair sur ce qu'il faut cliquer. */
+.q-tour-pulse-ring {
+  position: fixed;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  animation: q-tour-ring-anim 1.6s ease-out infinite;
+  pointer-events: none;
+  z-index: 201;
+}
+
+@keyframes q-tour-ring-anim {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.55); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}

@@ -331,7 +331,7 @@ const UQuail: React.FC = () => {
               textDecoration: 'none', boxShadow: '0 4px 12px -2px rgba(251,146,60,0.45)' }}>
             <CircleDollarSign size={14} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString('fr')}
           </Link>
-          <div style={{ position: 'relative' }}>
+          <div data-tour="home-notif" style={{ position: 'relative' }}>
             <button className="q-press" aria-label="Notifications" onClick={() => {
               const willOpen = !notifPanelOpen;
               setNotifPanelOpen(willOpen);
@@ -450,7 +450,7 @@ const UQuail: React.FC = () => {
       </div>
 
       {/* ── Hero XP card ── */}
-      <div className="rounded-3xl p-5 mb-5 relative overflow-hidden"
+      <div data-tour="home-xp" className="rounded-3xl p-5 mb-5 relative overflow-hidden"
         style={{ background: 'var(--q-vibrant-hero)',
           boxShadow: '0 14px 32px -10px rgba(124,58,237,0.45)',
           }}>
@@ -493,7 +493,7 @@ const UQuail: React.FC = () => {
       </div>
 
       {/* ── Streak ── */}
-      <div className="mb-5 rounded-3xl overflow-hidden"
+      <div data-tour="home-streak" className="mb-5 rounded-3xl overflow-hidden"
         style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
         <div className="flex items-center gap-3 p-4">
           {/* Icône principale */}
@@ -571,6 +571,7 @@ const UQuail: React.FC = () => {
       </div>
 
       {/* ── Ta journée ── */}
+      <div data-tour="home-today">
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="text-xl font-bold"
           style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
@@ -661,6 +662,7 @@ const UQuail: React.FC = () => {
           })}
         </div>
       )}
+      </div>
 
       {/* ── Quick nav cards — desktop only (mobile has bottom tab bar) ── */}
       <div className="hidden md:block">
@@ -708,7 +710,7 @@ const UQuail: React.FC = () => {
       </div>
 
       {/* ── Classement (mobile only — desktop has sidebar) ── */}
-      <div className="md:hidden mb-5">
+      <div data-tour="home-leaderboard" className="md:hidden mb-5">
         <div className="flex items-baseline justify-between mb-3">
           <h2 className="text-xl font-bold"
             style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
@@ -792,6 +794,7 @@ const UQuail: React.FC = () => {
       </div>
 
       {/* ── Suggestion du jour ── */}
+      <div data-tour="home-daily">
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="text-xl font-bold"
           style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
@@ -863,6 +866,7 @@ const UQuail: React.FC = () => {
           </div>
         )}
       </Link>
+      </div>
 
     </div>
   );
