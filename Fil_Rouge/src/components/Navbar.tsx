@@ -1,18 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
-import { Moon, Sun, User, LogOut, Zap, Trophy, ShoppingBag, Joystick, CircleDollarSign } from 'lucide-react';
+import { Moon, Sun, User, LogOut, Zap, Trophy, ShoppingBag, CircleDollarSign } from 'lucide-react';
 import UserAvatar from './UserAvatar';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 
-const fmt = (n: number): string => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.0', '')}M`;
-  if (n >= 1_000) return `${Math.floor(n / 1_000)}K`;
-  return n.toLocaleString('fr-FR');
-};
-
 const Navbar: React.FC = () => {
   const { user, setUser, darkMode, toggleDarkMode } = useStore();
+  const { t } = useTranslation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [navCosmetics, setNavCosmetics] = useState<EquippedCosmetic[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -52,7 +48,7 @@ const Navbar: React.FC = () => {
   const xpToNext = 1000 - xpInLevel;
 
   return (
-    <nav aria-label="Navigation globale" className="hidden md:block sticky top-0 z-10 shadow-sm border-b"
+    <nav aria-label={t('navbar.globalNav')} className="hidden md:block sticky top-0 z-10 shadow-sm border-b"
       style={{ background: 'var(--q-chrome)', borderColor: 'var(--q-line)', fontFamily: 'var(--q-font)' }}>
       <div className="flex justify-between items-center px-3 py-2 md:px-6">
 
@@ -69,7 +65,7 @@ const Navbar: React.FC = () => {
           {user && (
             <div className="flex items-center gap-2">
               {/* Coins pill */}
-              <Link to="/shop" title="Boutique"
+              <Link to="/shop" title={t('navbar.shop')}
                 className="q-press flex items-center gap-1 px-2.5 py-1.5 rounded-full font-bold text-xs transition-opacity hover:opacity-80"
                 style={{ background: 'linear-gradient(135deg, #FACC15, #FB923C)', color: '#fff',
                   boxShadow: '0 4px 12px -2px rgba(251,146,60,0.45)' }}>
@@ -79,13 +75,13 @@ const Navbar: React.FC = () => {
 
               {/* Niveau + XP — mini vibrant hero card */}
               <Link to="/leaderboard"
-                title={`${xpInLevel} / 1000 XP — encore ${xpToNext} XP pour le niveau ${(user.level ?? 1) + 1}`}
+                title={t('navbar.xpProgress', { xpInLevel, xpToNext, nextLevel: (user.level ?? 1) + 1 })}
                 className="q-press flex flex-col justify-center gap-0.5 px-2.5 py-1.5 rounded-xl font-bold text-xs transition-opacity hover:opacity-80 min-w-[58px] relative overflow-hidden"
                 style={{ background: 'var(--q-vibrant-hero)', color: '#fff',
                   boxShadow: '0 4px 12px -2px rgba(124,58,237,0.45)' }}>
                 <span className="flex items-center gap-1 leading-none relative z-10">
                   <Zap size={11} aria-hidden="true" />
-                  Niv.{user.level ?? 1}
+                  {t('navbar.level', { level: user.level ?? 1 })}
                 </span>
                 <div className="w-full h-1 rounded-full relative z-10" style={{ background: 'rgba(255,255,255,0.30)' }}>
                   <div className="h-full rounded-full transition-all duration-500"
@@ -100,7 +96,7 @@ const Navbar: React.FC = () => {
             className="q-press flex items-center justify-center w-8 h-8 rounded-full transition-opacity hover:opacity-80"
             style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', color: darkMode ? '#FACC15' : '#A78BFA',
               border: '1px solid var(--q-line)' }}
-            aria-label="Changer le thème">
+            aria-label={t('navbar.toggleTheme')}>
             {darkMode ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
           </button>
 
@@ -108,7 +104,7 @@ const Navbar: React.FC = () => {
           <div className="relative" ref={dropdownRef}>
             <button className="q-press flex items-center justify-center rounded-full transition-opacity hover:opacity-80"
               data-tour="nav-avatar"
-              onClick={() => setDropdownOpen(o => !o)} aria-label="Profil" aria-expanded={dropdownOpen} aria-haspopup="menu">
+              onClick={() => setDropdownOpen(o => !o)} aria-label={t('navbar.profile')} aria-expanded={dropdownOpen} aria-haspopup="menu">
               {user ? (
                 <UserAvatar avatar={user.avatar} username={user.username ?? ''} cosmetics={navCosmetics} size="sm" />
               ) : (
@@ -135,30 +131,30 @@ const Navbar: React.FC = () => {
                       <div className="flex gap-2 mt-1 text-xs font-bold text-white/90 relative z-10">
                         <span className="flex items-center gap-1"><CircleDollarSign size={11} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString('fr-FR')}</span>
                         <span style={{ color: 'rgba(255,255,255,0.7)' }}>·</span>
-                        <span>Niv. {user.level ?? 1}</span>
+                        <span>{t('navbar.level', { level: user.level ?? 1 })}</span>
                       </div>
                     </div>
 
                     <Link to="/challenges" onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-80"
                       style={{ color: 'var(--q-text)' }}>
-                      <Trophy size={15} className="text-yellow-500" aria-hidden="true" /> Mes défis
+                      <Trophy size={15} className="text-yellow-500" aria-hidden="true" /> {t('navbar.myChallenges')}
                     </Link>
                     <Link to="/shop" onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-80"
                       style={{ color: 'var(--q-text)' }}>
-                      <ShoppingBag size={15} className="text-pink-500" aria-hidden="true" /> Boutique
+                      <ShoppingBag size={15} className="text-pink-500" aria-hidden="true" /> {t('navbar.shop')}
                     </Link>
                     <Link to="/profile" onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-80"
                       style={{ color: 'var(--q-text)' }}>
-                      <User size={15} className="text-violet-500" aria-hidden="true" /> Profil
+                      <User size={15} className="text-violet-500" aria-hidden="true" /> {t('navbar.profile')}
                     </Link>
                     <div className="mx-3 my-1 h-px" style={{ background: 'var(--q-line)' }} />
                     <button
                       onClick={() => { setUser(null); localStorage.removeItem('token'); setDropdownOpen(false); globalThis.location.reload(); }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                      <LogOut size={15} aria-hidden="true" /> Déconnexion
+                      <LogOut size={15} aria-hidden="true" /> {t('navbar.logout')}
                     </button>
                   </>
                 ) : (
@@ -166,12 +162,12 @@ const Navbar: React.FC = () => {
                     <Link to="/login" onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors hover:opacity-80"
                       style={{ color: 'var(--q-accent)' }}>
-                      Se connecter
+                      {t('navbar.login')}
                     </Link>
                     <Link to="/register" onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors hover:opacity-80"
                       style={{ color: 'var(--q-accent)' }}>
-                      S'inscrire
+                      {t('navbar.register')}
                     </Link>
                   </>
                 )}

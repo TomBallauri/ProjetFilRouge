@@ -3,6 +3,7 @@ import multer from 'multer';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../lib/auth.js';
+import { uploadLimiter } from '../lib/rateLimiters.js';
 
 // Stockage en mémoire (pas sur disque) : le disque de Render est éphémère et
 // perd son contenu à chaque redémarrage/redéploiement. Les fichiers sont
@@ -21,7 +22,7 @@ const upload = multer({
 
 const router = Router();
 
-router.post('/api/upload', authMiddleware, (req, res) => {
+router.post('/api/upload', authMiddleware, uploadLimiter, (req, res) => {
   upload.single('file')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message || 'Erreur upload' });
     if (!req.file) return res.status(400).json({ error: 'Aucun fichier' });

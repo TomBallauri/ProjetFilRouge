@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Bell, Users, Trophy, MessageSquare, UserX, Flame } from 'lucide-react';
 
 type Toast = { id: number; message: string; type: string; link?: string };
@@ -23,9 +24,10 @@ const COLOR: Record<string, string> = {
 const NotifToastContainer: React.FC = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const dismiss = useCallback((id: number) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
 
   useEffect(() => {
@@ -43,11 +45,11 @@ const NotifToastContainer: React.FC = () => {
 
   return (
     <div style={{ position: 'fixed', bottom: 80, right: 16, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {toasts.map(t => (
+      {toasts.map(toast => (
         <button
-          key={t.id}
+          key={toast.id}
           type="button"
-          onClick={() => { dismiss(t.id); if (t.link) navigate(t.link); }}
+          onClick={() => { dismiss(toast.id); if (toast.link) navigate(toast.link); }}
           style={{
             display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
             background: 'var(--q-chrome)', border: '1px solid var(--q-line)',
@@ -57,14 +59,14 @@ const NotifToastContainer: React.FC = () => {
             fontFamily: 'var(--q-font)',
             animation: 'notif-toast-in 0.35s cubic-bezier(0.34,1.56,0.64,1) both',
             maxWidth: 280, width: '100%',
-            cursor: t.link ? 'pointer' : 'default',
+            cursor: toast.link ? 'pointer' : 'default',
           }}
         >
-          <span style={{ color: COLOR[t.type] ?? 'var(--q-accent)', flexShrink: 0 }}>
-            {ICON[t.type] ?? <Bell size={15} />}
+          <span style={{ color: COLOR[toast.type] ?? 'var(--q-accent)', flexShrink: 0 }}>
+            {ICON[toast.type] ?? <Bell size={15} />}
           </span>
-          <span style={{ flex: 1 }}>{t.message}</span>
-          {t.link && <span style={{ fontSize: 11, color: 'var(--q-text3)', flexShrink: 0 }}>Ouvrir →</span>}
+          <span style={{ flex: 1 }}>{toast.message}</span>
+          {toast.link && <span style={{ fontSize: 11, color: 'var(--q-text3)', flexShrink: 0 }}>{t('common.open')} →</span>}
         </button>
       ))}
     </div>

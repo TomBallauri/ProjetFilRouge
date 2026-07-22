@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { driver } from 'driver.js';
 import type { DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
@@ -75,244 +77,143 @@ function hidePulse() {
 // juste "Précédent"/"×", qui rebouclent sur le même problème plus loin en arrière).
 type StepOpts = { waitForElement?: number; skipMissingElement?: boolean; noPrevious?: boolean };
 
-// Étape où l'action attendue est un vrai clic sur l'élément (navigation) plutôt que "Suivant".
-const clickStep = (
-  popover: Omit<NonNullable<DriveStep['popover']>, 'showButtons'>,
-  element: DriveStep['element'],
-  opts: StepOpts = {},
-): DriveStep => {
-  const { noPrevious, ...driverOpts } = opts;
-  return {
-    element,
-    ...driverOpts,
-    advanceOnClick: true,
-    onHighlighted: (el) => showPulse(el),
-    onDeselected: () => hidePulse(),
-    popover: { ...popover, description: `${popover.description} Clique sur le bouton pour passer à la prochaine étape.`, showButtons: noPrevious ? ['close'] : ['previous', 'close'] },
-  };
-};
+function buildSteps(t: TFunction): DriveStep[] {
+  const step = (key: string) => ({
+    title: t(`onboarding.steps.${key}.title`),
+    description: t(`onboarding.steps.${key}.description`),
+  });
 
-// Étape purement informative (le contenu de la page suffit, pas besoin de cliquer pour voir).
-// L'élément reste désactivé pendant l'étape (disableActiveInteraction) — sinon cliquer dessus
-// (ex: la cloche de notifs) déclenche sa vraie action et perturbe l'affichage du tuto.
-const infoStep = (
-  popover: Omit<NonNullable<DriveStep['popover']>, 'showButtons'>,
-  element?: DriveStep['element'],
-  opts: StepOpts = {},
-): DriveStep => {
-  const { noPrevious, ...driverOpts } = opts;
-  let buttons: NonNullable<DriveStep['popover']>['showButtons'] = ['next', 'close'];
-  if (element) buttons = noPrevious ? ['next', 'close'] : ['next', 'previous', 'close'];
-  return {
-    element,
-    ...driverOpts,
-    disableActiveInteraction: true,
-    popover: { ...popover, showButtons: buttons },
+  // Étape où l'action attendue est un vrai clic sur l'élément (navigation) plutôt que "Suivant".
+  const clickStep = (
+    key: string,
+    element: DriveStep['element'],
+    popoverExtra: Partial<NonNullable<DriveStep['popover']>> = {},
+    opts: StepOpts = {},
+  ): DriveStep => {
+    const { noPrevious, ...driverOpts } = opts;
+    const { title, description } = step(key);
+    return {
+      element,
+      ...driverOpts,
+      advanceOnClick: true,
+      onHighlighted: (el) => showPulse(el),
+      onDeselected: () => hidePulse(),
+      popover: {
+        title, ...popoverExtra,
+        description: `${description} ${t('onboarding.clickToAdvance')}`,
+        showButtons: noPrevious ? ['close'] : ['previous', 'close'],
+      },
+    };
   };
-};
 
-const STEPS: DriveStep[] = [
-  infoStep({
-    title: 'Bienvenue sur U-Quail !',
-    description: "Transforme tes objectifs en défis, gagne des coins et de l'XP en les complétant, et fais grimper ta série de jours (streak). On te montre rapidement comment ça marche.",
-  }),
-  infoStep(
-    { title: 'Accueil', description: "Ta page d'accueil résume ta progression : niveau, XP, streak actuelle, et le défi du jour.", side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="nav-accueil"]'),
-  ),
-  infoStep(
-    { title: 'Notifications', description: 'Demandes d\'amis, invitations de groupe, nouveaux messages et alertes de streak arrivent ici.', side: 'left', align: 'start' },
-    () => resolveVisible('[data-tour="home-notif"]'),
-    { waitForElement: 1500 },
-  ),
-  infoStep(
-    { title: 'Ta progression', description: "Ton niveau, l'XP qu'il te reste avant le prochain, et le nombre de défis en cours — tout est résumé ici.", side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="home-xp"]'),
-    { waitForElement: 1500 },
-  ),
-  infoStep(
-    { title: 'Ta streak', description: "Complète au moins un défi chaque jour pour la faire grimper — plus elle est haute, plus tes récompenses sont multipliées.", side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="home-streak"]'),
-    { waitForElement: 1500 },
-  ),
-  infoStep(
-    { title: 'Ta journée', description: 'Les défis que tu as commencés et pas encore terminés apparaissent ici, pour y revenir facilement.', side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="home-today"]'),
-    { waitForElement: 1500 },
-  ),
-  infoStep(
-    { title: 'Classement', description: 'Le podium des joueurs les mieux classés — tu peux le consulter en entier plus tard, pas besoin d\'y aller maintenant.', side: 'top', align: 'start' },
-    () => resolveVisible('[data-tour="home-leaderboard"], [data-tour="nav-classement"]'),
-    { waitForElement: 1500 },
-  ),
-  infoStep(
-    { title: 'Suggestion du jour', description: 'Un défi mis en avant chaque jour, avec un bonus de récompense (+50%) si tu le complètes aujourd\'hui.', side: 'top', align: 'start' },
-    () => resolveVisible('[data-tour="home-daily"]'),
-    { waitForElement: 1500 },
-  ),
-  clickStep(
-    { title: 'Défis', description: 'Parcours les défis disponibles, rejoins-en un, et complète-le pour gagner des récompenses.', side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="nav-defis"]'),
-  ),
-  infoStep(
-    { title: 'Voici tes défis', description: 'Ta progression (coins, niveau, défis complétés) est résumée ici.', side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="page-defis"]'),
-    { waitForElement: 2000, noPrevious: true },
-  ),
-  {
-    ...infoStep(
-      { title: 'Choisis parmi les défis existants', description: 'Rejoins directement un défi déjà proposé par la communauté — pas besoin de créer le tien pour commencer.', side: 'top', align: 'start' },
-      () => resolveVisible('[data-tour="page-defis-available"]'),
-    ),
-    skipMissingElement: true,
-  },
-  clickStep(
-    { title: 'Créer un défi', description: 'Ou crée le tien depuis ce bouton — on va détailler le formulaire.', side: 'bottom', align: 'end' },
-    () => resolveVisible('[data-tour="create-challenge"]'),
-  ),
-  infoStep(
-    { title: 'Le titre', description: 'Un titre court et clair pour ton défi (ex: "Courir 5km sans s\'arrêter").', side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="create-title"]'),
-    { waitForElement: 2000, noPrevious: true },
-  ),
-  infoStep(
-    { title: 'La description', description: "Explique précisément ce qu'il faut accomplir pour valider le défi.", side: 'top', align: 'start' },
-    () => resolveVisible('[data-tour="create-description"]'),
-  ),
-  infoStep(
-    { title: 'La catégorie', description: 'Classe ton défi (Gaming, Sport, Cuisine...) pour que les autres joueurs le retrouvent facilement.', side: 'top', align: 'start' },
-    () => resolveVisible('[data-tour="create-category"]'),
-  ),
-  infoStep(
-    { title: "Pas d'inspiration ?", description: "L'assistant IA peut générer une série entière de défis personnalisés à partir de ton objectif — plus besoin de tout remplir à la main.", side: 'left', align: 'start' },
-    () => resolveVisible('[data-tour="create-ai"]'),
-  ),
-  clickStep(
-    { title: 'Amis', description: 'Ajoute des amis, suis leur progression et défie-les.', side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="nav-amis"]'),
-    { waitForElement: 2000 },
-  ),
-  clickStep(
-    { title: 'Recherche des joueurs', description: 'Trouve n\'importe qui par pseudo et envoie-lui une demande d\'ami.', side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="friends-search"]'),
-    { waitForElement: 2000, noPrevious: true },
-  ),
-  {
-    // Le champ n'existe que sous l'onglet "Rechercher" — s'il est encore en train de
-    // s'afficher juste après le clic sur l'onglet, on patiente un peu.
-    ...infoStep(
-      { title: 'La barre de recherche', description: 'Tape un pseudo ici pour trouver un joueur et lui envoyer une demande d\'ami.', side: 'bottom', align: 'start' },
-      () => resolveVisible('[data-tour="friends-search-input"]'),
-      { waitForElement: 1000 },
-    ),
-    skipMissingElement: true,
-  },
-  clickStep(
-    { title: 'Demandes en attente', description: 'Les demandes d\'amis reçues (et un badge quand il y en a de nouvelles) apparaissent dans cet onglet.', side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="friends-requests"]'),
-    { noPrevious: true },
-  ),
-  clickStep(
-    { title: 'Boutique', description: 'Dépense tes coins pour débloquer cadres, bannières, titres et badges.', side: 'bottom', align: 'start' },
-    () => resolveVisible('[data-tour="nav-boutique"]'),
-    { waitForElement: 2000 },
-  ),
-  infoStep(
-    { title: 'Voici la boutique', description: 'Ton solde de coins est affiché ici en permanence.', side: 'bottom', align: 'end' },
-    () => resolveVisible('[data-tour="page-boutique"]'),
-    { waitForElement: 2000, noPrevious: true },
-  ),
-  {
-    ...infoStep(
-      { title: 'Ce que tu peux acheter', description: 'Cadres d\'avatar, bannières, titres et badges de différentes raretés — dépense tes coins pour personnaliser ton profil. Fais défiler pour tout voir.', side: 'top', align: 'start' },
-      () => resolveVisible('[data-tour="shop-items"]'),
-    ),
-    // Cette grille peut dépasser la hauteur de l'écran (beaucoup d'articles) — contrairement
-    // aux autres étapes "info", on laisse l'interaction active pour que la page reste
-    // scrollable/cliquable même quand la zone mise en avant dépasse le viewport.
-    disableActiveInteraction: false,
-  },
-  clickStep(
-    { title: 'Profil', description: 'Retrouve ici tes réglages, ton historique de défis, et la personnalisation de ton compte.', side: 'bottom', align: 'end' },
-    () => resolveVisible('[data-tour="nav-profil"], [data-tour="nav-avatar"]'),
-    { waitForElement: 2000, skipMissingElement: true },
-  ),
-  {
-    ...infoStep(
-      { title: 'Ton niveau', description: 'Ton pseudo, ton niveau et ta progression sont affichés en haut de ton profil.', side: 'bottom', align: 'start' },
-      () => resolveVisible('[data-tour="profile-level"]'),
-      { waitForElement: 2000, noPrevious: true },
-    ),
-    // Sur desktop, l'avatar ouvre un menu au lieu de naviguer directement vers /profile :
-    // on ne bloque pas le tuto si cette étape ne trouve jamais son élément.
-    skipMissingElement: true,
-  },
-  {
-    // Toujours présent une fois la page chargée (pas de wait nécessaire : l'attente s'est
-    // déjà faite à l'étape "Ton niveau" juste avant, sur le même chargement de page).
-    ...infoStep(
-      { title: 'Personnalise ton compte', description: 'Change ta photo, ta bannière, ta bio et ton pseudo — et retrouve juste en dessous le changement de mot de passe et d\'adresse email.', side: 'bottom', align: 'start' },
-      () => resolveVisible('[data-tour="profile-edit"]'),
-    ),
-    skipMissingElement: true,
-  },
-  {
-    ...infoStep(
-      { title: 'Tes cosmétiques', description: "Les objets achetés en boutique (cadres, bannières, titres, badges) se gèrent et s'équipent ici.", side: 'top', align: 'start' },
-      () => resolveVisible('[data-tour="profile-cosmetics"]'),
-    ),
-    skipMissingElement: true,
-  },
-  {
-    // Celui-ci PEUT être réellement absent (compte sans aucun défi complété) — un wait court
-    // suffit largement (la page est déjà chargée), pas besoin des 2s des étapes cross-page :
-    // avec 2000ms ici, "Suivant" restait bloqué 2 secondes avant de sauter l'étape.
-    ...infoStep(
-      { title: 'Ton historique', description: 'Tous les défis que tu as complétés ou en cours, avec le détail de chacun.', side: 'top', align: 'start' },
-      () => resolveVisible('[data-tour="profile-history"]'),
-      { waitForElement: 300 },
-    ),
-    skipMissingElement: true,
-  },
-  {
-    ...infoStep(
-      { title: 'Tes réglages', description: 'Thème, notifications et langue se configurent dans cette section. Tu peux aussi revoir ce tutoriel à tout moment depuis ici.', side: 'top', align: 'start' },
-      () => resolveVisible('[data-tour="profile-settings"]'),
-    ),
-    skipMissingElement: true,
-  },
-  {
-    ...infoStep(
-      { title: 'Apparence', description: 'Bascule entre thème clair et sombre.', side: 'top', align: 'start' },
-      () => resolveVisible('[data-tour="settings-appearance"]'),
-    ),
-    skipMissingElement: true,
-  },
-  {
-    ...infoStep(
-      { title: 'Notifications', description: 'Choisis quelles notifications tu veux recevoir : rappels de défis, nouveaux messages, mises à jour...', side: 'top', align: 'start' },
-      () => resolveVisible('[data-tour="settings-notifications"]'),
-    ),
-    skipMissingElement: true,
-  },
-  {
-    ...infoStep(
-      { title: 'Accessibilité', description: 'Change la langue de l\'appli ou réduis les animations.', side: 'top', align: 'start' },
-      () => resolveVisible('[data-tour="settings-accessibility"]'),
-    ),
-    skipMissingElement: true,
-  },
-  infoStep({
-    title: "C'est tout bon !",
-    description: "Tu sais maintenant comment fonctionne U-Quail. Tu peux revoir ce tutoriel à tout moment depuis Profil → Paramètres → Revoir le tutoriel. Bon défis !",
-  }),
-];
+  // Étape purement informative (le contenu de la page suffit, pas besoin de cliquer pour voir).
+  // L'élément reste désactivé pendant l'étape (disableActiveInteraction) — sinon cliquer dessus
+  // (ex: la cloche de notifs) déclenche sa vraie action et perturbe l'affichage du tuto.
+  const infoStep = (
+    key: string,
+    element?: DriveStep['element'],
+    popoverExtra: Partial<NonNullable<DriveStep['popover']>> = {},
+    opts: StepOpts = {},
+  ): DriveStep => {
+    const { noPrevious, ...driverOpts } = opts;
+    let buttons: NonNullable<DriveStep['popover']>['showButtons'] = ['next', 'close'];
+    if (element) buttons = noPrevious ? ['next', 'close'] : ['next', 'previous', 'close'];
+    return {
+      element,
+      ...driverOpts,
+      disableActiveInteraction: true,
+      popover: { ...step(key), ...popoverExtra, showButtons: buttons },
+    };
+  };
+
+  return [
+    infoStep('welcome'),
+    infoStep('home', () => resolveVisible('[data-tour="nav-accueil"]'), { side: 'bottom', align: 'start' }),
+    infoStep('notifications', () => resolveVisible('[data-tour="home-notif"]'), { side: 'left', align: 'start' }, { waitForElement: 1500 }),
+    infoStep('progress', () => resolveVisible('[data-tour="home-xp"]'), { side: 'bottom', align: 'start' }, { waitForElement: 1500 }),
+    infoStep('streak', () => resolveVisible('[data-tour="home-streak"]'), { side: 'bottom', align: 'start' }, { waitForElement: 1500 }),
+    infoStep('today', () => resolveVisible('[data-tour="home-today"]'), { side: 'bottom', align: 'start' }, { waitForElement: 1500 }),
+    infoStep('leaderboard', () => resolveVisible('[data-tour="home-leaderboard"], [data-tour="nav-classement"]'), { side: 'top', align: 'start' }, { waitForElement: 1500 }),
+    infoStep('dailySuggestion', () => resolveVisible('[data-tour="home-daily"]'), { side: 'top', align: 'start' }, { waitForElement: 1500 }),
+    clickStep('challengesNav', () => resolveVisible('[data-tour="nav-defis"]'), { side: 'bottom', align: 'start' }),
+    infoStep('challengesIntro', () => resolveVisible('[data-tour="page-defis"]'), { side: 'bottom', align: 'start' }, { waitForElement: 2000, noPrevious: true }),
+    {
+      ...infoStep('existingChallenges', () => resolveVisible('[data-tour="page-defis-available"]'), { side: 'top', align: 'start' }),
+      skipMissingElement: true,
+    },
+    clickStep('createChallengeNav', () => resolveVisible('[data-tour="create-challenge"]'), { side: 'bottom', align: 'end' }),
+    infoStep('title', () => resolveVisible('[data-tour="create-title"]'), { side: 'bottom', align: 'start' }, { waitForElement: 2000, noPrevious: true }),
+    infoStep('description', () => resolveVisible('[data-tour="create-description"]'), { side: 'top', align: 'start' }),
+    infoStep('category', () => resolveVisible('[data-tour="create-category"]'), { side: 'top', align: 'start' }),
+    infoStep('aiHint', () => resolveVisible('[data-tour="create-ai"]'), { side: 'left', align: 'start' }),
+    clickStep('friendsNav', () => resolveVisible('[data-tour="nav-amis"]'), { side: 'bottom', align: 'start' }, { waitForElement: 2000 }),
+    clickStep('searchPlayers', () => resolveVisible('[data-tour="friends-search"]'), { side: 'bottom', align: 'start' }, { waitForElement: 2000, noPrevious: true }),
+    {
+      // Le champ n'existe que sous l'onglet "Rechercher" — s'il est encore en train de
+      // s'afficher juste après le clic sur l'onglet, on patiente un peu.
+      ...infoStep('searchBar', () => resolveVisible('[data-tour="friends-search-input"]'), { side: 'bottom', align: 'start' }, { waitForElement: 1000 }),
+      skipMissingElement: true,
+    },
+    clickStep('pendingRequests', () => resolveVisible('[data-tour="friends-requests"]'), { side: 'bottom', align: 'start' }, { noPrevious: true }),
+    clickStep('shopNav', () => resolveVisible('[data-tour="nav-boutique"]'), { side: 'bottom', align: 'start' }, { waitForElement: 2000 }),
+    infoStep('shopIntro', () => resolveVisible('[data-tour="page-boutique"]'), { side: 'bottom', align: 'end' }, { waitForElement: 2000, noPrevious: true }),
+    {
+      ...infoStep('shopItems', () => resolveVisible('[data-tour="shop-items"]'), { side: 'top', align: 'start' }),
+      // Cette grille peut dépasser la hauteur de l'écran (beaucoup d'articles) — contrairement
+      // aux autres étapes "info", on laisse l'interaction active pour que la page reste
+      // scrollable/cliquable même quand la zone mise en avant dépasse le viewport.
+      disableActiveInteraction: false,
+    },
+    clickStep('profileNav', () => resolveVisible('[data-tour="nav-profil"], [data-tour="nav-avatar"]'), { side: 'bottom', align: 'end' }, { waitForElement: 2000, skipMissingElement: true }),
+    {
+      ...infoStep('profileLevel', () => resolveVisible('[data-tour="profile-level"]'), { side: 'bottom', align: 'start' }, { waitForElement: 2000, noPrevious: true }),
+      // Sur desktop, l'avatar ouvre un menu au lieu de naviguer directement vers /profile :
+      // on ne bloque pas le tuto si cette étape ne trouve jamais son élément.
+      skipMissingElement: true,
+    },
+    {
+      // Toujours présent une fois la page chargée (pas de wait nécessaire : l'attente s'est
+      // déjà faite à l'étape "Ton niveau" juste avant, sur le même chargement de page).
+      ...infoStep('profileEdit', () => resolveVisible('[data-tour="profile-edit"]'), { side: 'bottom', align: 'start' }),
+      skipMissingElement: true,
+    },
+    {
+      ...infoStep('profileCosmetics', () => resolveVisible('[data-tour="profile-cosmetics"]'), { side: 'top', align: 'start' }),
+      skipMissingElement: true,
+    },
+    {
+      // Celui-ci PEUT être réellement absent (compte sans aucun défi complété) — un wait court
+      // suffit largement (la page est déjà chargée), pas besoin des 2s des étapes cross-page :
+      // avec 2000ms ici, "Suivant" restait bloqué 2 secondes avant de sauter l'étape.
+      ...infoStep('profileHistory', () => resolveVisible('[data-tour="profile-history"]'), { side: 'top', align: 'start' }, { waitForElement: 300 }),
+      skipMissingElement: true,
+    },
+    {
+      ...infoStep('profileSettings', () => resolveVisible('[data-tour="profile-settings"]'), { side: 'top', align: 'start' }),
+      skipMissingElement: true,
+    },
+    {
+      ...infoStep('appearance', () => resolveVisible('[data-tour="settings-appearance"]'), { side: 'top', align: 'start' }),
+      skipMissingElement: true,
+    },
+    {
+      ...infoStep('notificationsSettings', () => resolveVisible('[data-tour="settings-notifications"]'), { side: 'top', align: 'start' }),
+      skipMissingElement: true,
+    },
+    {
+      ...infoStep('accessibility', () => resolveVisible('[data-tour="settings-accessibility"]'), { side: 'top', align: 'start' }),
+      skipMissingElement: true,
+    },
+    infoStep('done'),
+  ];
+}
 
 // Composant purement imperatif : driver.js gère lui-même son DOM (overlay + popover
 // montés sur document.body), donc ce composant ne rend rien — il pilote juste la lib
 // en fonction de l'état `tourOpen` du store.
 const OnboardingTour: React.FC = () => {
   const { tourOpen, closeTour } = useStore();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!tourOpen) return;
@@ -324,7 +225,9 @@ const OnboardingTour: React.FC = () => {
     // On réinitialise tous les conteneurs de scroll possibles (le vrai est <main>, mais on ne
     // prend pas de risque si html/body défilent aussi dans certains contextes).
     const resetScroll = () => {
-      document.querySelector<HTMLElement>('main[aria-label="Contenu principal"]')?.scrollTo(0, 0);
+      // Sélecteur indépendant de la langue (l'aria-label de <main> est maintenant traduit) —
+      // il n'y a qu'un seul <main> sur la page, pas besoin de le qualifier davantage.
+      document.querySelector<HTMLElement>('main')?.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
       window.scrollTo(0, 0);
@@ -335,7 +238,7 @@ const OnboardingTour: React.FC = () => {
     requestAnimationFrame(resetScroll);
 
     const driverObj = driver({
-      steps: STEPS,
+      steps: buildSteps(t),
       showProgress: true,
       progressText: '{{current}} / {{total}}',
       animate: true,
@@ -343,9 +246,9 @@ const OnboardingTour: React.FC = () => {
       overlayOpacity: 0.65,
       stageRadius: 12,
       popoverClass: 'q-tour-popover',
-      nextBtnText: 'Suivant',
-      prevBtnText: 'Précédent',
-      doneBtnText: 'Terminer',
+      nextBtnText: t('onboarding.nextButton'),
+      prevBtnText: t('onboarding.prevButton'),
+      doneBtnText: t('onboarding.doneButton'),
       // Un clic à côté ne doit pas fermer le tuto par accident (retour utilisateur) —
       // seuls le bouton × / "Terminer" / un vrai clic sur l'élément indiqué font avancer.
       overlayClickBehavior: () => {},

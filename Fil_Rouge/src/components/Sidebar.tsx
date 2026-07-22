@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { useNotificationPolling } from '../hooks/useNotificationPolling';
 import { Home, Trophy, Lock, ShoppingBag, Star, User, Users, Sparkles, Zap, Flame } from 'lucide-react';
 
-type TabItem = { path: string; label: string; icon: React.ReactNode; end: boolean };
+type TabItem = { path: string; labelKey: string; icon: React.ReactNode; end: boolean };
 
 type DailyChallenge = {
   id: number;
@@ -23,11 +24,11 @@ const DIFF_COLORS: Record<string, string> = {
   EXPERT: '#EC4899',
 };
 
-const DIFF_LABELS: Record<string, string> = {
-  EASY:   'Facile',
-  MEDIUM: 'Moyen',
-  HARD:   'Difficile',
-  EXPERT: 'Expert',
+const DIFF_LABEL_KEYS: Record<string, string> = {
+  EASY:   'common.difficulty.easy',
+  MEDIUM: 'common.difficulty.medium',
+  HARD:   'common.difficulty.hard',
+  EXPERT: 'common.difficulty.expert',
 };
 
 const DIFF_ICONS: Record<string, typeof Zap> = {
@@ -39,6 +40,7 @@ const DIFF_ICONS: Record<string, typeof Zap> = {
 
 const Sidebar: React.FC = () => {
   const { darkMode, user, notifCount } = useStore();
+  const { t } = useTranslation();
   const location = useLocation();
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
 
@@ -53,20 +55,20 @@ const Sidebar: React.FC = () => {
   }, []);
 
   const menuItems: TabItem[] = [
-    { path: '/',            label: 'Accueil',     icon: <Home size={20} />,         end: true },
-    { path: '/challenges',  label: 'Défis',       icon: <Trophy size={20} />,       end: false },
-    { path: '/friends',     label: 'Amis',        icon: <Users size={20} />,        end: false },
-    { path: '/leaderboard', label: 'Classement',  icon: <Star size={20} />,         end: false },
-    { path: '/shop',        label: 'Boutique',    icon: <ShoppingBag size={20} />,  end: false },
-    ...(user?.isAdmin ? [{ path: '/admin', label: 'Dashboard', icon: <Lock size={20} />, end: false }] : []),
+    { path: '/',            labelKey: 'sidebar.home',        icon: <Home size={20} />,         end: true },
+    { path: '/challenges',  labelKey: 'sidebar.challenges',  icon: <Trophy size={20} />,       end: false },
+    { path: '/friends',     labelKey: 'sidebar.friends',     icon: <Users size={20} />,        end: false },
+    { path: '/leaderboard', labelKey: 'sidebar.leaderboard', icon: <Star size={20} />,         end: false },
+    { path: '/shop',        labelKey: 'sidebar.shop',        icon: <ShoppingBag size={20} />,  end: false },
+    ...(user?.isAdmin ? [{ path: '/admin', labelKey: 'sidebar.dashboard', icon: <Lock size={20} />, end: false }] : []),
   ];
 
   const mobileTabs: TabItem[] = [
-    { path: '/',           label: 'Accueil', icon: <Home size={20} />,        end: true },
-    { path: '/challenges', label: 'Défis',   icon: <Trophy size={20} />,      end: false },
-    { path: '/friends',    label: 'Amis',    icon: <Users size={20} />,       end: false },
-    { path: '/shop',       label: 'Boutique',icon: <ShoppingBag size={20} />, end: false },
-    { path: '/profile',    label: 'Profil',  icon: <User size={20} />,        end: false },
+    { path: '/',           labelKey: 'sidebar.home',       icon: <Home size={20} />,        end: true },
+    { path: '/challenges', labelKey: 'sidebar.challenges', icon: <Trophy size={20} />,      end: false },
+    { path: '/friends',    labelKey: 'sidebar.friends',    icon: <Users size={20} />,       end: false },
+    { path: '/shop',       labelKey: 'sidebar.shop',       icon: <ShoppingBag size={20} />, end: false },
+    { path: '/profile',    labelKey: 'sidebar.profile',    icon: <User size={20} />,        end: false },
   ];
 
   const isActiveTab = (path: string, end: boolean): boolean =>
@@ -90,7 +92,7 @@ const Sidebar: React.FC = () => {
     <>
       {/* ── Desktop sidebar — always visible on md+ ── */}
       <aside className={`hidden md:flex flex-col w-56 shrink-0 border-r ${sidebarBg} sticky top-0 h-screen`}>
-        <nav aria-label="Navigation principale" className="flex flex-col gap-1 pt-4 pb-4 flex-1">
+        <nav aria-label={t('sidebar.mainNav')} className="flex flex-col gap-1 pt-4 pb-4 flex-1">
           {menuItems.map(item => {
             const hasBadge = item.path === '/challenges' && notifCount > 0;
             return (
@@ -117,7 +119,7 @@ const Sidebar: React.FC = () => {
                     }}>{notifCount > 9 ? '9+' : notifCount}</span>
                   )}
                 </span>
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </NavLink>
             );
           })}
@@ -130,7 +132,7 @@ const Sidebar: React.FC = () => {
             <div className="flex items-center gap-1.5 px-2 mb-2">
               <Sparkles size={13} style={{ color: 'var(--q-amber-text)' }} />
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--q-amber-text)' }}>
-                Suggestion du jour
+                {t('sidebar.dailySuggestion')}
               </span>
             </div>
             <NavLink to={`/challenges?daily=${dailyChallenge.id}`} tabIndex={0}>
@@ -162,7 +164,7 @@ const Sidebar: React.FC = () => {
                     style={{ background: DIFF_COLORS[dailyChallenge.difficulty] ?? '#94A3B8' }}
                   >
                     <DiffIcon size={10} aria-hidden="true" />
-                    {DIFF_LABELS[dailyChallenge.difficulty] ?? dailyChallenge.difficulty}
+                    {DIFF_LABEL_KEYS[dailyChallenge.difficulty] ? t(DIFF_LABEL_KEYS[dailyChallenge.difficulty]) : dailyChallenge.difficulty}
                   </span>
                   <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-bold bg-amber-400 text-gray-900">
                     <Sparkles size={10} aria-hidden="true" />
@@ -171,8 +173,8 @@ const Sidebar: React.FC = () => {
                 </div>
 
                 <p className="text-xs" style={{ color: darkMode ? '#9CA3AF' : '#6B7280' }}>
-                  {dailyChallenge.coinReward} coins · {dailyChallenge.xpReward} XP
-                  <span className="block font-medium" style={{ color: 'var(--q-amber-text)' }}>si réalisé aujourd'hui</span>
+                  {t('sidebar.dailyRewards', { coins: dailyChallenge.coinReward, xp: dailyChallenge.xpReward })}
+                  <span className="block font-medium" style={{ color: 'var(--q-amber-text)' }}>{t('sidebar.ifDoneToday')}</span>
                 </p>
               </div>
             </NavLink>
@@ -182,7 +184,7 @@ const Sidebar: React.FC = () => {
 
       {/* ── Mobile bottom tab bar — hidden on md+ ── */}
       <div className="fixed md:hidden z-40" style={{ bottom: 14, left: 12, right: 12 }}>
-        <nav aria-label="Navigation mobile" style={{
+        <nav aria-label={t('sidebar.mobileNav')} style={{
           background: darkMode ? 'rgba(42,43,63,0.92)' : 'rgba(255,255,255,0.88)',
           backdropFilter: 'blur(20px) saturate(180%)',
           WebkitBackdropFilter: 'blur(20px) saturate(180%)',
@@ -225,7 +227,7 @@ const Sidebar: React.FC = () => {
                     }}>{notifCount > 9 ? '9+' : notifCount}</span>
                   )}
                 </span>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.2 }}>{tab.label}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.2 }}>{t(tab.labelKey)}</span>
               </NavLink>
             );
           })}

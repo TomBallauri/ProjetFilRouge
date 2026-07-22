@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { useVisibilityPausedInterval } from '../hooks/useVisibilityPausedInterval';
 import { useStore } from '../lib/store';
 import type { User } from '../types/User';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -44,26 +46,26 @@ type ChallengeGroupType = {
 };
 type Friend = { friendshipId: number; user: { id: number; username: string; avatar?: string } };
 
-const CATEGORY_GRAD: Record<string, { grad: string; glow: string; Icon: React.FC<{ size?: number | string }>; label: string }> = {
-  GAMING:     { grad: 'linear-gradient(135deg,#A78BFA,#EC4899)', glow: 'rgba(167,139,250,0.5)', Icon: Gamepad2,        label: 'Gaming' },
-  SPORT:      { grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.5)',  Icon: Activity,        label: 'Sport' },
-  CUISINE:    { grad: 'linear-gradient(135deg,#FACC15,#FB923C,#EC4899)', glow: 'rgba(251,146,60,0.5)', Icon: UtensilsCrossed, label: 'Cuisine' },
-  FITNESS:    { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.5)',  Icon: Dumbbell,        label: 'Fitness' },
-  CREATIVITY: { grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.5)',  Icon: Palette,         label: 'Créativité' },
-  KNOWLEDGE:  { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.5)',  Icon: BookOpen,        label: 'Savoir' },
-  SOCIAL:     { grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(250,204,21,0.5)',  Icon: Users,           label: 'Social' },
-  NATURE:     { grad: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.5)',  Icon: Leaf,            label: 'Nature' },
-  MUSIC:      { grad: 'linear-gradient(135deg,#F472B6,#A78BFA)', glow: 'rgba(244,114,182,0.5)', Icon: Music,           label: 'Musique' },
-  WELLNESS:   { grad: 'linear-gradient(135deg,#6EE7B7,#3B82F6)', glow: 'rgba(110,231,183,0.5)', Icon: Heart,           label: 'Bien-être' },
-  DIY:        { grad: 'linear-gradient(135deg,#FB923C,#D97706)', glow: 'rgba(251,146,60,0.5)',  Icon: Wrench,          label: 'DIY' },
-  OTHERS:     { grad: 'linear-gradient(135deg,#94A3B8,#64748B)', glow: 'rgba(148,163,184,0.5)', Icon: LayoutGrid,      label: 'Autres' },
+const CATEGORY_GRAD: Record<string, { grad: string; glow: string; Icon: React.FC<{ size?: number | string }> }> = {
+  GAMING:     { grad: 'linear-gradient(135deg,#A78BFA,#EC4899)', glow: 'rgba(167,139,250,0.5)', Icon: Gamepad2 },
+  SPORT:      { grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.5)',  Icon: Activity },
+  CUISINE:    { grad: 'linear-gradient(135deg,#FACC15,#FB923C,#EC4899)', glow: 'rgba(251,146,60,0.5)', Icon: UtensilsCrossed },
+  FITNESS:    { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.5)',  Icon: Dumbbell },
+  CREATIVITY: { grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.5)',  Icon: Palette },
+  KNOWLEDGE:  { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.5)',  Icon: BookOpen },
+  SOCIAL:     { grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(250,204,21,0.5)',  Icon: Users },
+  NATURE:     { grad: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.5)',  Icon: Leaf },
+  MUSIC:      { grad: 'linear-gradient(135deg,#F472B6,#A78BFA)', glow: 'rgba(244,114,182,0.5)', Icon: Music },
+  WELLNESS:   { grad: 'linear-gradient(135deg,#6EE7B7,#3B82F6)', glow: 'rgba(110,231,183,0.5)', Icon: Heart },
+  DIY:        { grad: 'linear-gradient(135deg,#FB923C,#D97706)', glow: 'rgba(251,146,60,0.5)',  Icon: Wrench },
+  OTHERS:     { grad: 'linear-gradient(135deg,#94A3B8,#64748B)', glow: 'rgba(148,163,184,0.5)', Icon: LayoutGrid },
 };
 
-const DIFF_GRAD: Record<string, { label: string; grad: string; glow: string; icon: React.ReactNode }> = {
-  EASY:   { label: 'Facile',    grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.45)',  icon: <Star size={11} aria-hidden="true" /> },
-  MEDIUM: { label: 'Moyen',    grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(251,146,60,0.45)',  icon: <Zap size={11} aria-hidden="true" /> },
-  HARD:   { label: 'Difficile', grad: 'linear-gradient(135deg,#FB923C,#EC4899)', glow: 'rgba(251,146,60,0.45)', icon: <Flame size={11} aria-hidden="true" /> },
-  EXPERT: { label: 'Expert',   grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.45)', icon: <Trophy size={11} aria-hidden="true" /> },
+const DIFF_GRAD: Record<string, { grad: string; glow: string; icon: React.ReactNode }> = {
+  EASY:   { grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.45)',  icon: <Star size={11} aria-hidden="true" /> },
+  MEDIUM: { grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(251,146,60,0.45)',  icon: <Zap size={11} aria-hidden="true" /> },
+  HARD:   { grad: 'linear-gradient(135deg,#FB923C,#EC4899)', glow: 'rgba(251,146,60,0.45)', icon: <Flame size={11} aria-hidden="true" /> },
+  EXPERT: { grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.45)', icon: <Trophy size={11} aria-hidden="true" /> },
 };
 
 const CATEGORIES   = Object.keys(CATEGORY_GRAD);
@@ -79,6 +81,7 @@ interface CelebrationProps {
 }
 
 const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonus, multiplier, streakUp, onDismiss, groupSize, groupBonusMultiplier }) => {
+  const { t } = useTranslation();
   const [displayCoins, setDisplayCoins] = useState(0);
   const [displayXp, setDisplayXp]       = useState(0);
   const [streakPhase, setStreakPhase]   = useState<'before' | 'exiting' | 'after'>('before');
@@ -132,7 +135,7 @@ const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonu
 
   return (
     <div
-      role="dialog" aria-modal="true" aria-label="Récompenses obtenues"
+      role="dialog" aria-modal="true" aria-label={t('challengePage.celebration.ariaLabel')}
       className="celebrate-backdrop fixed inset-0 z-[60] flex items-center justify-center px-4"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', cursor: 'pointer' }}
       onClick={onDismiss}
@@ -196,10 +199,10 @@ const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonu
         <div className="text-center">
           <p className="font-black leading-tight text-white"
             style={{ fontFamily: 'var(--q-display)', fontSize: '1.7rem', letterSpacing: '-0.025em' }}>
-            {isDailyBonus ? '⚡ Bonus du jour !' : '🎉 Défi validé !'}
+            {isDailyBonus ? t('challengePage.celebration.dailyBonusTitle') : t('challengePage.celebration.challengeValidatedTitle')}
           </p>
           <p className="mt-1.5 text-sm" style={{ color: 'rgba(255,255,255,0.48)' }}>
-            Continue comme ça, tu es incroyable !
+            {t('challengePage.celebration.encouragement')}
           </p>
         </div>
 
@@ -213,7 +216,7 @@ const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonu
           }}>
             <CircleDollarSign size={28} color="#FACC15" aria-hidden="true" />
             <span className="font-black text-2xl text-white">+{displayCoins}</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(250,204,21,0.65)' }}>Coins</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(250,204,21,0.65)' }}>{t('challengePage.celebration.coins')}</span>
           </div>
 
           <div style={{
@@ -252,7 +255,7 @@ const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonu
                         ? 'streak-number-exit 0.28s cubic-bezier(0.55,0,1,0.45) both'
                         : undefined,
                     }}>
-                    {streakUp - 1}j
+                    {t('common.daysAbbrev', { count: streakUp - 1 })}
                   </span>
                 )}
 
@@ -268,12 +271,12 @@ const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonu
                       textShadow: '0 0 18px rgba(251,146,60,0.95), 0 0 36px rgba(251,146,60,0.55), -1.5px -1.5px 0 rgba(0,0,0,0.55), 1.5px -1.5px 0 rgba(0,0,0,0.55), -1.5px 1.5px 0 rgba(0,0,0,0.55), 1.5px 1.5px 0 rgba(0,0,0,0.55)',
                       animation: 'streak-number-slam 0.58s cubic-bezier(0.22,1,0.36,1) both',
                     }}>
-                    {streakUp}j
+                    {t('common.daysAbbrev', { count: streakUp })}
                   </span>
                 )}
               </div>
 
-              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#FB923C' }}>Streak</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#FB923C' }}>{t('challengePage.celebration.streak')}</span>
             </div>
           )}
         </div>
@@ -283,7 +286,7 @@ const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonu
           <div style={{ animation: 'reward-item-pop 0.4s 0.82s cubic-bezier(0.34,1.56,0.64,1) both' }}>
             <span className="flex items-center gap-1.5 font-black text-sm text-amber-900 px-5 py-2 rounded-full"
               style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)', boxShadow: '0 6px 20px rgba(251,146,60,0.5)' }}>
-              <Sparkles size={14} aria-hidden="true" /> ×{multiplier} bonus journalier
+              <Sparkles size={14} aria-hidden="true" /> {t('challengePage.celebration.dailyBonusChip', { multiplier })}
             </span>
           </div>
         )}
@@ -293,14 +296,14 @@ const CelebrationOverlay: React.FC<CelebrationProps> = ({ coins, xp, isDailyBonu
           <div style={{ animation: 'reward-item-pop 0.4s 0.94s cubic-bezier(0.34,1.56,0.64,1) both' }}>
             <span className="flex items-center gap-1.5 font-black text-sm text-white px-5 py-2 rounded-full"
               style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)', boxShadow: '0 6px 20px rgba(167,139,250,0.5)' }}>
-              <Users size={14} aria-hidden="true" /> ×{groupBonusMultiplier.toFixed(1)} bonus de groupe ({groupSize} joueurs)
+              <Users size={14} aria-hidden="true" /> {t('challengePage.celebration.groupBonusChip', { multiplier: groupBonusMultiplier.toFixed(1), count: groupSize })}
             </span>
           </div>
         )}
 
         {/* Dismiss hint */}
         <p aria-hidden="true" style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 4, animation: 'reward-item-pop 0.3s 1.3s ease-out both' }}>
-          Appuie n'importe où pour continuer
+          {t('challengePage.celebration.dismissHint')}
         </p>
       </div>
     </div>
@@ -343,6 +346,7 @@ type ChallengeCardProps = {
 };
 
 const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoading, user, onStart, onComplete, onLogin, onInvite, isDaily }) => {
+  const { t } = useTranslation();
   const diff = DIFF_GRAD[challenge.difficulty] ?? DIFF_GRAD.EASY;
   const cat  = CATEGORY_GRAD[challenge.category] ?? CATEGORY_GRAD.GAMING;
   const CatIcon = cat.Icon;
@@ -354,28 +358,28 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
       <button onClick={onLogin}
         className="q-press w-full py-2.5 rounded-full text-white font-bold text-sm transition-opacity hover:opacity-85"
         style={{ background: 'var(--q-accent)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
-        Se connecter pour participer
+        {t('challengePage.card.loginToParticipate')}
       </button>
     );
     if (status === 'COMPLETED') return (
       <div className="w-full py-2.5 rounded-full text-center font-bold text-sm"
         style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff',
           boxShadow: '0 4px 12px rgba(52,211,153,0.40)' }}>
-        Défi complété !
+        {t('challengePage.card.completed')}
       </div>
     );
     if (status === 'IN_PROGRESS') return (
       <button onClick={() => onComplete(challenge.id)} disabled={isLoading}
         className="q-press w-full py-2.5 rounded-full text-white font-bold text-sm disabled:opacity-60"
         style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', boxShadow: '0 4px 12px rgba(52,211,153,0.40)' }}>
-        {isLoading ? '...' : 'Marquer comme complété'}
+        {isLoading ? '...' : t('challengePage.card.markCompleted')}
       </button>
     );
     return (
       <button onClick={() => onStart(challenge.id)} disabled={isLoading}
         className="q-press w-full py-2.5 rounded-full text-white font-bold text-sm disabled:opacity-60"
         style={{ background: 'var(--q-vibrant-lavender)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
-        {isLoading ? '...' : 'Commencer le défi'}
+        {isLoading ? '...' : t('challengePage.card.start')}
       </button>
     );
   };
@@ -392,8 +396,8 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
         <IconTile cat={challenge.category} />
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap gap-1.5 mb-1">
-            <VibrantChip grad={diff.grad} glow={diff.glow}>{diff.icon}{diff.label}</VibrantChip>
-            <VibrantChip grad={cat.grad} glow={cat.glow}><CatIcon size={11} aria-hidden="true" /> {cat.label}</VibrantChip>
+            <VibrantChip grad={diff.grad} glow={diff.glow}>{diff.icon}{t(`common.difficulty.${challenge.difficulty.toLowerCase()}`)}</VibrantChip>
+            <VibrantChip grad={cat.grad} glow={cat.glow}><CatIcon size={11} aria-hidden="true" /> {t(`common.category.${challenge.category}`)}</VibrantChip>
             {isDaily && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-amber-900"
                 style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)', boxShadow: '0 3px 10px -2px rgba(251,146,60,0.5)' }}>
@@ -413,7 +417,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
           {hasLongDescription && (
             <button type="button" onClick={() => setExpanded(e => !e)}
               className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-500 hover:text-sky-400 transition-colors">
-              {expanded ? 'Voir moins' : 'Voir plus'}
+              {expanded ? t('challengePage.card.seeLess') : t('challengePage.card.seeMore')}
             </button>
           )}
         </div>
@@ -421,7 +425,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
 
       <div className="flex items-center gap-3 text-xs">
         <span className="font-bold" style={{ color: '#FB923C' }}>
-          {challenge.coinReward}{isDaily ? ` → ${Math.floor(challenge.coinReward * 1.5)}` : ''} coins
+          {challenge.coinReward}{isDaily ? ` → ${Math.floor(challenge.coinReward * 1.5)}` : ''} {t('challengePage.card.coins')}
         </span>
         <span className="font-bold" style={{ color: '#A78BFA' }}>
           <Zap size={11} aria-hidden="true" className="inline mr-0.5" />
@@ -429,7 +433,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
         </span>
         {challenge._count && (
           <span className="ml-auto font-semibold" style={{ color: 'var(--q-text3)' }}>
-            {challenge._count.participants} participant{challenge._count.participants > 1 ? 's' : ''}
+            {t('challengePage.card.participants', { count: challenge._count.participants })}
           </span>
         )}
       </div>
@@ -439,7 +443,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
         <button onClick={() => onInvite(challenge)}
           className="q-press w-full py-2 rounded-full font-bold text-xs flex items-center justify-center gap-1.5"
           style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', border: '1px solid var(--q-accent)' }}>
-          <Users size={12} aria-hidden="true" /> Défi en groupe
+          <Users size={12} aria-hidden="true" /> {t('challengePage.card.groupChallenge')}
         </button>
       )}
     </div>
@@ -494,6 +498,7 @@ const SeriesDropdown: React.FC<{
   onJoined?: () => void;
   onGroupChange?: () => void;
 }> = ({ name, challenges, actionLoading, getUserStatus, onStart, onComplete, user, onJoined, onGroupChange }) => {
+  const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [group, setGroup] = useState<SeriesGroupData | null | undefined>(undefined); // undefined=loading, null=none
   const [friends, setFriends] = useState<FriendEntry[]>([]);
@@ -514,10 +519,12 @@ const SeriesDropdown: React.FC<{
 
   const token = () => localStorage.getItem('token') ?? '';
 
-  const sorted = [...challenges].sort((a, b) => {
+  // Le dropdown se re-rend souvent sans changement de `challenges` (frappe dans le tchat,
+  // ticks de polling...) : useMemo évite de re-trier à chaque fois pour rien.
+  const sorted = useMemo(() => [...challenges].sort((a, b) => {
     const n = (t: string) => Number.parseInt(/\d+/.exec(t)?.[0] ?? '0', 10);
     return n(a.title) - n(b.title);
-  });
+  }), [challenges]);
   const doneCount = sorted.filter(c => getUserStatus(c.id) === 'COMPLETED').length;
   const startableCount = sorted.filter(c => getUserStatus(c.id) === null).length;
   const myMembership = group?.members.find(m => m.userId === user?.id);
@@ -557,16 +564,12 @@ const SeriesDropdown: React.FC<{
   }, [open, user, name]);
 
   // Polling silencieux toutes les 10s pendant que le dropdown est ouvert
-  useEffect(() => {
-    if (!open || !user) return;
-    const id = setInterval(() => {
-      fetch(`/api/series-groups/by-series/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token()}` } })
-        .then(r => r.json())
-        .then(data => setGroup(data ?? null))
-        .catch(() => {});
-    }, 10000);
-    return () => clearInterval(id);
-  }, [open, user, name]);
+  useVisibilityPausedInterval(() => {
+    fetch(`/api/series-groups/by-series/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.json())
+      .then(data => setGroup(data ?? null))
+      .catch(() => {});
+  }, 10000, open && !!user);
 
   // Fetch friends when create or invite panel opens
   useEffect(() => {
@@ -601,31 +604,27 @@ const SeriesDropdown: React.FC<{
   }, [showChat, group?.id, myMembership?.status]);
 
   // Polling messages toutes les 4s quand le dropdown est ouvert
-  useEffect(() => {
-    if (!open || !group || myMembership?.status !== 'JOINED') return;
-    const groupId = group.id;
-    const poll = () => {
-      fetch(`/api/series-groups/${groupId}/messages`, { headers: { Authorization: `Bearer ${token()}` } })
-        .then(r => r.json())
-        .then((data: SeriesGroupMsg[]) => {
-          if (!Array.isArray(data) || data.length === 0) return;
-          const latestId = data[data.length - 1].id;
-          if (latestId > lastMsgIdRef.current) {
-            const isBaseline = lastMsgIdRef.current === 0;
-            const newCount = isBaseline ? 0 : data.filter(m => m.id > lastMsgIdRef.current).length;
-            setMessages(data);
-            lastMsgIdRef.current = latestId;
-            localStorage.setItem(`sg_lm_${groupId}`, String(latestId));
-            if (!showChat && newCount > 0) {
-              setUnreadMessages(u => u + newCount);
-            }
+  useVisibilityPausedInterval(() => {
+    const groupId = group?.id;
+    if (!groupId) return;
+    fetch(`/api/series-groups/${groupId}/messages`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.json())
+      .then((data: SeriesGroupMsg[]) => {
+        if (!Array.isArray(data) || data.length === 0) return;
+        const latestId = data[data.length - 1].id;
+        if (latestId > lastMsgIdRef.current) {
+          const isBaseline = lastMsgIdRef.current === 0;
+          const newCount = isBaseline ? 0 : data.filter(m => m.id > lastMsgIdRef.current).length;
+          setMessages(data);
+          lastMsgIdRef.current = latestId;
+          localStorage.setItem(`sg_lm_${groupId}`, String(latestId));
+          if (!showChat && newCount > 0) {
+            setUnreadMessages(u => u + newCount);
           }
-        })
-        .catch(() => {});
-    };
-    const id = setInterval(poll, 4000);
-    return () => clearInterval(id);
-  }, [open, group?.id, myMembership?.status, showChat]);
+        }
+      })
+      .catch(() => {});
+  }, 4000, open && !!group && myMembership?.status === 'JOINED');
 
   // Auto-scroll vers le bas quand de nouveaux messages arrivent (seulement si le chat est ouvert)
   useEffect(() => {
@@ -682,7 +681,7 @@ const SeriesDropdown: React.FC<{
       setShowCreate(false);
       setSelectedFriends([]);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Erreur');
+      alert(e instanceof Error ? e.message : t('challengePage.notif.genericError'));
     } finally {
       setSaving(false);
     }
@@ -699,7 +698,7 @@ const SeriesDropdown: React.FC<{
         onJoined?.();
         onGroupChange?.();
       } else {
-        alert(data.error ?? 'Erreur');
+        alert(data.error ?? t('challengePage.notif.genericError'));
         if (res.status === 410) setGroup(null); // invitation supprimée côté serveur (expirée ou groupe déjà terminé)
       }
     } finally { setSaving(false); }
@@ -733,7 +732,7 @@ const SeriesDropdown: React.FC<{
       const res = await fetch(`/api/series-groups/${group.id}/complete`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
       const data = await res.json();
       if (res.ok) { setGroup(data); onGroupChange?.(); }
-      else alert(data.error ?? 'Erreur');
+      else alert(data.error ?? t('challengePage.notif.genericError'));
     } finally { setSaving(false); }
   };
 
@@ -747,7 +746,7 @@ const SeriesDropdown: React.FC<{
       });
       const data = await res.json();
       if (res.ok) setGroup(data);
-      else alert(data.error ?? 'Erreur');
+      else alert(data.error ?? t('challengePage.notif.genericError'));
     } finally { setKickLoading(null); }
   };
 
@@ -766,7 +765,7 @@ const SeriesDropdown: React.FC<{
       setShowInvite(false);
       setSelectedFriends([]);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Erreur');
+      alert(e instanceof Error ? e.message : t('challengePage.notif.genericError'));
     } finally {
       setSaving(false);
     }
@@ -803,7 +802,7 @@ const SeriesDropdown: React.FC<{
                 background: 'var(--q-vibrant-lavender)', color: '#fff',
                 fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: startingAll ? 0.6 : 1,
               }}>
-                {startingAll ? '…' : `Commencer toute la série (${startableCount})`}
+                {startingAll ? '…' : t('challengePage.series.startAll', { count: startableCount })}
               </button>
             </div>
           )}
@@ -811,21 +810,21 @@ const SeriesDropdown: React.FC<{
           {/* ── Section groupe de série ── */}
           {user && (
             <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--q-line)', background: 'var(--q-accent-soft)' }}>
-              {group === undefined && <div style={{ fontSize: 12, color: 'var(--q-text3)' }}>Chargement…</div>}
+              {group === undefined && <div style={{ fontSize: 12, color: 'var(--q-text3)' }}>{t('challengePage.series.loading')}</div>}
 
               {group === null && !showCreate && (
                 <button type="button" onClick={() => setShowCreate(true)} style={{
                   display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none',
                   color: 'var(--q-accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: 0,
                 }}>
-                  <UserPlus size={14} aria-hidden="true" /> Créer un groupe de série
+                  <UserPlus size={14} aria-hidden="true" /> {t('challengePage.series.createGroup')}
                 </button>
               )}
 
               {group === null && showCreate && (
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--q-text)', marginBottom: 8 }}>Inviter des amis</div>
-                  {friends.length === 0 && <div style={{ fontSize: 11, color: 'var(--q-text3)', marginBottom: 8 }}>Aucun ami à inviter.</div>}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--q-text)', marginBottom: 8 }}>{t('challengePage.series.inviteFriends')}</div>
+                  {friends.length === 0 && <div style={{ fontSize: 11, color: 'var(--q-text3)', marginBottom: 8 }}>{t('challengePage.series.noFriends')}</div>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
                     {friends.slice(0, 3).map(f => {
                       const sel = selectedFriends.includes(f.user.id);
@@ -847,23 +846,23 @@ const SeriesDropdown: React.FC<{
                     <button type="button" onClick={() => setShowCreate(false)} style={{
                       flex: 1, padding: '7px', borderRadius: 10, border: '1px solid var(--q-line)',
                       background: 'transparent', color: 'var(--q-text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    }}>Annuler</button>
+                    }}>{t('common.cancel')}</button>
                     <button type="button" onClick={handleCreate} disabled={saving} style={{
                       flex: 2, padding: '7px', borderRadius: 10, border: 'none',
                       background: 'var(--q-accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                       opacity: saving ? 0.6 : 1,
-                    }}>{saving ? '…' : 'Créer le groupe'}</button>
+                    }}>{saving ? '…' : t('challengePage.series.createGroupButton')}</button>
                   </div>
                 </div>
               )}
 
               {group && myMembership?.status === 'INVITED' && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                  <span style={{ fontSize: 12, color: 'var(--q-text2)' }}>Tu es invité à rejoindre ce groupe de série</span>
+                  <span style={{ fontSize: 12, color: 'var(--q-text2)' }}>{t('challengePage.series.invitedToJoin')}</span>
                   <button type="button" onClick={handleJoin} disabled={saving} style={{
                     padding: '5px 12px', borderRadius: 999, border: 'none',
                     background: 'var(--q-accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                  }}>{saving ? '…' : 'Rejoindre'}</button>
+                  }}>{saving ? '…' : t('challengePage.join')}</button>
                 </div>
               )}
 
@@ -873,21 +872,21 @@ const SeriesDropdown: React.FC<{
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--q-text)' }}>
                       <Users size={12} style={{ display: 'inline', marginRight: 4 }} aria-hidden="true" />
-                      Groupe · {group.members.filter(m => m.status === 'JOINED').length} membres
+                      {t('challengePage.series.membersCount', { count: group.members.filter(m => m.status === 'JOINED').length })}
                     </span>
                     {!group.completedAt && (
                       <button type="button" onClick={() => { setShowInvite(p => !p); setSelectedFriends([]); }} style={{
                         display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
                         fontSize: 11, color: 'var(--q-accent)', cursor: 'pointer', fontWeight: 700,
-                      }}><UserPlus size={12} aria-hidden="true" /> Inviter</button>
+                      }}><UserPlus size={12} aria-hidden="true" /> {t('challengePage.series.invite')}</button>
                     )}
                   </div>
 
                   {/* ── Panneau d'invitation post-création ── */}
                   {showInvite && (
                     <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--q-bg)', border: '1px solid var(--q-line)' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--q-text)', marginBottom: 8 }}>Inviter des amis</div>
-                      {friends.length === 0 && <div style={{ fontSize: 11, color: 'var(--q-text3)', marginBottom: 8 }}>Aucun ami à inviter.</div>}
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--q-text)', marginBottom: 8 }}>{t('challengePage.series.inviteFriends')}</div>
+                      {friends.length === 0 && <div style={{ fontSize: 11, color: 'var(--q-text3)', marginBottom: 8 }}>{t('challengePage.series.noFriends')}</div>}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
                         {friends
                           .filter(f => !group.members.some(m => m.userId === f.user.id))
@@ -912,13 +911,13 @@ const SeriesDropdown: React.FC<{
                         <button type="button" onClick={() => { setShowInvite(false); setSelectedFriends([]); }} style={{
                           flex: 1, padding: '7px', borderRadius: 10, border: '1px solid var(--q-line)',
                           background: 'transparent', color: 'var(--q-text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                        }}>Annuler</button>
+                        }}>{t('common.cancel')}</button>
                         <button type="button" onClick={handleInvite} disabled={saving || !selectedFriends.length} style={{
                           flex: 2, padding: '7px', borderRadius: 10, border: 'none',
                           background: selectedFriends.length ? 'var(--q-accent)' : 'var(--q-line)',
                           color: '#fff', fontSize: 12, fontWeight: 700, cursor: selectedFriends.length ? 'pointer' : 'default',
                           opacity: saving ? 0.6 : 1,
-                        }}>{saving ? '…' : `Inviter (${selectedFriends.length})`}</button>
+                        }}>{saving ? '…' : t('challengePage.series.inviteCount', { count: selectedFriends.length })}</button>
                       </div>
                     </div>
                   )}
@@ -937,11 +936,11 @@ const SeriesDropdown: React.FC<{
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                               <span style={{ fontSize: 12, fontWeight: 600, color: m.status === 'INVITED' ? 'var(--q-text3)' : 'var(--q-text)' }}>
-                                {m.user.username}{m.status === 'INVITED' ? ' (invité)' : ''}
+                                {m.user.username}{m.status === 'INVITED' ? t('challengePage.series.invitedSuffix') : ''}
                               </span>
                               {memberDone ? (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 700, color: m.confirmedAt ? '#34D399' : 'var(--q-text3)' }}>
-                                  <CheckCircle size={11} aria-hidden="true" /> {m.confirmedAt ? 'Validé' : 'Terminé (en attente)'}
+                                  <CheckCircle size={11} aria-hidden="true" /> {m.confirmedAt ? t('challengePage.series.validated') : t('challengePage.series.doneWaitingConfirm')}
                                 </span>
                               ) : (
                                 <span style={{ fontSize: 11, color: 'var(--q-text3)', fontFamily: 'var(--q-mono)' }}>
@@ -956,9 +955,9 @@ const SeriesDropdown: React.FC<{
                           {isCreator && !isMe && !group.completedAt && (
                             <button
                               type="button"
-                              onClick={() => handleKick(m.userId)}
+                              onClick={() => { if (globalThis.confirm(t('challengePage.series.excludeConfirm', { username: m.user.username }))) handleKick(m.userId); }}
                               disabled={kickLoading === m.userId}
-                              title={`Exclure ${m.user.username}`}
+                              title={t('challengePage.series.excludeTitle', { username: m.user.username })}
                               style={{
                                 width: 26, height: 26, borderRadius: '50%', border: 'none', flexShrink: 0,
                                 background: 'rgba(239,68,68,0.12)', color: '#EF4444',
@@ -984,7 +983,7 @@ const SeriesDropdown: React.FC<{
                       background: 'linear-gradient(135deg,rgba(52,211,153,0.2),rgba(56,189,248,0.2))',
                       color: '#34D399', fontSize: 13, fontWeight: 700,
                     }}>
-                      <PartyPopper size={14} aria-hidden="true" /> Série terminée en groupe !
+                      <PartyPopper size={14} aria-hidden="true" /> {t('challengePage.series.seriesCompletedInGroup')}
                     </div>
                   ) : myConfirmed ? (
                     <div style={{
@@ -992,7 +991,7 @@ const SeriesDropdown: React.FC<{
                       padding: '10px', borderRadius: 12, marginTop: 12,
                       background: 'var(--q-accent-soft)', color: 'var(--q-text2)', fontSize: 12, fontWeight: 600,
                     }}>
-                      En attente de {pendingConfirmCount} membre{pendingConfirmCount > 1 ? 's' : ''} pour clore la série
+                      {t('challengePage.series.waitingMembers', { count: pendingConfirmCount })}
                     </div>
                   ) : myDone && (
                     <button type="button" onClick={handleCompleteSeries} disabled={saving} style={{
@@ -1001,7 +1000,7 @@ const SeriesDropdown: React.FC<{
                       background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff',
                       fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.6 : 1,
                     }}>
-                      {saving ? '…' : <><CheckCircle size={14} aria-hidden="true" /> Valider ma participation</>}
+                      {saving ? '…' : <><CheckCircle size={14} aria-hidden="true" /> {t('challengePage.series.validateParticipation')}</>}
                     </button>
                   )}
 
@@ -1014,7 +1013,7 @@ const SeriesDropdown: React.FC<{
                         background: 'var(--q-accent)', color: '#fff',
                         fontSize: 13, fontWeight: 700, cursor: 'pointer', position: 'relative',
                       }}>
-                        <MessageCircle size={14} aria-hidden="true" /> Tchat
+                        <MessageCircle size={14} aria-hidden="true" /> {t('challengePage.series.chat')}
                         {unreadMessages > 0 && (
                           <span style={{
                             background: '#EF4444', color: '#fff', borderRadius: 999,
@@ -1033,7 +1032,7 @@ const SeriesDropdown: React.FC<{
                         background: 'rgba(239,68,68,0.08)',
                         color: '#EF4444', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                       }}>
-                        Quitter le groupe
+                        {t('challengePage.series.leaveGroup')}
                       </button>
                     </div>
                   )}
@@ -1057,21 +1056,21 @@ const SeriesDropdown: React.FC<{
                     <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(239,68,68,0.12)', border: '1.5px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                       <Users size={22} color="#EF4444" aria-hidden="true" />
                     </div>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--q-text)', marginBottom: 8 }}>Quitter le groupe ?</div>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--q-text)', marginBottom: 8 }}>{t('challengePage.series.leaveConfirmTitle')}</div>
                     <div style={{ fontSize: 13, color: 'var(--q-text2)', marginBottom: 24, lineHeight: 1.5 }}>
-                      Tu perdras l'accès au tchat et à la progression du groupe pour la série <strong style={{ color: 'var(--q-text)' }}>{name}</strong>.
+                      <Trans i18nKey="challengePage.series.leaveConfirmBody" values={{ name }} components={{ strong: <strong style={{ color: 'var(--q-text)' }} /> }} />
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
                       <button type="button" onClick={() => setConfirmLeave(false)} style={{
                         flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
                         background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                      }}>Annuler</button>
+                      }}>{t('common.cancel')}</button>
                       <button type="button" onClick={() => { setConfirmLeave(false); handleLeave(); }} disabled={saving} style={{
                         flex: 1, padding: '12px', borderRadius: 12, border: 'none',
                         background: 'linear-gradient(135deg,#EF4444,#DC2626)',
                         color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                         opacity: saving ? 0.6 : 1,
-                      }}>{saving ? '…' : 'Quitter'}</button>
+                      }}>{saving ? '…' : t('challengePage.series.leave')}</button>
                     </div>
                   </div>
                 </div>
@@ -1105,7 +1104,7 @@ const SeriesDropdown: React.FC<{
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--q-text3)' }}>{group?.members.filter(m => m.status === 'JOINED').length ?? '…'} membres</div>
+                        <div style={{ fontSize: 11, color: 'var(--q-text3)' }}>{t('challengePage.seriesInvites.membersJoined', { count: group?.members.filter(m => m.status === 'JOINED').length ?? 0 })}</div>
                       </div>
                       <button type="button" onClick={() => setShowChat(false)} style={{
                         width: 32, height: 32, borderRadius: '50%', border: 'none',
@@ -1121,7 +1120,7 @@ const SeriesDropdown: React.FC<{
                       {messages.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--q-text3)', fontSize: 13 }}>
                           <MessageCircle size={32} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.3 }} />
-                          Aucun message pour l'instant. Soyez les premiers !
+                          {t('challengePage.series.noMessagesYet')}
                         </div>
                       )}
                       {messages.map(msg => {
@@ -1141,7 +1140,7 @@ const SeriesDropdown: React.FC<{
                                 {msg.content}
                               </div>
                               <div style={{ fontSize: 10, color: 'var(--q-text3)', marginTop: 3, textAlign: isMe ? 'right' : 'left' }}>
-                                {new Date(msg.createdAt).toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(msg.createdAt).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}
                               </div>
                             </div>
                           </div>
@@ -1157,7 +1156,7 @@ const SeriesDropdown: React.FC<{
                         value={chatInput}
                         onChange={e => setChatInput(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-                        placeholder="Écrire un message…"
+                        placeholder={t('challengePage.series.writeMessagePlaceholder')}
                         autoFocus
                         style={{
                           flex: 1, padding: '11px 14px', borderRadius: 14,
@@ -1195,20 +1194,20 @@ const SeriesDropdown: React.FC<{
                 opacity: done ? 0.55 : 1,
               }}>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-                  {diff && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: diff.grad }}>{diff.icon} {diff.label}</span>}
-                  {cat && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: cat.grad }}><cat.Icon size={11} aria-hidden="true" /> {cat.label}</span>}
+                  {diff && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: diff.grad }}>{diff.icon} {t(`common.difficulty.${c.difficulty.toLowerCase()}`)}</span>}
+                  {cat && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: cat.grad }}><cat.Icon size={11} aria-hidden="true" /> {t(`common.category.${c.category}`)}</span>}
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--q-text)', marginBottom: 4 }}>{c.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--q-text2)', marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                   {c.description}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, fontSize: 12, fontWeight: 700 }}>
-                  <span style={{ color: '#FB923C' }}>{c.coinReward} coins</span>
+                  <span style={{ color: '#FB923C' }}>{c.coinReward} {t('challengePage.card.coins')}</span>
                   <span style={{ color: '#A78BFA' }}><Zap size={11} aria-hidden="true" className="inline mr-0.5" />{c.xpReward} XP</span>
                 </div>
                 {done ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#34D399', fontSize: 12, fontWeight: 700 }}>
-                    <CheckCircle size={14} aria-hidden="true" /> Terminé
+                    <CheckCircle size={14} aria-hidden="true" /> {t('challengePage.series.done')}
                   </div>
                 ) : (
                   <button type="button" disabled={actionLoading === c.id} onClick={() => inProgress ? handleCompleteAndRefresh(c.id) : onStart(c.id)} style={{
@@ -1217,7 +1216,7 @@ const SeriesDropdown: React.FC<{
                     color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                     opacity: actionLoading === c.id ? 0.5 : 1,
                   }}>
-                    {actionLoading === c.id ? '…' : inProgress ? 'Marquer comme complété' : 'Commencer'}
+                    {actionLoading === c.id ? '…' : inProgress ? t('challengePage.card.markCompleted') : t('challengePage.series.start')}
                   </button>
                 )}
               </div>
@@ -1230,7 +1229,8 @@ const SeriesDropdown: React.FC<{
 };
 
 const ChallengePage: React.FC = () => {
-  usePageTitle('Défis');
+  const { t, i18n } = useTranslation();
+  usePageTitle(t('challengePage.pageTitle'));
   const { user, setUser } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1475,15 +1475,15 @@ const ChallengePage: React.FC = () => {
       if (res.ok) {
         setPendingSeriesInvites(prev => prev.filter(g => g.id !== groupId));
         globalThis.dispatchEvent(new CustomEvent('series-invite-updated'));
-        showNotif('Tu as rejoint le groupe !', 'success');
+        showNotif(t('challengePage.notif.joinedGroup'), 'success');
         await fetchUserChallenges();
         await fetchInProgressItems(0);
       } else {
         if (res.status === 410) setPendingSeriesInvites(prev => prev.filter(g => g.id !== groupId));
         const data = await res.json().catch(() => null);
-        showNotif(data?.error || 'Erreur lors de la connexion', 'error');
+        showNotif(data?.error || t('challengePage.notif.connectionError'), 'error');
       }
-    } catch { showNotif('Erreur lors de la connexion', 'error'); }
+    } catch { showNotif(t('challengePage.notif.connectionError'), 'error'); }
     finally { setSeriesInviteLoading(null); }
   };
 
@@ -1496,7 +1496,7 @@ const ChallengePage: React.FC = () => {
         setPendingSeriesInvites(prev => prev.filter(g => g.id !== groupId));
         globalThis.dispatchEvent(new CustomEvent('series-invite-updated'));
       }
-    } catch { showNotif('Erreur', 'error'); }
+    } catch { showNotif(t('challengePage.notif.genericError'), 'error'); }
     finally { setSeriesInviteLoading(null); }
   };
 
@@ -1524,12 +1524,12 @@ const ChallengePage: React.FC = () => {
         body: JSON.stringify({ challengeId: inviteModal.id, friendIds: selectedFriends }),
       });
       const data = await res.json();
-      if (!res.ok) { showNotif(data.error || 'Erreur', 'error'); return; }
+      if (!res.ok) { showNotif(data.error || t('challengePage.notif.genericError'), 'error'); return; }
       setGroups(prev => [data, ...prev]);
       setInviteModal(null);
       setSelectedFriends([]);
-      showNotif('Groupe créé ! Tes amis ont été invités.', 'success');
-    } catch { showNotif('Erreur lors de la création', 'error'); }
+      showNotif(t('challengePage.notif.groupCreated'), 'success');
+    } catch { showNotif(t('challengePage.notif.groupCreateError'), 'error'); }
     finally { setGroupCreating(false); }
   };
 
@@ -1600,11 +1600,9 @@ const ChallengePage: React.FC = () => {
   };
 
   // Polling toutes les 2s quand le chat est ouvert (identique à ForumTchat)
-  useEffect(() => {
-    if (chatGroupId === null) return;
-    const interval = setInterval(() => fetchChatMessages(chatGroupId), 2000);
-    return () => clearInterval(interval);
-  }, [chatGroupId]);
+  useVisibilityPausedInterval(() => {
+    if (chatGroupId !== null) fetchChatMessages(chatGroupId);
+  }, 2000, chatGroupId !== null);
 
   // Scroll vers le bas uniquement si l'utilisateur est déjà proche du bas
   useEffect(() => {
@@ -1623,12 +1621,12 @@ const ChallengePage: React.FC = () => {
       const res = await fetch(`/api/groups/${groupId}/join`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        showNotif(data?.error || 'Erreur', 'error');
+        showNotif(data?.error || t('challengePage.notif.genericError'), 'error');
         if (res.status === 410) await fetchGroups();
         return;
       }
       await fetchGroups();
-      showNotif('Tu as rejoint le groupe !', 'success');
+      showNotif(t('challengePage.notif.joinedGroup'), 'success');
     } finally { setGroupActionLoading(null); }
   };
 
@@ -1647,9 +1645,9 @@ const ChallengePage: React.FC = () => {
     try {
       const res = await fetch(`/api/groups/${groupId}/complete`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      if (!res.ok) { showNotif(data.error || 'Erreur', 'error'); return; }
+      if (!res.ok) { showNotif(data.error || t('challengePage.notif.genericError'), 'error'); return; }
       await fetchGroups();
-      showNotif(data.allCompleted ? 'Groupe terminé ! Bravo à tous !' : 'Complété ! En attente des autres membres…', 'success');
+      showNotif(data.allCompleted ? t('challengePage.notif.groupAllCompleted') : t('challengePage.notif.groupCompletedWaiting'), 'success');
     } finally { setGroupActionLoading(null); }
   };
 
@@ -1669,9 +1667,9 @@ const ChallengePage: React.FC = () => {
     try {
       const res = await fetch(`/api/challenges/${id}/start`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
       const data = await res.json();
-      if (!res.ok) { showNotif(data.error || 'Erreur', 'error'); return; }
+      if (!res.ok) { showNotif(data.error || t('challengePage.notif.genericError'), 'error'); return; }
       await Promise.all([fetchUserChallenges(), fetchInProgressItems(0), fetchCompletedItems(0)]);
-      showNotif('Défi commencé ! Bonne chance !', 'success');
+      showNotif(t('challengePage.notif.challengeStarted'), 'success');
     } finally { setActionLoading(null); }
   };
 
@@ -1681,7 +1679,7 @@ const ChallengePage: React.FC = () => {
     try {
       const res = await fetch(`/api/challenges/${id}/complete`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
       const data = await res.json();
-      if (!res.ok) { showNotif(data.error || 'Erreur', 'error'); return; }
+      if (!res.ok) { showNotif(data.error || t('challengePage.notif.genericError'), 'error'); return; }
       const prevStreak = user?.currentStreak ?? 0;
       if (data.user) setUser(data.user);
       await Promise.all([fetchUserChallenges(), fetchInProgressItems(0), fetchCompletedItems(0)]);
@@ -1825,12 +1823,12 @@ const ChallengePage: React.FC = () => {
         body: JSON.stringify({ friendIds: inviteExistingFriends }),
       });
       const data = await res.json();
-      if (!res.ok) { showNotif(data.error || 'Erreur', 'error'); return; }
+      if (!res.ok) { showNotif(data.error || t('challengePage.notif.genericError'), 'error'); return; }
       setGroups(prev => prev.map(g => g.id === inviteExistingGroup.id ? data : g));
       setInviteExistingGroup(null);
       setInviteExistingFriends([]);
-      showNotif('Invitation(s) envoyée(s) !', 'success');
-    } catch { showNotif('Erreur lors de l\'invitation', 'error'); }
+      showNotif(t('challengePage.notif.invitationsSent'), 'success');
+    } catch { showNotif(t('challengePage.notif.invitationError'), 'error'); }
     finally { setInviteExistingLoading(false); }
   };
 
@@ -1864,21 +1862,21 @@ const ChallengePage: React.FC = () => {
             <div className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{g.challenge.title}</div>
             <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--q-text2)' }}>
               {isPending
-                ? <><Mail size={10} aria-hidden="true" /> {g.creator.username} t'invite à ce défi en groupe</>
+                ? <><Mail size={10} aria-hidden="true" /> {t('challengePage.groupCard.invitedYouText', { username: g.creator.username })}</>
                 : allDone
-                  ? <><PartyPopper size={10} aria-hidden="true" /> Tous les membres ont terminé !</>
-                  : <><Users size={10} aria-hidden="true" /> {completedCount}/{joinedMembers.length} membre{joinedMembers.length > 1 ? 's' : ''} ont terminé</>}
+                  ? <><PartyPopper size={10} aria-hidden="true" /> {t('challengePage.groupCard.allCompleted')}</>
+                  : <><Users size={10} aria-hidden="true" /> {t('challengePage.groupCard.membersCompleted', { count: joinedMembers.length, completed: completedCount, total: joinedMembers.length })}</>}
             </div>
           </div>
           {isPending && (
             <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)' }}>Invitation</span>
+              style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)' }}>{t('challengePage.groupCard.invitation')}</span>
           )}
           {!isPending && (
             <button onClick={() => openChat(g.id)}
               className="q-press flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
               style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', border: '1px solid var(--q-accent)' }}>
-              <MessageCircle size={11} aria-hidden="true" /> Tchat
+              <MessageCircle size={11} aria-hidden="true" /> {t('challengePage.series.chat')}
             </button>
           )}
         </div>
@@ -1904,12 +1902,12 @@ const ChallengePage: React.FC = () => {
             <button onClick={() => handleJoinGroup(g.id)} disabled={groupActionLoading === g.id}
               className="q-press flex-1 py-2 rounded-full font-bold text-xs text-white disabled:opacity-60 flex items-center justify-center gap-1"
               style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)' }}>
-              {groupActionLoading === g.id ? <Loader2 size={12} className="animate-spin" /> : <><CheckCircle size={11} /> Rejoindre</>}
+              {groupActionLoading === g.id ? <Loader2 size={12} className="animate-spin" /> : <><CheckCircle size={11} /> {t('challengePage.join')}</>}
             </button>
             <button onClick={() => handleDeclineGroup(g.id)} disabled={groupActionLoading === g.id}
               className="q-press flex-1 py-2 rounded-full font-bold text-xs disabled:opacity-60"
               style={{ background: 'var(--q-line)', color: 'var(--q-text2)' }}>
-              Refuser
+              {t('challengePage.decline')}
             </button>
           </div>
         )}
@@ -1919,26 +1917,26 @@ const ChallengePage: React.FC = () => {
             style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)' }}>
             {groupActionLoading === g.id
               ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
-              : <><CheckCircle size={11} aria-hidden="true" /> Marquer comme complété</>}
+              : <><CheckCircle size={11} aria-hidden="true" /> {t('challengePage.card.markCompleted')}</>}
           </button>
         )}
         {isCompleted && !allDone && (
           <div className="w-full py-2 rounded-full font-bold text-xs text-center flex items-center justify-center gap-1"
             style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399' }}>
-            <CheckCircle size={11} aria-hidden="true" /> Complété — en attente des autres membres
+            <CheckCircle size={11} aria-hidden="true" /> {t('challengePage.groupCard.completedWaitingOthers')}
           </div>
         )}
         {allDone && (
           <div className="w-full py-2 rounded-full font-bold text-xs text-center flex items-center justify-center gap-1"
             style={{ background: 'linear-gradient(135deg,rgba(52,211,153,0.2),rgba(56,189,248,0.2))', color: '#34D399' }}>
-            <PartyPopper size={11} aria-hidden="true" /> Défi de groupe terminé !
+            <PartyPopper size={11} aria-hidden="true" /> {t('challengePage.groupCard.groupChallengeCompleted')}
           </div>
         )}
         {canInvite && (
           <button onClick={() => { setInviteExistingGroup(g); setInviteExistingFriends([]); if (friends.length === 0) fetchFriends(); }}
             className="q-press w-full py-2 rounded-full font-bold text-xs flex items-center justify-center gap-1 mt-1"
             style={{ background: 'var(--q-bg)', color: 'var(--q-text2)', border: '1px dashed var(--q-line)' }}>
-            <Plus size={11} aria-hidden="true" /> Inviter des amis ({4 - g.members.length} place{4 - g.members.length > 1 ? 's' : ''} libre{4 - g.members.length > 1 ? 's' : ''})
+            <Plus size={11} aria-hidden="true" /> {t('challengePage.groupCard.inviteFriendsSlots', { count: 4 - g.members.length })}
           </button>
         )}
       </div>
@@ -1962,10 +1960,10 @@ const ChallengePage: React.FC = () => {
             <div className="flex items-center justify-between p-4"
               style={{ borderBottom: '1px solid var(--q-line)', flexShrink: 0 }}>
               <h2 className="font-bold text-base flex items-center gap-1.5" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
-                <MessageCircle size={16} aria-hidden="true" /> Tchat du groupe
+                <MessageCircle size={16} aria-hidden="true" /> {t('challengePage.chatModal.title')}
               </h2>
               <button onClick={() => { setChatGroupId(null); setChatMessages([]); }}
-                aria-label="Fermer le tchat"
+                aria-label={t('challengePage.chatModal.closeAriaLabel')}
                 className="q-press p-1.5 rounded-full"
                 style={{ background: 'var(--q-line)', color: 'var(--q-text2)' }}>
                 <X size={15} aria-hidden="true" />
@@ -1987,7 +1985,7 @@ const ChallengePage: React.FC = () => {
                 </div>
               ) : chatMessages.length === 0 ? (
                 <p className="text-center text-sm" style={{ color: 'var(--q-text3)', paddingTop: 24 }}>
-                  Aucun message — commence la conversation !
+                  {t('challengePage.chatModal.noMessages')}
                 </p>
               ) : null}
               {chatMessages.map(msg => {
@@ -1998,7 +1996,7 @@ const ChallengePage: React.FC = () => {
                       {/* Avatar cliquable vers le profil */}
                       <button
                         onClick={() => msg.user.id === user?.id ? navigate('/profile') : navigate(`/user/${msg.user.id}`)}
-                        aria-label={`Voir le profil de ${msg.user.username}`}
+                        aria-label={t('challengePage.chatModal.viewProfileAriaLabel', { username: msg.user.username })}
                         className="flex-shrink-0 self-end"
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                         <UserAvatar
@@ -2018,7 +2016,7 @@ const ChallengePage: React.FC = () => {
                               {msg.user.username}
                             </button>
                             <span className="text-xs" style={{ color: 'var(--q-text3)' }}>
-                              {new Date(msg.createdAt).toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(msg.createdAt).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                         )}
@@ -2035,7 +2033,7 @@ const ChallengePage: React.FC = () => {
                         {isMe && (
                           <div className="text-right mt-1" style={{ paddingRight: 2 }}>
                             <span className="text-xs" style={{ color: 'var(--q-text3)' }}>
-                              {new Date(msg.createdAt).toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(msg.createdAt).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                         )}
@@ -2055,21 +2053,21 @@ const ChallengePage: React.FC = () => {
             )}
             <div className="p-3 flex items-center gap-2"
               style={{ borderTop: '1px solid var(--q-line)', flexShrink: 0 }}>
-              <label htmlFor="group-chat-input" className="sr-only">Écrire un message</label>
+              <label htmlFor="group-chat-input" className="sr-only">{t('challengePage.chatModal.writeMessageSrLabel')}</label>
               <input
                 id="group-chat-input"
                 type="text"
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value.slice(0, 500))}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) sendChatMessage(); }}
-                placeholder="Écrire un message..."
+                placeholder={t('challengePage.chatModal.placeholder')}
                 maxLength={500}
                 className="flex-1 py-2 px-4 rounded-full outline-none"
                 style={{ background: 'var(--q-bg)', border: '1px solid var(--q-line)',
                   color: 'var(--q-text)', fontSize: 13, fontFamily: 'inherit' }}
               />
               <button onClick={sendChatMessage} disabled={!chatInput.trim() || chatSending || chatInput.length > 500}
-                aria-label="Envoyer le message"
+                aria-label={t('challengePage.chatModal.sendAriaLabel')}
                 className={`p-2 rounded-full ${chatInput.trim() ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'}`}>
                 <Send size={18} aria-hidden="true" />
               </button>
@@ -2089,14 +2087,14 @@ const ChallengePage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-bold text-base" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
-                  Défi en groupe
+                  {t('challengePage.inviteModal.title')}
                 </div>
                 <div className="text-xs mt-0.5 font-semibold" style={{ color: 'var(--q-text2)' }}
                   title={inviteModal.title}>
                   {inviteModal.title.length > 40 ? inviteModal.title.slice(0, 40) + '…' : inviteModal.title}
                 </div>
               </div>
-              <button onClick={() => setInviteModal(null)} aria-label="Fermer"
+              <button onClick={() => setInviteModal(null)} aria-label={t('challengePage.inviteModal.closeAriaLabel')}
                 className="q-press w-8 h-8 rounded-full flex items-center justify-center"
                 style={{ background: 'var(--q-line)', color: 'var(--q-text2)' }}>
                 <X size={15} aria-hidden="true" />
@@ -2108,7 +2106,7 @@ const ChallengePage: React.FC = () => {
               border: '1px solid var(--q-line)' }}>
               <span style={{ fontSize: 12, color: 'var(--q-text2)' }}>
                 <Users size={12} style={{ display: 'inline', marginRight: 4 }} aria-hidden="true" />
-                Membres du groupe
+                {t('challengePage.inviteModal.groupMembers')}
               </span>
               <span style={{ fontSize: 12, fontWeight: 700,
                 color: selectedFriends.length >= 3 ? '#EF4444' : 'var(--q-accent)' }}>
@@ -2117,7 +2115,7 @@ const ChallengePage: React.FC = () => {
             </div>
             {friends.length === 0 ? (
               <p className="text-sm text-center py-4" style={{ color: 'var(--q-text3)' }}>
-                Ajoute des amis pour les inviter !
+                {t('challengePage.inviteModal.noFriends')}
               </p>
             ) : (
               <div className="space-y-2 max-h-56 overflow-y-auto">
@@ -2153,9 +2151,9 @@ const ChallengePage: React.FC = () => {
               disabled={groupCreating}
               className="q-press w-full py-3 rounded-full font-bold text-sm text-white disabled:opacity-60"
               style={{ background: 'var(--q-vibrant-lavender)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
-              {groupCreating ? 'Création…' : selectedFriends.length > 0
-                ? `Créer le groupe (${selectedFriends.length + 1} membres)`
-                : 'Créer le groupe (solo)'}
+              {groupCreating ? t('challengePage.inviteModal.creating') : selectedFriends.length > 0
+                ? t('challengePage.inviteModal.createWithMembers', { count: selectedFriends.length + 1 })
+                : t('challengePage.inviteModal.createSolo')}
             </button>
           </div>
         </div>
@@ -2172,14 +2170,14 @@ const ChallengePage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-bold text-base" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
-                  Inviter des amis
+                  {t('challengePage.inviteExistingModal.title')}
                 </div>
                 <div className="text-xs mt-0.5 font-semibold" style={{ color: 'var(--q-text2)' }}
                   title={inviteExistingGroup.challenge.title}>
                   {inviteExistingGroup.challenge.title.length > 40 ? inviteExistingGroup.challenge.title.slice(0, 40) + '…' : inviteExistingGroup.challenge.title}
                 </div>
               </div>
-              <button onClick={() => setInviteExistingGroup(null)} aria-label="Fermer"
+              <button onClick={() => setInviteExistingGroup(null)} aria-label={t('challengePage.inviteModal.closeAriaLabel')}
                 className="q-press w-8 h-8 rounded-full flex items-center justify-center"
                 style={{ background: 'var(--q-line)', color: 'var(--q-text2)' }}>
                 <X size={15} aria-hidden="true" />
@@ -2189,7 +2187,7 @@ const ChallengePage: React.FC = () => {
               padding: '8px 12px', borderRadius: 12, background: 'var(--q-bg)', border: '1px solid var(--q-line)' }}>
               <span style={{ fontSize: 12, color: 'var(--q-text2)' }}>
                 <Users size={12} style={{ display: 'inline', marginRight: 4 }} aria-hidden="true" />
-                Places disponibles
+                {t('challengePage.inviteExistingModal.availableSlots')}
               </span>
               <span style={{ fontSize: 12, fontWeight: 700,
                 color: inviteExistingFriends.length >= (4 - inviteExistingGroup.members.length) ? '#EF4444' : 'var(--q-accent)' }}>
@@ -2201,7 +2199,7 @@ const ChallengePage: React.FC = () => {
               const eligible = friends.filter(f => !alreadyIn.has(f.user.id));
               return eligible.length === 0 ? (
                 <p className="text-sm text-center py-4" style={{ color: 'var(--q-text3)' }}>
-                  {friends.length === 0 ? 'Ajoute des amis pour les inviter !' : 'Tous tes amis sont déjà dans ce groupe.'}
+                  {friends.length === 0 ? t('challengePage.inviteModal.noFriends') : t('challengePage.inviteExistingModal.allFriendsIn')}
                 </p>
               ) : (
                 <div className="space-y-2 max-h-56 overflow-y-auto">
@@ -2237,9 +2235,9 @@ const ChallengePage: React.FC = () => {
               disabled={inviteExistingLoading || inviteExistingFriends.length === 0}
               className="q-press w-full py-3 rounded-full font-bold text-sm text-white disabled:opacity-60"
               style={{ background: 'var(--q-vibrant-lavender)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
-              {inviteExistingLoading ? 'Envoi…' : inviteExistingFriends.length > 0
-                ? `Inviter (${inviteExistingFriends.length} ami${inviteExistingFriends.length > 1 ? 's' : ''})`
-                : 'Sélectionne des amis'}
+              {inviteExistingLoading ? t('challengePage.inviteExistingModal.sending') : inviteExistingFriends.length > 0
+                ? t('challengePage.inviteExistingModal.inviteCount', { count: inviteExistingFriends.length })
+                : t('challengePage.inviteExistingModal.selectFriends')}
             </button>
           </div>
         </div>
@@ -2274,18 +2272,18 @@ const ChallengePage: React.FC = () => {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
               <Trophy className="text-yellow-400" size={26} aria-hidden="true" />
-              Défis
+              {t('challengePage.heading')}
             </h1>
-            <p className="text-sm mt-0.5" style={{ color: 'var(--q-text2)' }}>Relève des défis et gagne des récompenses</p>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--q-text2)' }}>{t('challengePage.subtitle')}</p>
           </div>
         </div>
         <button onClick={() => navigate('/challenges/create')}
           data-tour="create-challenge"
-          aria-label="Créer un défi"
+          aria-label={t('challengePage.createAriaLabel')}
           className="q-press flex items-center gap-1.5 px-4 py-2 rounded-full text-white font-bold text-sm transition-opacity hover:opacity-85"
           style={{ background: 'var(--q-vibrant-lavender)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
           <Plus size={15} aria-hidden="true" />
-          <span className="hidden sm:inline" aria-hidden="true">Créer</span>
+          <span className="hidden sm:inline" aria-hidden="true">{t('challengePage.createButton')}</span>
         </button>
       </div>
 
@@ -2299,11 +2297,11 @@ const ChallengePage: React.FC = () => {
           </span>
           <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
             style={{ background: 'var(--q-vibrant-hero)', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
-            <Zap size={11} aria-hidden="true" /> Niv. {user.level ?? 1}
+            <Zap size={11} aria-hidden="true" /> {t('navbar.level', { level: user.level ?? 1 })}
           </span>
           <span className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
             style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', boxShadow: '0 4px 12px rgba(52,211,153,0.40)' }}>
-            <CheckCircle size={11} aria-hidden="true" /> {userChallenges.filter(c => c.status === 'COMPLETED').length} complétés
+            <CheckCircle size={11} aria-hidden="true" /> {t('challengePage.completedCount', { count: userChallenges.filter(c => c.status === 'COMPLETED').length })}
           </span>
         </div>
       )}
@@ -2314,7 +2312,7 @@ const ChallengePage: React.FC = () => {
           <div className="flex items-center gap-2 mb-2">
             <Mail size={15} style={{ color: '#A78BFA' }} aria-hidden="true" />
             <span className="font-bold text-sm" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
-              Invitations de groupe
+              {t('challengePage.seriesInvites.title')}
             </span>
             <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
               style={{ background: '#EF4444' }}>{pendingSeriesInvites.length}</span>
@@ -2338,8 +2336,8 @@ const ChallengePage: React.FC = () => {
                     {invite.seriesName}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>
-                    Invité par <span style={{ color: 'var(--q-accent)', fontWeight: 600 }}>{invite.creator.username}</span>
-                    {' · '}{invite.members.filter(m => m.status === 'JOINED').length} membre{invite.members.filter(m => m.status === 'JOINED').length > 1 ? 's' : ''}
+                    <Trans i18nKey="challengePage.seriesInvites.invitedBy" values={{ username: invite.creator.username }} components={{ strong: <span style={{ color: 'var(--q-accent)', fontWeight: 600 }} /> }} />
+                    {' · '}{t('challengePage.seriesInvites.membersJoined', { count: invite.members.filter(m => m.status === 'JOINED').length })}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -2351,7 +2349,7 @@ const ChallengePage: React.FC = () => {
                       border: '1px solid var(--q-line)', background: 'transparent',
                       color: 'var(--q-text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                       opacity: seriesInviteLoading === invite.id ? 0.5 : 1,
-                    }}>Refuser</button>
+                    }}>{t('challengePage.decline')}</button>
                   <button
                     onClick={() => handleJoinSeriesInvite(invite.id)}
                     disabled={seriesInviteLoading === invite.id}
@@ -2361,7 +2359,7 @@ const ChallengePage: React.FC = () => {
                       color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                       opacity: seriesInviteLoading === invite.id ? 0.5 : 1,
                     }}>
-                    {seriesInviteLoading === invite.id ? '…' : 'Rejoindre'}
+                    {seriesInviteLoading === invite.id ? '…' : t('challengePage.join')}
                   </button>
                 </div>
               </div>
@@ -2376,10 +2374,10 @@ const ChallengePage: React.FC = () => {
           <div className="flex items-center gap-2 mb-2">
             <Users size={16} style={{ color: '#A78BFA' }} aria-hidden="true" />
             <span className="font-bold text-sm" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
-              Défis en groupe
+              {t('challengePage.activeGroupsTitle')}
             </span>
             {groupsLoading
-              ? <Loader2 size={14} className="animate-spin" style={{ color: 'var(--q-text3)' }} aria-label="Chargement" />
+              ? <Loader2 size={14} className="animate-spin" style={{ color: 'var(--q-text3)' }} aria-label={t('challengePage.loadingAriaLabel')} />
               : activeGroups.length > 0 && (
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
                   style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)' }}>{activeGroups.length}</span>
@@ -2404,16 +2402,16 @@ const ChallengePage: React.FC = () => {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm" style={{ color: isDailyFilter ? '#fff' : 'var(--q-text)' }}>
-              Suggestion du jour
+              {t('challengePage.dailySuggestion')}
             </p>
             <p className="text-xs" style={{ color: isDailyFilter ? 'rgba(255,255,255,0.85)' : 'var(--q-text2)' }}>
-              {isDailyFilter ? 'Filtré — défi du jour uniquement' : '+50% de récompenses si complété aujourd\'hui'}
+              {isDailyFilter ? t('challengePage.dailyFilteredOnly') : t('challengePage.dailyBonusHint')}
             </p>
           </div>
           {isDailyFilter
             ? <X size={16} style={{ color: '#fff', flexShrink: 0 }} aria-hidden="true" />
             : <span className="text-xs font-bold px-2 py-0.5 rounded-full text-amber-900 flex-shrink-0"
-                style={{ background: '#FDE68A' }}>Voir</span>
+                style={{ background: '#FDE68A' }}>{t('challengePage.see')}</span>
           }
         </button>
       )}
@@ -2422,26 +2420,26 @@ const ChallengePage: React.FC = () => {
       <div className="rounded-2xl p-3 mb-3 flex gap-2" style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
         <div className="flex items-center gap-2 flex-1">
           <Search size={15} aria-hidden="true" style={{ color: 'var(--q-text3)' }} className="flex-shrink-0" />
-          <label htmlFor="challenge-search" className="sr-only">Rechercher un défi</label>
+          <label htmlFor="challenge-search" className="sr-only">{t('challengePage.searchAriaLabel')}</label>
           <input id="challenge-search" value={search} onChange={e => { setSearch(e.target.value); setIsDailyFilter(false); }}
-            placeholder="Rechercher un défi..."
+            placeholder={t('challengePage.searchPlaceholder')}
             className="flex-1 bg-transparent text-sm outline-none min-w-0"
             style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }} />
           {search && (
-            <button onClick={() => setSearch('')} aria-label="Effacer la recherche" style={{ color: 'var(--q-text3)' }}>
+            <button onClick={() => setSearch('')} aria-label={t('challengePage.clearSearchAriaLabel')} style={{ color: 'var(--q-text3)' }}>
               <X size={14} aria-hidden="true" />
             </button>
           )}
         </div>
         <button onClick={() => setFiltersOpen(o => !o)}
           aria-expanded={filtersOpen}
-          aria-label={`Filtres${activeFilters > 0 ? ` (${activeFilters} actif${activeFilters > 1 ? 's' : ''})` : ''}`}
+          aria-label={activeFilters > 0 ? t('challengePage.filtersActive', { count: activeFilters }) : t('challengePage.filters')}
           className="q-press flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold flex-shrink-0 transition-opacity"
           style={filtersOpen || activeFilters > 0
             ? { background: 'var(--q-accent)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }
             : { background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
           <SlidersHorizontal size={13} aria-hidden="true" />
-          <span aria-hidden="true">Filtres{activeFilters > 0 && ` (${activeFilters})`}</span>
+          <span aria-hidden="true">{t('challengePage.filters')}{activeFilters > 0 && ` (${activeFilters})`}</span>
         </button>
       </div>
 
@@ -2449,14 +2447,14 @@ const ChallengePage: React.FC = () => {
       {filtersOpen && (
         <div className="rounded-2xl p-4 mb-3 space-y-4" style={{ background: 'var(--q-chrome)', boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)' }}>
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: 'var(--q-text3)' }}>Catégorie</p>
+            <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: 'var(--q-text3)' }}>{t('challengePage.categoryLabel')}</p>
             <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
               <button onClick={() => { setSelectedCategory(''); setIsDailyFilter(false); }}
                 className="q-press flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
                 style={selectedCategory
                   ? { background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }
                   : { background: 'var(--q-accent)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
-                Tous
+                {t('challengePage.all')}
               </button>
               {CATEGORIES.map(c => {
                 const cfg = CATEGORY_GRAD[c];
@@ -2468,21 +2466,21 @@ const ChallengePage: React.FC = () => {
                     style={active
                       ? { background: cfg.grad, color: '#fff', boxShadow: `0 4px 12px ${cfg.glow}` }
                       : { background: 'var(--q-accent-soft)', color: 'var(--q-text2)' }}>
-                    <CfgIcon size={11} /> {cfg.label}
+                    <CfgIcon size={11} /> {t(`common.category.${c}`)}
                   </button>
                 );
               })}
             </div>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: 'var(--q-text3)' }}>Difficulté</p>
+            <p className="text-xs font-bold uppercase tracking-widest mb-2.5" style={{ color: 'var(--q-text3)' }}>{t('challengePage.difficultyLabel')}</p>
             <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
               <button onClick={() => { setSelectedDifficulty(''); setIsDailyFilter(false); }}
                 className="q-press flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
                 style={selectedDifficulty
                   ? { background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }
                   : { background: 'var(--q-accent)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.40)' }}>
-                Tous
+                {t('challengePage.all')}
               </button>
               {DIFFICULTIES.map(d => {
                 const cfg = DIFF_GRAD[d];
@@ -2493,7 +2491,7 @@ const ChallengePage: React.FC = () => {
                     style={active
                       ? { background: cfg.grad, color: '#fff', boxShadow: `0 4px 12px ${cfg.glow}` }
                       : { background: 'var(--q-accent-soft)', color: 'var(--q-text2)' }}>
-                    {cfg.label}
+                    {t(`common.difficulty.${d.toLowerCase()}`)}
                   </button>
                 );
               })}
@@ -2502,15 +2500,15 @@ const ChallengePage: React.FC = () => {
         </div>
       )}
 
-      {loading && <PageLoader message="Chargement des défis..." />}
+      {loading && <PageLoader message={t('challengePage.loadingChallenges')} />}
 
       {!loading && filtered.length === 0 && !hasInProgressContent && !hasCompletedContent && (
         <div className="text-center py-16" style={{ color: 'var(--q-text3)' }}>
           <Trophy size={44} className="mx-auto mb-3 opacity-30" />
-          <p>{isDailyFilter ? 'Le défi du jour n\'est pas encore disponible.' : 'Aucun défi trouvé.'}</p>
+          <p>{isDailyFilter ? t('challengePage.dailyNotAvailable') : t('challengePage.noChallengesFound')}</p>
           <button onClick={() => { setSearch(''); setSelectedCategory(''); setSelectedDifficulty(''); setIsDailyFilter(false); }}
             className="mt-3 text-sm font-semibold hover:opacity-70 transition-opacity" style={{ color: 'var(--q-accent)' }}>
-            Réinitialiser les filtres
+            {t('challengePage.resetFilters')}
           </button>
         </div>
       )}
@@ -2524,9 +2522,9 @@ const ChallengePage: React.FC = () => {
               style={{ background: 'linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.08))', border: '1px solid rgba(251,191,36,0.35)' }}>
               <Sparkles size={22} style={{ color: '#F59E0B', flexShrink: 0 }} aria-hidden="true" />
               <div>
-                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>Suggestion du jour</p>
+                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('challengePage.dailySuggestion')}</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--q-text2)' }}>
-                  Complète ce défi aujourd'hui pour +50% de coins et XP !
+                  {t('challengePage.dailyBonusBanner')}
                 </p>
               </div>
             </div>
@@ -2534,7 +2532,7 @@ const ChallengePage: React.FC = () => {
 
           {hasInProgressContent && (
             <section>
-              <SectionHeader icon={<Clock size={16} style={{ color: '#38BDF8' }} />} label="En cours"
+              <SectionHeader icon={<Clock size={16} style={{ color: '#38BDF8' }} />} label={t('challengePage.sectionInProgress')}
                 count={isDailyFilter ? displayedInProgress.length : visibleInProgressCount}
                 grad="linear-gradient(135deg,#38BDF8,#A78BFA)" onClick={() => setInProgressOpen(o => !o)} isOpen={inProgressOpen} />
               {inProgressOpen && (
@@ -2563,7 +2561,7 @@ const ChallengePage: React.FC = () => {
                     <button onClick={() => fetchInProgressItems(loadedInProgressGroupCount)} disabled={loadingMoreInProgress}
                       className="q-press mt-4 w-full py-2.5 rounded-2xl border-2 border-dashed text-sm font-bold transition-opacity hover:opacity-70 disabled:opacity-40"
                       style={{ borderColor: '#38BDF8', color: '#38BDF8' }}>
-                      {loadingMoreInProgress ? 'Chargement…' : 'Charger plus'}
+                      {loadingMoreInProgress ? t('challengePage.loadingMore') : t('challengePage.loadMore')}
                     </button>
                   )}
                 </>
@@ -2573,7 +2571,7 @@ const ChallengePage: React.FC = () => {
 
           {available.length > 0 && (
             <section data-tour="page-defis-available">
-              <SectionHeader icon={<Trophy size={16} style={{ color: '#FACC15' }} />} label="Disponibles" count={available.length}
+              <SectionHeader icon={<Trophy size={16} style={{ color: '#FACC15' }} />} label={t('challengePage.sectionAvailable')} count={available.length}
                 grad="linear-gradient(135deg,#FACC15,#FB923C)" onClick={() => setAvailableOpen(o => !o)} isOpen={availableOpen} />
               {availableOpen && (
                 <>
@@ -2603,7 +2601,7 @@ const ChallengePage: React.FC = () => {
                     <button onClick={() => fetchChallenges(loadedChallengeGroupCount)} disabled={loadingMore}
                       className="q-press mt-4 w-full py-2.5 rounded-2xl border-2 border-dashed text-sm font-bold transition-opacity hover:opacity-70 disabled:opacity-40"
                       style={{ borderColor: 'var(--q-accent)', color: 'var(--q-accent)' }}>
-                      {loadingMore ? 'Chargement…' : 'Charger plus'}
+                      {loadingMore ? t('challengePage.loadingMore') : t('challengePage.loadMore')}
                     </button>
                   )}
                 </>
@@ -2613,7 +2611,7 @@ const ChallengePage: React.FC = () => {
 
           {(hasCompletedContent || (!isDailyFilter && completedGroups.length > 0)) && (
             <section>
-              <SectionHeader icon={<CheckCircle size={16} style={{ color: '#34D399' }} />} label="Terminés"
+              <SectionHeader icon={<CheckCircle size={16} style={{ color: '#34D399' }} />} label={t('challengePage.sectionCompleted')}
                 count={isDailyFilter ? displayedCompleted.length : visibleCompletedCount + completedGroups.length}
                 grad="linear-gradient(135deg,#34D399,#38BDF8)" onClick={() => setCompletedOpen(o => !o)} isOpen={completedOpen} />
               {completedOpen && (
@@ -2642,7 +2640,7 @@ const ChallengePage: React.FC = () => {
                     <button onClick={() => fetchCompletedItems(loadedCompletedGroupCount)} disabled={loadingMoreCompleted}
                       className="q-press mt-4 w-full py-2.5 rounded-2xl border-2 border-dashed text-sm font-bold transition-opacity hover:opacity-70 disabled:opacity-40"
                       style={{ borderColor: '#34D399', color: '#34D399' }}>
-                      {loadingMoreCompleted ? 'Chargement…' : 'Charger plus'}
+                      {loadingMoreCompleted ? t('challengePage.loadingMore') : t('challengePage.loadMore')}
                     </button>
                   )}
                   {/* Groupes terminés */}
@@ -2650,7 +2648,7 @@ const ChallengePage: React.FC = () => {
                     <div className={displayedCompleted.length > 0 ? 'mt-4 pt-4' : ''} style={displayedCompleted.length > 0 ? { borderTop: '1px solid var(--q-line)' } : {}}>
                       <div className="flex items-center gap-2 mb-2">
                         <Users size={14} style={{ color: '#A78BFA' }} aria-hidden="true" />
-                        <span className="font-bold text-sm" style={{ color: 'var(--q-text2)', fontFamily: 'var(--q-display)' }}>Groupes terminés</span>
+                        <span className="font-bold text-sm" style={{ color: 'var(--q-text2)', fontFamily: 'var(--q-display)' }}>{t('challengePage.groupsCompleted')}</span>
                         <span className="text-xs font-bold px-1.5 py-0.5 rounded-full text-white"
                           style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)' }}>{completedGroups.length}</span>
                       </div>

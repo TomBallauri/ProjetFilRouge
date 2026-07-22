@@ -69,7 +69,8 @@ router.post('/api/series-groups', authMiddleware, async (req, res) => {
     ensureSeriesChallengesStarted(req.userId, seriesName).catch(() => {});
     res.json(group);
   } catch (error) {
-    res.status(500).json({ error: error?.message ?? 'Erreur lors de la création' });
+    console.error('[series-groups] création:', error?.message ?? error);
+    res.status(500).json({ error: 'Erreur lors de la création' });
   }
 });
 

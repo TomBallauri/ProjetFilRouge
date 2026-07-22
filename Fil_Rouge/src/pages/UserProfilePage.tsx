@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, Award, ChevronLeft, UserPlus, UserCheck, UserX, Clock } from 'lucide-react';
 import { BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
@@ -44,6 +45,7 @@ type FriendStatus = { status: 'NONE' | 'PENDING' | 'ACCEPTED'; requestId?: numbe
 const UserProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const { user: currentUser } = useStore();
   const [profile, setProfile] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,7 @@ const UserProfilePage: React.FC = () => {
         .then(data => setFriendStatus(data))
         .catch(() => {});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const sendFriendRequest = async () => {
@@ -96,8 +99,8 @@ const UserProfilePage: React.FC = () => {
 
   if (notFound || !profile) return (
     <div style={{ textAlign: 'center', padding: '60px 24px', fontFamily: 'var(--q-font)' }}>
-      <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--q-text)', marginBottom: 8 }}>Utilisateur introuvable</p>
-      <button onClick={() => navigate(-1)} style={{ fontSize: 14, color: 'var(--q-accent)', background: 'none', border: 'none', cursor: 'pointer' }}>Retour</button>
+      <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--q-text)', marginBottom: 8 }}>{t('userProfile.notFound')}</p>
+      <button onClick={() => navigate(-1)} style={{ fontSize: 14, color: 'var(--q-accent)', background: 'none', border: 'none', cursor: 'pointer' }}>{t('common.back')}</button>
     </div>
   );
 
@@ -109,7 +112,7 @@ const UserProfilePage: React.FC = () => {
   const bannerUrl   = resolveUrl(profile.banner);
   const bannerClass = equippedBanner ? (BANNER_CLASSES[equippedBanner.cosmetic.rarity] ?? '') : '';
   const xpInLevel   = profile.xp % 1000;
-  const memberSince = new Date(profile.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  const memberSince = new Date(profile.createdAt).toLocaleDateString(i18n.language, { month: 'long', year: 'numeric' });
 
   return (
     <div style={{ paddingBottom: 100, color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
@@ -156,7 +159,7 @@ const UserProfilePage: React.FC = () => {
             </div>
           )}
           <div style={{ fontSize: 12, color: 'var(--q-text2)', fontWeight: 500, marginTop: 4 }}>
-            Membre depuis {memberSince}
+            {t('userProfile.memberSince', { date: memberSince })}
           </div>
           {profile.bio && (
             <div style={{ fontSize: 13, color: 'var(--q-text2)', marginTop: 8, maxWidth: 320, margin: '8px auto 0' }}>
@@ -167,7 +170,7 @@ const UserProfilePage: React.FC = () => {
             background: 'var(--q-accent-soft)', padding: '6px 14px', borderRadius: 999 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-accent-deep)',
               textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              Niveau {profile.level}
+              {t('userProfile.level', { level: profile.level })}
             </span>
           </div>
 
@@ -181,7 +184,7 @@ const UserProfilePage: React.FC = () => {
                     background: 'linear-gradient(135deg,#A78BFA,#3B82F6)', color: '#fff',
                     boxShadow: '0 6px 18px -4px rgba(167,139,250,0.55)',
                     opacity: friendLoading ? 0.6 : 1 }}>
-                  <UserPlus size={16} /> Ajouter en ami
+                  <UserPlus size={16} /> {t('userProfile.addFriend')}
                 </button>
               )}
               {friendStatus.status === 'PENDING' && friendStatus.isSender && (
@@ -190,7 +193,7 @@ const UserProfilePage: React.FC = () => {
                     borderRadius: 999, border: '2px solid rgba(148,163,184,0.4)', cursor: 'pointer',
                     fontWeight: 700, fontSize: 13, background: 'transparent',
                     color: 'var(--q-text2)', opacity: friendLoading ? 0.6 : 1 }}>
-                  <Clock size={16} /> Demande envoyée
+                  <Clock size={16} /> {t('userProfile.requestSent')}
                 </button>
               )}
               {friendStatus.status === 'PENDING' && !friendStatus.isSender && (
@@ -200,14 +203,14 @@ const UserProfilePage: React.FC = () => {
                       borderRadius: 999, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
                       background: 'linear-gradient(135deg,#34D399,#3B82F6)', color: '#fff',
                       opacity: friendLoading ? 0.6 : 1 }}>
-                    <UserCheck size={16} /> Accepter
+                    <UserCheck size={16} /> {t('userProfile.accept')}
                   </button>
                   <button onClick={removeFriend} disabled={friendLoading}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px',
                       borderRadius: 999, border: '2px solid rgba(239,68,68,0.4)', cursor: 'pointer',
                       fontWeight: 700, fontSize: 13, background: 'transparent',
                       color: '#EF4444', opacity: friendLoading ? 0.6 : 1 }}>
-                    <UserX size={16} /> Refuser
+                    <UserX size={16} /> {t('userProfile.decline')}
                   </button>
                 </div>
               )}
@@ -217,7 +220,7 @@ const UserProfilePage: React.FC = () => {
                     borderRadius: 999, border: '2px solid rgba(52,211,153,0.5)', cursor: 'pointer',
                     fontWeight: 700, fontSize: 13, background: 'rgba(52,211,153,0.1)',
                     color: '#34D399', opacity: friendLoading ? 0.6 : 1 }}>
-                  <UserCheck size={16} /> Amis · Retirer
+                  <UserCheck size={16} /> {t('userProfile.friendsRemove')}
                 </button>
               )}
             </div>
@@ -228,9 +231,9 @@ const UserProfilePage: React.FC = () => {
       {/* ── Stats 3-col ── */}
       <div style={{ padding: '20px 18px 0', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
         {[
-          { value: profile.level,                      label: 'Niveau' },
-          { value: profile._count.challenges,           label: 'Défis' },
-          { value: fmt(profile.xp),                    label: 'XP totale' },
+          { value: profile.level,            label: t('userProfile.statLevel') },
+          { value: profile._count.challenges, label: t('userProfile.statChallenges') },
+          { value: fmt(profile.xp),           label: t('userProfile.statTotalXp') },
         ].map(({ value, label }) => (
           <div key={label} style={{ borderRadius: 22, padding: 14, textAlign: 'center',
             background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
@@ -244,7 +247,7 @@ const UserProfilePage: React.FC = () => {
       {/* ── XP bar ── */}
       <div style={{ padding: '12px 18px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, marginBottom: 5 }}>
-          <span style={{ color: 'var(--q-text3)' }}>Vers le niveau {profile.level + 1}</span>
+          <span style={{ color: 'var(--q-text3)' }}>{t('userProfile.towardsLevel', { level: profile.level + 1 })}</span>
           <span style={{ color: 'var(--q-accent)' }}>{xpInLevel} / 1000 XP</span>
         </div>
         <div style={{ height: 6, borderRadius: 999, background: 'var(--q-accent-soft)' }}>
@@ -257,9 +260,9 @@ const UserProfilePage: React.FC = () => {
       {equippedBadges.length > 0 && (
         <>
           <div style={{ padding: '22px 22px 10px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--q-display)', letterSpacing: -0.2, color: 'var(--q-text)' }}>Badges</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--q-display)', letterSpacing: -0.2, color: 'var(--q-text)' }}>{t('userProfile.badges')}</h2>
             <span style={{ fontSize: 12, color: 'var(--q-text2)', fontWeight: 600 }}>
-              {equippedBadges.length} équipé{equippedBadges.length !== 1 ? 's' : ''}
+              {t('userProfile.badgesEquipped', { count: equippedBadges.length })}
             </span>
           </div>
           <div style={{ padding: '0 18px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
@@ -297,10 +300,10 @@ const UserProfilePage: React.FC = () => {
           </div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--q-text)' }}>
-              {profile._count.challenges} défi{profile._count.challenges !== 1 ? 's' : ''} complété{profile._count.challenges !== 1 ? 's' : ''}
+              {t('userProfile.challengesCompleted', { count: profile._count.challenges })}
             </div>
             <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 1 }}>
-              {fmt(profile.xp)} XP accumulée
+              {t('userProfile.xpAccumulated', { amount: fmt(profile.xp) })}
             </div>
           </div>
         </div>

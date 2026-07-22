@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { Mail, ArrowLeft, Zap } from 'lucide-react';
 import BackButton from '../components/BackButton';
 
 const ForgotPasswordPage: React.FC = () => {
   const { darkMode } = useStore();
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -22,10 +24,10 @@ const ForgotPasswordPage: React.FC = () => {
         body: JSON.stringify({ email }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Une erreur est survenue.');
+      if (!response.ok) throw new Error(data.error || t('auth.genericError'));
       setSent(true);
     } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue.');
+      setError(err.message || t('auth.genericError'));
     } finally {
       setLoading(false);
     }
@@ -85,10 +87,10 @@ const ForgotPasswordPage: React.FC = () => {
             <Zap size={28} color="#fff" aria-hidden="true" />
           </div>
           <div style={{ fontSize: 28, fontFamily: '"DM Serif Display", Georgia, serif', color: titleColor, letterSpacing: -0.5 }}>
-            Mot de passe oublié
+            {t('forgotPassword.title')}
           </div>
           <div style={{ fontSize: 13, color: subColor, marginTop: 4, fontWeight: 500 }}>
-            {sent ? 'Vérifie ta boîte mail' : 'On t\'envoie un lien pour le réinitialiser'}
+            {sent ? t('forgotPassword.checkInbox') : t('forgotPassword.subtitle')}
           </div>
         </div>
 
@@ -100,26 +102,26 @@ const ForgotPasswordPage: React.FC = () => {
             <div>
               <div style={{ padding: '10px 14px', borderRadius: 12, background: successBg,
                 border: `1px solid ${successBorder}`, color: successColor, fontSize: 13, marginBottom: 20 }}>
-                Si un compte existe avec l'adresse <strong>{email}</strong>, un email contenant un lien de réinitialisation vient de lui être envoyé. Le lien est valable 1 heure.
+                <Trans i18nKey="forgotPassword.sentMessage" values={{ email }} components={{ strong: <strong /> }} />
               </div>
               <Link to="/login" style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 color: linkColor, fontWeight: 700, textDecoration: 'none', fontSize: 13,
               }}>
-                <ArrowLeft size={14} aria-hidden="true" /> Retour à la connexion
+                <ArrowLeft size={14} aria-hidden="true" /> {t('forgotPassword.backToLogin')}
               </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <label htmlFor="email" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
-                  Adresse e-mail
+                  {t('auth.email')}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <Mail size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
                   <input
                     id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    required placeholder="ton@email.com" style={inputStyle}
+                    required placeholder="ton@email.com" autoComplete="email" style={inputStyle}
                     onFocus={e => e.currentTarget.style.borderColor = '#A78BFA'}
                     onBlur={e => e.currentTarget.style.borderColor = inputBorder}
                   />
@@ -144,8 +146,8 @@ const ForgotPasswordPage: React.FC = () => {
                   marginTop: 4,
                 }}>
                 {loading
-                  ? <output aria-label="Chargement"><div aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /></output>
-                  : 'Envoyer le lien'
+                  ? <output aria-label={t('common.loading')}><div aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /></output>
+                  : t('forgotPassword.sendLink')
                 }
               </button>
 
@@ -153,7 +155,7 @@ const ForgotPasswordPage: React.FC = () => {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 color: linkColor, fontWeight: 700, textDecoration: 'none', fontSize: 13, marginTop: 4,
               }}>
-                <ArrowLeft size={14} aria-hidden="true" /> Retour à la connexion
+                <ArrowLeft size={14} aria-hidden="true" /> {t('forgotPassword.backToLogin')}
               </Link>
             </form>
           )}

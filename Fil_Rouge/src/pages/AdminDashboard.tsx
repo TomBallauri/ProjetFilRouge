@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { X, Lock, Users, Trophy, Sparkles, ChevronLeft, ChevronDown, Upload } from "lucide-react";
 import { useStore } from "../lib/store";
 import { usePageTitle } from "../hooks/usePageTitle";
@@ -59,12 +60,7 @@ const COSMETIC_TYPES = ['AVATAR_FRAME', 'BANNER', 'BADGE', 'TITLE'];
 const RARITIES = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY'];
 const RARITY_BASE_PRICE: Record<string, number> = { COMMON: 250, RARE: 500, EPIC: 1000, LEGENDARY: 2000 };
 
-const TABS = [
-  { id: 'users', label: 'Utilisateurs', icon: Users },
-  { id: 'challenges', label: 'Défis', icon: Trophy },
-  { id: 'cosmetics', label: 'Cosmétiques', icon: Sparkles },
-] as const;
-type Tab = typeof TABS[number]['id'];
+type Tab = 'users' | 'challenges' | 'cosmetics';
 
 // ── styles partagés (tokens de design de l'appli) ───────────────────────────
 const card: React.CSSProperties = { background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' };
@@ -86,11 +82,12 @@ function Field({ label, children }: Readonly<{ label: string; children: (id: str
   );
 }
 
-function Select({ id, value, onChange, options }: Readonly<{ id: string; value: string; onChange: (v: string) => void; options: readonly string[] }>) {
+function Select({ id, value, onChange, options, labelFor }: Readonly<{ id: string; value: string; onChange: (v: string) => void; options: readonly string[]; labelFor?: (opt: string) => string }>) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const label = (opt: string) => labelFor ? labelFor(opt) : opt;
 
   useEffect(() => {
     if (!open) return;
@@ -126,7 +123,7 @@ function Select({ id, value, onChange, options }: Readonly<{ id: string; value: 
         className={`${inputCls} flex items-center justify-between gap-2`}
         style={inputStyle}
       >
-        <span className="truncate">{value}</span>
+        <span className="truncate">{label(value)}</span>
         <ChevronDown size={16} aria-hidden="true"
           style={{ color: 'var(--q-text3)', flexShrink: 0, transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s ease' }} />
       </button>
@@ -151,7 +148,7 @@ function Select({ id, value, onChange, options }: Readonly<{ id: string; value: 
                   className="w-full text-left px-3 py-2.5 text-sm"
                   style={{ background: selected ? 'var(--q-accent)' : 'transparent', color: selected ? '#fff' : 'var(--q-text)' }}
                 >
-                  {opt}
+                  {label(opt)}
                 </button>
               </li>
             );
@@ -172,18 +169,52 @@ function StatChip({ value, label }: Readonly<{ value: React.ReactNode; label: st
 }
 
 function Modal({ title, onClose, children }: Readonly<{ title: string; onClose: () => void; children: React.ReactNode }>) {
+  const { t } = useTranslation();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    // Sans focus initial dans la modale, Tab continue de naviguer dans la page derrière
+    // l'overlay — et sans piège à focus, Tab finit par en sortir complètement.
+    const focusables = () => Array.from(
+      panelRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      ) ?? []
+    ).filter(el => !el.hasAttribute('disabled'));
+    focusables()[0]?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key !== 'Tab') return;
+      const els = focusables();
+      if (els.length === 0) return;
+      const first = els[0];
+      const last = els[els.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
-      <button type="button" aria-label="Fermer" onClick={onClose}
+      <button type="button" aria-label={t('common.close')} onClick={onClose}
         className="absolute inset-0 w-full h-full cursor-default border-none bg-transparent" />
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
         className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto"
         style={card}
         aria-label={title}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-base" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>{title}</h2>
-          <button onClick={onClose} aria-label="Fermer" className="q-press w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          <button onClick={onClose} aria-label={t('common.close')} className="q-press w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
             style={{ background: 'var(--q-line)', color: 'var(--q-text2)' }}>
             <X size={16} aria-hidden="true" />
           </button>
@@ -195,10 +226,17 @@ function Modal({ title, onClose, children }: Readonly<{ title: string; onClose: 
 }
 
 const AdminDashboard: React.FC = () => {
-  usePageTitle('Admin');
+  const { t } = useTranslation();
+  usePageTitle(t('admin.pageTitle'));
   const navigate = useNavigate();
   const { user } = useStore();
   const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+
+  const TABS = [
+    { id: 'users' as const, label: t('admin.tabs.users'), icon: Users },
+    { id: 'challenges' as const, label: t('admin.tabs.challenges'), icon: Trophy },
+    { id: 'cosmetics' as const, label: t('admin.tabs.cosmetics'), icon: Sparkles },
+  ];
 
   const [tab, setTab] = useState<Tab>("users");
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -225,10 +263,10 @@ const AdminDashboard: React.FC = () => {
       form.append('file', file);
       const res = await fetch('/api/upload', { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form });
       const data = await res.json();
-      if (!res.ok) { showNotif(data.error || "Erreur lors de l'upload", 'error'); return; }
+      if (!res.ok) { showNotif(data.error || t('admin.uploadError'), 'error'); return; }
       setEditingCosmetic(c => ({ ...c, imageUrl: data.url }));
     } catch {
-      showNotif("Erreur lors de l'upload de l'image", 'error');
+      showNotif(t('admin.imageUploadError'), 'error');
     } finally {
       setUploadingImage(false);
     }
@@ -256,11 +294,12 @@ const AdminDashboard: React.FC = () => {
         if (!res.ok) throw new Error(`Échec du chargement de l'onglet ${tab}`);
         setter(await res.json());
       } catch {
-        setError("Impossible de charger ces données.");
+        setError(t('admin.loadError'));
       } finally {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, user]);
 
   const onTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
@@ -274,19 +313,19 @@ const AdminDashboard: React.FC = () => {
 
   // ── Users ──────────────────────────────────────────────────────────────
   const handleDeleteUser = async (id: number) => {
-    if (!globalThis.confirm("Supprimer cet utilisateur ?")) return;
+    if (!globalThis.confirm(t('admin.confirmDeleteUser'))) return;
     const res = await authFetch(`/api/users/${id}`, { method: "DELETE" });
-    if (res.ok) { setUsers(prev => prev.filter(u => u.id !== id)); showNotif('Utilisateur supprimé.', 'success'); }
-    else { const d = await res.json().catch(() => ({})); showNotif(d.error || "Erreur", 'error'); }
+    if (res.ok) { setUsers(prev => prev.filter(u => u.id !== id)); showNotif(t('admin.userDeleted'), 'success'); }
+    else { const d = await res.json().catch(() => ({})); showNotif(d.error || t('admin.error'), 'error'); }
   };
   const handleToggleAdmin = async (u: AdminUser) => {
     const res = await authFetch(`/api/users/${u.id}`, { method: "PUT", body: JSON.stringify({ isAdmin: !u.isAdmin }) });
     const data = await res.json();
     if (data.user) {
       setUsers(prev => prev.map(x => x.id === u.id ? { ...x, isAdmin: data.user.isAdmin } : x));
-      showNotif(data.user.isAdmin ? `${u.username} est maintenant admin.` : `Rôle admin retiré à ${u.username}.`, 'success');
+      showNotif(data.user.isAdmin ? t('admin.nowAdmin', { username: u.username }) : t('admin.adminRemoved', { username: u.username }), 'success');
     } else {
-      showNotif(data.error || "Erreur lors du changement de rôle", 'error');
+      showNotif(data.error || t('admin.roleChangeError'), 'error');
     }
   };
   const handleSaveUser = async () => {
@@ -299,18 +338,18 @@ const AdminDashboard: React.FC = () => {
       }),
     });
     const data = await res.json();
-    if (!res.ok) { showNotif(data.error || "Erreur", 'error'); return; }
+    if (!res.ok) { showNotif(data.error || t('admin.error'), 'error'); return; }
     setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...data.user } : u));
     setEditingUser(null);
-    showNotif('Utilisateur mis à jour.', 'success');
+    showNotif(t('admin.userUpdated'), 'success');
   };
 
   // ── Challenges ─────────────────────────────────────────────────────────
   const handleDeleteChallenge = async (id: number) => {
-    if (!globalThis.confirm("Supprimer ce défi ?")) return;
+    if (!globalThis.confirm(t('admin.confirmDeleteChallenge'))) return;
     const res = await authFetch(`/api/admin/challenges/${id}`, { method: "DELETE" });
-    if (res.ok) { setChallenges(prev => prev.filter(c => c.id !== id)); showNotif('Défi supprimé.', 'success'); }
-    else { const d = await res.json().catch(() => ({})); showNotif(d.error || "Erreur", 'error'); }
+    if (res.ok) { setChallenges(prev => prev.filter(c => c.id !== id)); showNotif(t('admin.challengeDeleted'), 'success'); }
+    else { const d = await res.json().catch(() => ({})); showNotif(d.error || t('admin.error'), 'error'); }
   };
   const handleSaveChallenge = async () => {
     if (!editingChallenge) return;
@@ -318,19 +357,19 @@ const AdminDashboard: React.FC = () => {
     const url = isNew ? '/api/admin/challenges' : `/api/admin/challenges/${editingChallenge.id}`;
     const res = await authFetch(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(editingChallenge) });
     const data = await res.json();
-    if (!res.ok) { showNotif(data.error || "Erreur", 'error'); return; }
+    if (!res.ok) { showNotif(data.error || t('admin.error'), 'error'); return; }
     if (isNew) setChallenges(prev => [data, ...prev]);
     else setChallenges(prev => prev.map(c => c.id === data.id ? { ...c, ...data } : c));
     setEditingChallenge(null);
-    showNotif(isNew ? 'Défi créé.' : 'Défi mis à jour.', 'success');
+    showNotif(isNew ? t('admin.challengeCreated') : t('admin.challengeUpdated'), 'success');
   };
 
   // ── Cosmetics ──────────────────────────────────────────────────────────
   const handleDeleteCosmetic = async (id: number) => {
-    if (!globalThis.confirm("Supprimer ce cosmétique ?")) return;
+    if (!globalThis.confirm(t('admin.confirmDeleteCosmetic'))) return;
     const res = await authFetch(`/api/admin/cosmetics/${id}`, { method: "DELETE" });
-    if (res.ok) { setCosmetics(prev => prev.filter(c => c.id !== id)); showNotif('Cosmétique supprimé.', 'success'); }
-    else { const d = await res.json().catch(() => ({})); showNotif(d.error || "Erreur", 'error'); }
+    if (res.ok) { setCosmetics(prev => prev.filter(c => c.id !== id)); showNotif(t('admin.cosmeticDeleted'), 'success'); }
+    else { const d = await res.json().catch(() => ({})); showNotif(d.error || t('admin.error'), 'error'); }
   };
   const handleSaveCosmetic = async () => {
     if (!editingCosmetic) return;
@@ -338,19 +377,23 @@ const AdminDashboard: React.FC = () => {
     const url = isNew ? '/api/admin/cosmetics' : `/api/admin/cosmetics/${editingCosmetic.id}`;
     const res = await authFetch(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(editingCosmetic) });
     const data = await res.json();
-    if (!res.ok) { showNotif(data.error || "Erreur", 'error'); return; }
+    if (!res.ok) { showNotif(data.error || t('admin.error'), 'error'); return; }
     if (isNew) setCosmetics(prev => [data, ...prev]);
     else setCosmetics(prev => prev.map(c => c.id === data.id ? { ...c, ...data } : c));
     setEditingCosmetic(null);
-    showNotif(isNew ? 'Cosmétique créé.' : 'Cosmétique mis à jour.', 'success');
+    showNotif(isNew ? t('admin.cosmeticCreated') : t('admin.cosmeticUpdated'), 'success');
   };
 
   if (!user?.isAdmin) return null;
 
   const gridCls = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3";
   const emptyMsg = (label: string) => (
-    <p className="text-sm text-center py-12" style={{ color: 'var(--q-text3)' }}>Aucun {label} pour le moment.</p>
+    <p className="text-sm text-center py-12" style={{ color: 'var(--q-text3)' }}>{t('admin.emptyList', { label })}</p>
   );
+  const categoryLabel = (v: string) => t(`common.category.${v}`);
+  const difficultyLabel = (v: string) => t(`common.difficulty.${v.toLowerCase()}`);
+  const cosmeticTypeLabel = (v: string) => t(`shop.type.${v}`);
+  const rarityLabel = (v: string) => t(`common.rarity.${v}`);
 
   return (
     <div style={{ background: 'var(--q-bg)', minHeight: '100vh', fontFamily: 'var(--q-font)', paddingBottom: 40 }}>
@@ -370,22 +413,22 @@ const AdminDashboard: React.FC = () => {
               boxShadow: '0 1px 0 rgba(255,255,255,0.10) inset, 0 4px 14px -2px rgba(167,139,250,0.35)',
               cursor: 'pointer',
             }}
-            aria-label="Retour au profil"
+            aria-label={t('admin.backToProfile')}
           >
             <ChevronLeft size={18} aria-hidden="true" />
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-text3)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              Administration
+              {t('admin.eyebrow')}
             </div>
             <div style={{ fontSize: 22, fontFamily: 'var(--q-display)', color: 'var(--q-text)', fontWeight: 700, letterSpacing: -0.4, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Lock size={18} style={{ color: 'var(--q-accent)' }} aria-hidden="true" /> Dashboard admin
+              <Lock size={18} style={{ color: 'var(--q-accent)' }} aria-hidden="true" /> {t('admin.title')}
             </div>
           </div>
         </div>
 
         {/* ── Tabs : grille de tuiles, tout visible sans scroll ni troncature ── */}
-        <div role="tablist" aria-label="Sections d'administration" className="grid grid-cols-3 gap-2 mb-4">
+        <div role="tablist" aria-label={t('admin.tabsLabel')} className="grid grid-cols-3 gap-2 mb-4">
           {TABS.map(({ id, label, icon: Icon }, idx) => {
             const active = tab === id;
             return (
@@ -416,13 +459,13 @@ const AdminDashboard: React.FC = () => {
 
         {/* ── Contenu ── */}
         <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-          <h2 className="sr-only">{TABS.find(t => t.id === tab)?.label}</h2>
+          <h2 className="sr-only">{TABS.find(x => x.id === tab)?.label}</h2>
 
-          {loading && <PageLoader message="Chargement..." />}
+          {loading && <PageLoader message={t('common.loading')} />}
           {error && <p role="alert" className="text-sm text-center py-6" style={{ color: '#EF4444' }}>{error}</p>}
 
           {!loading && !error && tab === "users" && (
-            users.length === 0 ? emptyMsg('utilisateur') : (
+            users.length === 0 ? emptyMsg(t('admin.userLabel')) : (
               <div className={gridCls}>
                 {users.map((u) => (
                   <div key={u.id} className="rounded-2xl p-4" style={card}>
@@ -433,14 +476,14 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       {u.isAdmin && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 text-white" style={{ background: 'var(--q-accent)' }}>
-                          ADMIN
+                          {t('admin.adminBadge')}
                         </span>
                       )}
                     </div>
                     <div className="flex justify-between gap-2 mb-3">
-                      <StatChip value={u.coins} label="coins" />
-                      <StatChip value={`Niv ${u.level}`} label="niveau" />
-                      <StatChip value={`${u.currentStreak}j`} label="streak" />
+                      <StatChip value={u.coins} label={t('admin.statCoins')} />
+                      <StatChip value={`${t('admin.statLevelAbbrev')} ${u.level}`} label={t('admin.statLevel')} />
+                      <StatChip value={t('common.daysAbbrev', { count: u.currentStreak })} label={t('admin.statStreak')} />
                     </div>
                     <div className="flex gap-2 flex-wrap">
                       <button
@@ -448,25 +491,25 @@ const AdminDashboard: React.FC = () => {
                         style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)' }}
                         onClick={() => setEditingUser(u)}
                       >
-                        Éditer
+                        {t('admin.edit')}
                       </button>
                       <button
                         className={primaryBtn}
                         style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)' }}
                         disabled={u.id === user.id}
-                        title={u.id === user.id ? "Tu ne peux pas changer ton propre rôle" : undefined}
+                        title={u.id === user.id ? t('admin.cannotChangeOwnRole') : undefined}
                         onClick={() => handleToggleAdmin(u)}
                       >
-                        {u.isAdmin ? "Retirer admin" : "Donner admin"}
+                        {u.isAdmin ? t('admin.removeAdmin') : t('admin.makeAdmin')}
                       </button>
                       <button
                         className={primaryBtn}
                         style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
                         disabled={u.id === user.id}
-                        title={u.id === user.id ? "Tu ne peux pas supprimer ton propre compte" : undefined}
+                        title={u.id === user.id ? t('admin.cannotDeleteOwnAccount') : undefined}
                         onClick={() => handleDeleteUser(u.id)}
                       >
-                        Supprimer
+                        {t('admin.delete')}
                       </button>
                     </div>
                   </div>
@@ -485,9 +528,9 @@ const AdminDashboard: React.FC = () => {
                   coinReward: 50, xpReward: 100, isPublic: true, isDefault: false, seriesName: '',
                 })}
               >
-                + Créer un défi
+                + {t('admin.createChallenge')}
               </button>
-              {challenges.length === 0 ? emptyMsg('défi') : (
+              {challenges.length === 0 ? emptyMsg(t('admin.challengeLabel')) : (
                 <div className={gridCls}>
                   {challenges.map((c) => (
                     <div key={c.id} className="rounded-2xl p-4" style={card}>
@@ -495,27 +538,27 @@ const AdminDashboard: React.FC = () => {
                         <div className="min-w-0">
                           <p className="font-bold text-sm truncate" style={{ color: 'var(--q-text)' }}>{c.title}</p>
                           <p className="text-xs truncate" style={{ color: 'var(--q-text2)' }}>
-                            {c.category} · {c.difficulty}{c.seriesName ? ` · ${c.seriesName}` : ''}
+                            {categoryLabel(c.category)} · {difficultyLabel(c.difficulty)}{c.seriesName ? ` · ${c.seriesName}` : ''}
                           </p>
                         </div>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
                           style={{ background: c.isPublic ? 'rgba(52,211,153,0.15)' : 'var(--q-line)', color: c.isPublic ? '#34D399' : 'var(--q-text3)' }}>
-                          {c.isPublic ? 'Public' : 'Privé'}
+                          {c.isPublic ? t('createChallenge.public') : t('createChallenge.private')}
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-xs mb-3" style={{ color: 'var(--q-text2)' }}>
-                        <span>{c.coinReward} coins</span>
+                        <span>{t('createChallenge.coinsAmount', { count: c.coinReward })}</span>
                         <span>{c.xpReward} XP</span>
-                        <span>{c._count?.participants ?? 0} participant{(c._count?.participants ?? 0) > 1 ? 's' : ''}</span>
+                        <span>{t('admin.participantCount', { count: c._count?.participants ?? 0 })}</span>
                       </div>
                       <div className="flex gap-2 flex-wrap">
                         <button className={primaryBtn} style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)' }}
                           onClick={() => setEditingChallenge({ ...c, seriesName: c.seriesName ?? '' })}>
-                          Éditer
+                          {t('admin.edit')}
                         </button>
                         <button className={primaryBtn} style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
                           onClick={() => handleDeleteChallenge(c.id)}>
-                          Supprimer
+                          {t('admin.delete')}
                         </button>
                       </div>
                     </div>
@@ -532,16 +575,16 @@ const AdminDashboard: React.FC = () => {
                 style={{ background: 'var(--q-accent)' }}
                 onClick={() => setEditingCosmetic({ name: '', description: '', type: 'BADGE', imageUrl: '', price: 100, rarity: 'COMMON' })}
               >
-                + Créer un cosmétique
+                + {t('admin.createCosmetic')}
               </button>
-              {cosmetics.length === 0 ? emptyMsg('cosmétique') : (
+              {cosmetics.length === 0 ? emptyMsg(t('admin.cosmeticLabel')) : (
                 <div className={gridCls}>
                   {cosmetics.map((c) => (
                     <div key={c.id} className="rounded-2xl p-4" style={card}>
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="min-w-0">
                           <p className="font-bold text-sm truncate" style={{ color: 'var(--q-text)' }}>{c.name}</p>
-                          <p className="text-xs truncate" style={{ color: 'var(--q-text2)' }}>{c.type} · {c.rarity}</p>
+                          <p className="text-xs truncate" style={{ color: 'var(--q-text2)' }}>{cosmeticTypeLabel(c.type)} · {rarityLabel(c.rarity)}</p>
                         </div>
                         <span className="text-xs font-bold flex-shrink-0" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-mono)' }}>
                           {c.price}💰
@@ -550,11 +593,11 @@ const AdminDashboard: React.FC = () => {
                       <div className="flex gap-2 flex-wrap">
                         <button className={primaryBtn} style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)' }}
                           onClick={() => setEditingCosmetic(c)}>
-                          Éditer
+                          {t('admin.edit')}
                         </button>
                         <button className={primaryBtn} style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
                           onClick={() => handleDeleteCosmetic(c.id)}>
-                          Supprimer
+                          {t('admin.delete')}
                         </button>
                       </div>
                     </div>
@@ -568,28 +611,28 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {editingChallenge && (
-        <Modal title={editingChallenge.id == null ? "Créer un défi" : "Éditer le défi"} onClose={() => setEditingChallenge(null)}>
+        <Modal title={editingChallenge.id == null ? t('admin.createChallenge') : t('admin.editChallenge')} onClose={() => setEditingChallenge(null)}>
           <div className="flex flex-col gap-3">
-            <Field label="Titre">{id => (
+            <Field label={t('createChallenge.titleLabel')}>{id => (
               <input id={id} required className={inputCls} style={inputStyle} value={editingChallenge.title ?? ''}
                 onChange={e => setEditingChallenge(c => ({ ...c, title: e.target.value }))} />
             )}</Field>
-            <Field label="Description">{id => (
+            <Field label={t('createChallenge.descriptionLabel')}>{id => (
               <textarea id={id} required rows={3} className={inputCls} style={inputStyle} value={editingChallenge.description ?? ''}
                 onChange={e => setEditingChallenge(c => ({ ...c, description: e.target.value }))} />
             )}</Field>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Field label="Catégorie">{id => (
-                <Select id={id} value={editingChallenge.category ?? 'OTHERS'} options={CATEGORIES}
+              <Field label={t('createChallenge.categoryLabel')}>{id => (
+                <Select id={id} value={editingChallenge.category ?? 'OTHERS'} options={CATEGORIES} labelFor={categoryLabel}
                   onChange={v => setEditingChallenge(c => ({ ...c, category: v }))} />
               )}</Field>
-              <Field label="Difficulté">{id => (
-                <Select id={id} value={editingChallenge.difficulty ?? 'EASY'} options={DIFFICULTIES}
+              <Field label={t('createChallenge.difficultyLabel')}>{id => (
+                <Select id={id} value={editingChallenge.difficulty ?? 'EASY'} options={DIFFICULTIES} labelFor={difficultyLabel}
                   onChange={v => setEditingChallenge(c => ({ ...c, difficulty: v }))} />
               )}</Field>
             </div>
             <div className="flex gap-3">
-              <Field label="Coins">{id => (
+              <Field label={t('admin.coinsLabel')}>{id => (
                 <input id={id} type="number" min={0} className={inputCls} style={inputStyle} value={editingChallenge.coinReward ?? 0}
                   onChange={e => setEditingChallenge(c => ({ ...c, coinReward: Number(e.target.value) }))} />
               )}</Field>
@@ -598,42 +641,42 @@ const AdminDashboard: React.FC = () => {
                   onChange={e => setEditingChallenge(c => ({ ...c, xpReward: Number(e.target.value) }))} />
               )}</Field>
             </div>
-            <Field label="Nom de série (optionnel)">{id => (
+            <Field label={t('admin.seriesNameLabel')}>{id => (
               <input id={id} className={inputCls} style={inputStyle} value={editingChallenge.seriesName ?? ''}
                 onChange={e => setEditingChallenge(c => ({ ...c, seriesName: e.target.value }))} />
             )}</Field>
             <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--q-text)' }}>
               <input type="checkbox" checked={editingChallenge.isPublic !== false}
                 onChange={e => setEditingChallenge(c => ({ ...c, isPublic: e.target.checked }))} />
-              <span>Public</span>
+              <span>{t('createChallenge.public')}</span>
             </label>
             <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--q-text)' }}>
               <input type="checkbox" checked={!!editingChallenge.isDefault}
                 onChange={e => setEditingChallenge(c => ({ ...c, isDefault: e.target.checked }))} />
-              <span>Défi par défaut (bibliothèque de base)</span>
+              <span>{t('admin.isDefaultChallenge')}</span>
             </label>
             <button className="q-press mt-2 px-4 py-2.5 rounded-2xl font-bold text-sm text-white"
               style={{ background: 'var(--q-accent)' }} onClick={handleSaveChallenge}>
-              Enregistrer
+              {t('common.save')}
             </button>
           </div>
         </Modal>
       )}
 
       {editingCosmetic && (
-        <Modal title={editingCosmetic.id == null ? "Créer un cosmétique" : "Éditer le cosmétique"} onClose={() => setEditingCosmetic(null)}>
+        <Modal title={editingCosmetic.id == null ? t('admin.createCosmetic') : t('admin.editCosmetic')} onClose={() => setEditingCosmetic(null)}>
           <div className="flex flex-col gap-3">
-            <Field label="Nom">{id => (
+            <Field label={t('admin.nameLabel')}>{id => (
               <input id={id} required className={inputCls} style={inputStyle} value={editingCosmetic.name ?? ''}
                 onChange={e => setEditingCosmetic(c => ({ ...c, name: e.target.value }))} />
             )}</Field>
-            <Field label="Description">{id => (
+            <Field label={t('createChallenge.descriptionLabel')}>{id => (
               <textarea id={id} required rows={2} className={inputCls} style={inputStyle} value={editingCosmetic.description ?? ''}
                 onChange={e => setEditingCosmetic(c => ({ ...c, description: e.target.value }))} />
             )}</Field>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Field label="Type">{id => (
-                <Select id={id} value={editingCosmetic.type ?? 'BADGE'} options={COSMETIC_TYPES}
+              <Field label={t('shop.typeLabel')}>{id => (
+                <Select id={id} value={editingCosmetic.type ?? 'BADGE'} options={COSMETIC_TYPES} labelFor={cosmeticTypeLabel}
                   onChange={v => setEditingCosmetic(c => ({
                     ...c, type: v,
                     // Seuls les cadres et bannières affichent une image (voir ShopPage) —
@@ -641,20 +684,20 @@ const AdminDashboard: React.FC = () => {
                     imageUrl: (v === 'AVATAR_FRAME' || v === 'BANNER') ? c?.imageUrl : '',
                   }))} />
               )}</Field>
-              <Field label="Rareté">{id => (
-                <Select id={id} value={editingCosmetic.rarity ?? 'COMMON'} options={RARITIES}
+              <Field label={t('shop.rarityLabel')}>{id => (
+                <Select id={id} value={editingCosmetic.rarity ?? 'COMMON'} options={RARITIES} labelFor={rarityLabel}
                   onChange={v => setEditingCosmetic(c => ({ ...c, rarity: v, price: RARITY_BASE_PRICE[v] ?? c?.price }))} />
               )}</Field>
             </div>
-            <Field label="Prix">{id => (
+            <Field label={t('admin.priceLabel')}>{id => (
               <input id={id} type="number" min={0} className={inputCls} style={inputStyle} value={editingCosmetic.price ?? 0}
                 onChange={e => setEditingCosmetic(c => ({ ...c, price: Number(e.target.value) }))} />
             )}</Field>
             {(editingCosmetic.type === 'AVATAR_FRAME' || editingCosmetic.type === 'BANNER') && (
-              <Field label="Image (optionnel)">{id => {
-                let uploadLabel = 'Choisir une image sur cet ordinateur';
-                if (uploadingImage) uploadLabel = 'Envoi…';
-                else if (editingCosmetic.imageUrl) uploadLabel = "Changer l'image";
+              <Field label={t('admin.imageOptionalLabel')}>{id => {
+                let uploadLabel = t('admin.chooseImage');
+                if (uploadingImage) uploadLabel = t('admin.uploading');
+                else if (editingCosmetic.imageUrl) uploadLabel = t('admin.changeImage');
                 return (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-3">
@@ -686,7 +729,7 @@ const AdminDashboard: React.FC = () => {
                   {editingCosmetic.imageUrl && (
                     <button type="button" onClick={() => setEditingCosmetic(c => ({ ...c, imageUrl: '' }))}
                       className="text-xs font-semibold self-start underline" style={{ color: 'var(--q-text3)' }}>
-                      Retirer l'image
+                      {t('admin.removeImage')}
                     </button>
                   )}
                 </div>
@@ -695,16 +738,16 @@ const AdminDashboard: React.FC = () => {
             )}
             <button className="q-press mt-2 px-4 py-2.5 rounded-2xl font-bold text-sm text-white"
               style={{ background: 'var(--q-accent)' }} onClick={handleSaveCosmetic}>
-              Enregistrer
+              {t('common.save')}
             </button>
           </div>
         </Modal>
       )}
 
       {editingUser && (
-        <Modal title={`Éditer ${editingUser.username}`} onClose={() => setEditingUser(null)}>
+        <Modal title={t('admin.editUserTitle', { username: editingUser.username })} onClose={() => setEditingUser(null)}>
           <div className="flex flex-col gap-3">
-            <Field label="Coins">{id => (
+            <Field label={t('admin.coinsLabel')}>{id => (
               <input id={id} type="number" min={0} className={inputCls} style={inputStyle} value={editingUser.coins ?? 0}
                 onChange={e => setEditingUser(u => ({ ...u, coins: Number(e.target.value) }))} />
             )}</Field>
@@ -713,18 +756,18 @@ const AdminDashboard: React.FC = () => {
                 <input id={id} type="number" min={0} className={inputCls} style={inputStyle} value={editingUser.xp ?? 0}
                   onChange={e => setEditingUser(u => ({ ...u, xp: Number(e.target.value) }))} />
               )}</Field>
-              <Field label="Niveau">{id => (
+              <Field label={t('admin.statLevel')}>{id => (
                 <input id={id} type="number" min={1} className={inputCls} style={inputStyle} value={editingUser.level ?? 1}
                   onChange={e => setEditingUser(u => ({ ...u, level: Number(e.target.value) }))} />
               )}</Field>
             </div>
-            <Field label="Streak (jours)">{id => (
+            <Field label={t('admin.streakDaysLabel')}>{id => (
               <input id={id} type="number" min={0} className={inputCls} style={inputStyle} value={editingUser.currentStreak ?? 0}
                 onChange={e => setEditingUser(u => ({ ...u, currentStreak: Number(e.target.value) }))} />
             )}</Field>
             <button className="q-press mt-2 px-4 py-2.5 rounded-2xl font-bold text-sm text-white"
               style={{ background: 'var(--q-accent)' }} onClick={handleSaveUser}>
-              Enregistrer
+              {t('common.save')}
             </button>
           </div>
         </Modal>

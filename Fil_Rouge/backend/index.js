@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { prisma } from './src/lib/prisma.js';
 
 import authRoutes from './src/routes/auth.routes.js';
@@ -20,7 +21,14 @@ const app = express();
 // req.ip ne reflète pas la vraie IP du client. On ne fait confiance qu'au premier hop (le
 // load balancer de Render), pas à une chaîne arbitraire fournie par le client.
 app.set('trust proxy', 1);
+// Évite d'annoncer la stack au monde entier — helmet seul ne suffit pas ici, Express
+// réécrit l'en-tête après coup si ce réglage n'est pas désactivé au niveau de l'app.
+app.disable('x-powered-by');
 
+// Front et back sont toujours joints via un rewrite (Vercel en prod, le proxy Vite en dev) :
+// vu du navigateur c'est du same-origin, donc les réglages par défaut (dont
+// Cross-Origin-Resource-Policy: same-origin) n'empêchent pas de charger les avatars/bannières.
+app.use(helmet());
 app.use(cors());
 app.use(express.json());
 // express.json() laisse req.body à `undefined` (au lieu de `{}`) quand la requête

@@ -182,7 +182,7 @@ router.post('/api/users/me/cosmetics/:id/equip', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('[equip]', error);
-    res.status(400).json({ error: String(error?.message ?? "Erreur lors de l'équipement") });
+    res.status(400).json({ error: "Erreur lors de l'équipement" });
   }
 });
 

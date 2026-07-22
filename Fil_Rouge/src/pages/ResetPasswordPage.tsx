@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { Eye, EyeOff, Lock, Zap } from 'lucide-react';
 import BackButton from '../components/BackButton';
@@ -10,6 +11,7 @@ const ResetPasswordPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
   const { darkMode } = useStore();
+  const { t } = useTranslation();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -19,9 +21,9 @@ const ResetPasswordPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!token) { setError('Lien invalide — le token est manquant.'); return; }
-    if (!isStrongPassword(password)) { setError(`Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}`); return; }
-    if (password !== confirmPassword) { setError('Les deux mots de passe ne correspondent pas.'); return; }
+    if (!token) { setError(t('resetPassword.invalidToken')); return; }
+    if (!isStrongPassword(password)) { setError(`${t('auth.weakPassword')} ${PASSWORD_REQUIREMENTS_TEXT}`); return; }
+    if (password !== confirmPassword) { setError(t('resetPassword.passwordsDontMatch')); return; }
 
     setLoading(true);
     try {
@@ -31,10 +33,10 @@ const ResetPasswordPage: React.FC = () => {
         body: JSON.stringify({ token, password }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Une erreur est survenue.');
+      if (!response.ok) throw new Error(data.error || t('auth.genericError'));
       navigate('/login', { state: { resetSuccess: true } });
     } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue.');
+      setError(err.message || t('auth.genericError'));
     } finally {
       setLoading(false);
     }
@@ -91,10 +93,10 @@ const ResetPasswordPage: React.FC = () => {
             <Zap size={28} color="#fff" aria-hidden="true" />
           </div>
           <div style={{ fontSize: 28, fontFamily: '"DM Serif Display", Georgia, serif', color: titleColor, letterSpacing: -0.5 }}>
-            Nouveau mot de passe
+            {t('resetPassword.title')}
           </div>
           <div style={{ fontSize: 13, color: subColor, marginTop: 4, fontWeight: 500 }}>
-            Choisis un mot de passe pour ton compte
+            {t('resetPassword.subtitle')}
           </div>
         </div>
 
@@ -106,17 +108,17 @@ const ResetPasswordPage: React.FC = () => {
             <div>
               <div style={{ padding: '10px 14px', borderRadius: 12, background: errorBg,
                 border: `1px solid ${errorBorder}`, color: errorColor, fontSize: 13, marginBottom: 20 }}>
-                Ce lien de réinitialisation est invalide. Demande-en un nouveau depuis la page de connexion.
+                {t('resetPassword.linkInvalid')}
               </div>
               <Link to="/forgot-password" style={{ color: linkColor, fontWeight: 700, textDecoration: 'none', fontSize: 13 }}>
-                Demander un nouveau lien
+                {t('resetPassword.requestNewLink')}
               </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <label htmlFor="password" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
-                  Nouveau mot de passe
+                  {t('resetPassword.newPassword')}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <Lock size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
@@ -128,7 +130,7 @@ const ResetPasswordPage: React.FC = () => {
                     onBlur={e => e.currentTarget.style.borderColor = inputBorder}
                   />
                   <button type="button" onClick={() => setShowPassword(p => !p)}
-                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                    aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                     style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
                       background: 'none', border: 'none', cursor: 'pointer', color: iconColor, padding: 2, display: 'flex' }}>
                     {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
@@ -141,7 +143,7 @@ const ResetPasswordPage: React.FC = () => {
 
               <div>
                 <label htmlFor="confirmPassword" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
-                  Confirme le mot de passe
+                  {t('resetPassword.confirmPassword')}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <Lock size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
@@ -173,8 +175,8 @@ const ResetPasswordPage: React.FC = () => {
                   marginTop: 4,
                 }}>
                 {loading
-                  ? <output aria-label="Chargement"><div aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /></output>
-                  : 'Réinitialiser le mot de passe'
+                  ? <output aria-label={t('common.loading')}><div aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /></output>
+                  : t('resetPassword.submit')
                 }
               </button>
             </form>

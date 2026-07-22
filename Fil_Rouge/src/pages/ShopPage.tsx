@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, CheckCircle, SlidersHorizontal, Search, X, CircleDollarSign, Frame, PanelTop, Award, Tag, Package } from 'lucide-react';
@@ -20,18 +21,20 @@ type Cosmetic = {
 
 type UserCosmetic = { cosmeticId: number };
 
-const RARITY: Record<string, { label: string; color: string; bg: string; border: string; glow: string }> = {
-  COMMON:    { label: 'Commun',     color: 'text-gray-500 dark:text-gray-400',    bg: 'bg-gray-100 dark:bg-gray-700',          border: 'border-gray-300 dark:border-gray-600', glow: '' },
-  RARE:      { label: 'Rare',       color: 'text-blue-600 dark:text-blue-400',    bg: 'bg-blue-50 dark:bg-blue-900/20',         border: 'border-blue-400',                      glow: 'hover:shadow-blue-200 dark:hover:shadow-blue-900' },
-  EPIC:      { label: 'Épique',     color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20',    border: 'border-purple-400',                    glow: 'hover:shadow-purple-200 dark:hover:shadow-purple-900' },
-  LEGENDARY: { label: 'Légendaire', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20',   border: 'border-yellow-400',                    glow: 'hover:shadow-yellow-200 dark:hover:shadow-yellow-900' },
+// Le libellé affiché vient de common.rarity.<clé> / shop.type.<clé> (voir usages ci-dessous),
+// pour rester traduisible — seule la présentation (couleurs, icônes) reste ici.
+const RARITY: Record<string, { color: string; bg: string; border: string; glow: string }> = {
+  COMMON:    { color: 'text-gray-500 dark:text-gray-400',    bg: 'bg-gray-100 dark:bg-gray-700',          border: 'border-gray-300 dark:border-gray-600', glow: '' },
+  RARE:      { color: 'text-blue-600 dark:text-blue-400',    bg: 'bg-blue-50 dark:bg-blue-900/20',         border: 'border-blue-400',                      glow: 'hover:shadow-blue-200 dark:hover:shadow-blue-900' },
+  EPIC:      { color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20',    border: 'border-purple-400',                    glow: 'hover:shadow-purple-200 dark:hover:shadow-purple-900' },
+  LEGENDARY: { color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20',   border: 'border-yellow-400',                    glow: 'hover:shadow-yellow-200 dark:hover:shadow-yellow-900' },
 };
 
-const TYPE: Record<string, { label: string; icon: LucideIcon }> = {
-  AVATAR_FRAME: { label: "Cadre d'avatar", icon: Frame },
-  BANNER:       { label: 'Bannière',        icon: PanelTop },
-  BADGE:        { label: 'Badge',           icon: Award },
-  TITLE:        { label: 'Titre',           icon: Tag },
+const TYPE: Record<string, { icon: LucideIcon }> = {
+  AVATAR_FRAME: { icon: Frame },
+  BANNER:       { icon: PanelTop },
+  BADGE:        { icon: Award },
+  TITLE:        { icon: Tag },
 };
 
 const RARITIES = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY'];
@@ -128,25 +131,27 @@ type CosmeticCardProps = {
 };
 
 const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, canAfford, isLoading, user, darkMode, card, onBuy, onLogin }) => {
+  const { t } = useTranslation();
   const r = RARITY[cosmetic.rarity] ?? RARITY.COMMON;
-  const t = TYPE[cosmetic.type] ?? { label: cosmetic.type, icon: Package };
+  const typeMeta = TYPE[cosmetic.type] ?? { icon: Package };
+  const typeLabel = TYPE[cosmetic.type] ? t(`shop.type.${cosmetic.type}`) : cosmetic.type;
 
   const actionZone = () => {
     if (alreadyOwned) return (
       <div className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs font-bold">
-        <CheckCircle size={13} aria-hidden="true" /> Possédé
+        <CheckCircle size={13} aria-hidden="true" /> {t('shop.owned')}
       </div>
     );
     if (!user) return (
       <button onClick={onLogin} className="w-full py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors active:scale-95">
-        Connexion
+        {t('shop.login')}
       </button>
     );
     const btnColor = canAfford ? 'bg-pink-600 hover:bg-pink-700' : 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed';
     return (
       <button onClick={() => onBuy(cosmetic)} disabled={!canAfford || isLoading}
         className={`w-full py-1.5 rounded-lg text-white text-xs font-bold transition-all active:scale-95 ${btnColor} disabled:opacity-60`}>
-        {isLoading ? '...' : canAfford ? 'Acheter' : 'Insuffisant'}
+        {isLoading ? '...' : canAfford ? t('shop.buy') : t('shop.insufficient')}
       </button>
     );
   };
@@ -154,13 +159,13 @@ const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, can
   return (
     <div className={`${card} border-2 ${r.border} ${r.glow} rounded-xl p-3 flex flex-col gap-2 hover:shadow-lg transition-all duration-200`}>
       <div className="flex items-center justify-between">
-        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.bg} ${r.color}`}>{r.label}</span>
-        <t.icon size={16} aria-hidden="true" />
+        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.bg} ${r.color}`}>{t(`common.rarity.${cosmetic.rarity}`)}</span>
+        <typeMeta.icon size={16} aria-hidden="true" />
       </div>
       <CosmeticPreview cosmetic={cosmetic} />
       <div className="text-center">
         <p className="font-bold text-sm leading-tight">{cosmetic.name}</p>
-        <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t.label}</p>
+        <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{typeLabel}</p>
       </div>
       <div className={`pt-2 border-t ${darkMode ? 'border-gray-700' : 'border-gray-100'} mt-auto`}>
         <div className="flex items-center justify-between mb-1.5">
@@ -176,7 +181,8 @@ const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, can
 };
 
 const ShopPage: React.FC = () => {
-  usePageTitle('Boutique');
+  const { t, i18n } = useTranslation();
+  usePageTitle(t('shop.pageTitle'));
   const { user, setUser, darkMode } = useStore();
   const navigate = useNavigate();
   const [cosmetics, setCosmetics] = useState<Cosmetic[]>([]);
@@ -214,15 +220,15 @@ const ShopPage: React.FC = () => {
 
   const handleBuy = async (c: Cosmetic) => {
     if (!user) { navigate('/login'); return; }
-    if ((user.coins ?? 0) < c.price) { showNotif(`Il te manque ${c.price - (user.coins ?? 0)} coins !`, 'error'); return; }
+    if ((user.coins ?? 0) < c.price) { showNotif(t('shop.missingCoins', { amount: c.price - (user.coins ?? 0) }), 'error'); return; }
     setBuyLoading(c.id);
     try {
       const res = await fetch(`/api/cosmetics/${c.id}/buy`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
       const data = await res.json();
-      if (!res.ok) { showNotif(data.error || 'Erreur', 'error'); return; }
+      if (!res.ok) { showNotif(data.error || t('shop.error'), 'error'); return; }
       if (data.user) setUser(data.user);
       await fetchOwned();
-      showNotif(`"${c.name}" acheté ! -${c.price} 🪙`, 'success');
+      showNotif(t('shop.purchased', { name: c.name, price: c.price }), 'success');
     } finally { setBuyLoading(null); }
   };
 
@@ -249,10 +255,10 @@ const ShopPage: React.FC = () => {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
               <ShoppingBag className="text-pink-500" size={26} aria-hidden="true" />
-              Boutique
+              {t('shop.pageTitle')}
             </h1>
             <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              Dépense tes coins pour te démarquer
+              {t('shop.subtitle')}
             </p>
           </div>
         </div>
@@ -263,7 +269,7 @@ const ShopPage: React.FC = () => {
             padding: '7px 12px', borderRadius: 999, fontWeight: 700, fontSize: 13,
             fontVariantNumeric: 'tabular-nums',
             boxShadow: '0 4px 12px rgba(251,146,60,0.40)' }}>
-            <CircleDollarSign size={14} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString('fr')}
+            <CircleDollarSign size={14} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString(i18n.language)}
           </div>
         )}
       </div>
@@ -275,12 +281,12 @@ const ShopPage: React.FC = () => {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher un article..."
-            aria-label="Rechercher un article"
+            placeholder={t('shop.searchPlaceholder')}
+            aria-label={t('shop.searchPlaceholder')}
             className={`flex-1 bg-transparent text-sm outline-none min-w-0 ${darkMode ? 'placeholder-gray-500' : 'placeholder-gray-400'}`}
           />
           {search && (
-            <button onClick={() => setSearch('')} aria-label="Effacer la recherche" className="text-gray-400 hover:text-gray-600">
+            <button onClick={() => setSearch('')} aria-label={t('shop.clearSearch')} className="text-gray-400 hover:text-gray-600">
               <X size={14} aria-hidden="true" />
             </button>
           )}
@@ -290,7 +296,7 @@ const ShopPage: React.FC = () => {
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold flex-shrink-0 transition-colors ${filterBtnClass}`}
         >
           <SlidersHorizontal size={14} aria-hidden="true" />
-          Filtres{activeFilters > 0 && ` (${activeFilters})`}
+          {t('shop.filters')}{activeFilters > 0 && ` (${activeFilters})`}
         </button>
       </div>
 
@@ -298,36 +304,36 @@ const ShopPage: React.FC = () => {
       {filtersOpen && (
         <div className={`${card} border rounded-xl p-3 mb-3 space-y-3`}>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">Type</p>
+            <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">{t('shop.typeLabel')}</p>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setFilterType('')}
                 className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterType ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                Tous
+                {t('shop.allTypes')}
               </button>
-              {TYPES.map(t => {
-                const TypeIcon = TYPE[t]?.icon ?? Package;
+              {TYPES.map(ty => {
+                const TypeIcon = TYPE[ty]?.icon ?? Package;
                 return (
-                  <button key={t} onClick={() => setFilterType(t === filterType ? '' : t)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterType === t ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                    <TypeIcon size={13} aria-hidden="true" /> {TYPE[t]?.label}
+                  <button key={ty} onClick={() => setFilterType(ty === filterType ? '' : ty)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterType === ty ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    <TypeIcon size={13} aria-hidden="true" /> {t(`shop.type.${ty}`)}
                   </button>
                 );
               })}
             </div>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">Rareté</p>
+            <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">{t('shop.rarityLabel')}</p>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setFilterRarity('')}
                 className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterRarity ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                Toutes
+                {t('shop.allRarities')}
               </button>
               {RARITIES.map(r => {
                 const cfg = RARITY[r];
                 return (
                   <button key={r} onClick={() => setFilterRarity(r === filterRarity ? '' : r)}
                     className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterRarity === r ? `${cfg.bg} ${cfg.color} border ${cfg.border}` : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                    {cfg.label}
+                    {t(`common.rarity.${r}`)}
                   </button>
                 );
               })}
@@ -337,11 +343,11 @@ const ShopPage: React.FC = () => {
       )}
 
       {loading ? (
-        <PageLoader message="Chargement de la boutique..." />
+        <PageLoader message={t('shop.loading')} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <ShoppingBag size={44} className="mx-auto mb-3 opacity-30" aria-hidden="true" />
-          <p>Aucun article disponible.</p>
+          <p>{t('shop.noItems')}</p>
         </div>
       ) : (
         <div data-tour="shop-items" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

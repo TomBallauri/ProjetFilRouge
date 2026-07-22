@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { Eye, EyeOff, Mail, Lock, User, Zap } from 'lucide-react';
 import BackButton from '../components/BackButton';
@@ -11,6 +12,7 @@ type AuthMode = 'login' | 'register';
 const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const resetSuccess = !!(location.state as { resetSuccess?: boolean } | null)?.resetSuccess;
   const { setUser, darkMode, applyServerSettings } = useStore();
   const [email, setEmail] = useState('');
@@ -24,7 +26,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
     e.preventDefault();
     setError(null);
     if (mode === 'register' && !isStrongPassword(password)) {
-      setError(`Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}`);
+      setError(`${t('auth.weakPassword')} ${PASSWORD_REQUIREMENTS_TEXT}`);
       return;
     }
     setLoading(true);
@@ -40,20 +42,20 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
       });
       const isJson = response.headers.get('content-type')?.includes('application/json');
       const data = isJson ? await response.json() : {};
-      if (!response.ok) throw new Error(data.error || (mode === 'register' ? "Échec de l'inscription" : 'Échec de la connexion'));
+      if (!response.ok) throw new Error(data.error || (mode === 'register' ? t('auth.registerFailed') : t('auth.loginFailed')));
       if (data.token) localStorage.setItem('token', data.token);
       setUser(data.user);
       applyServerSettings(data.user?.settings);
       navigate('/', mode === 'register' ? { state: { showOnboarding: true } } : undefined);
     } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue.');
+      setError(err.message || t('auth.genericError'));
     } finally {
       setLoading(false);
     }
   };
 
   const isLogin = mode === 'login';
-  const submitLabel = isLogin ? 'Se connecter' : 'Créer mon compte';
+  const submitLabel = isLogin ? t('auth.login') : t('auth.createAccount');
 
   const dk = darkMode;
 
@@ -117,10 +119,10 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
             <Zap size={28} color="#fff" aria-hidden="true" />
           </div>
           <div style={{ fontSize: 28, fontFamily: '"DM Serif Display", Georgia, serif', color: titleColor, letterSpacing: -0.5 }}>
-            {isLogin ? 'Content de te revoir' : "Rejoins l'aventure"}
+            {isLogin ? t('auth.welcomeBack') : t('auth.joinAdventure')}
           </div>
           <div style={{ fontSize: 13, color: subColor, marginTop: 4, fontWeight: 500 }}>
-            {isLogin ? 'Connecte-toi à ton compte' : 'Crée ton compte gratuitement'}
+            {isLogin ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}
           </div>
         </div>
 
@@ -135,13 +137,13 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
             {!isLogin && (
               <div>
                 <label htmlFor="name" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
-                  Pseudo
+                  {t('auth.username')}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <User size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
                   <input
                     id="name" type="text" value={name} onChange={e => setName(e.target.value)}
-                    placeholder="Ton pseudo" style={inputStyle}
+                    placeholder={t('auth.usernamePlaceholder')} style={inputStyle}
                     onFocus={e => e.currentTarget.style.borderColor = '#A78BFA'}
                     onBlur={e => e.currentTarget.style.borderColor = inputBorder}
                   />
@@ -152,13 +154,13 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
             {/* Email */}
             <div>
               <label htmlFor="email" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
-                Adresse e-mail
+                {t('auth.email')}
               </label>
               <div style={{ position: 'relative' }}>
                 <Mail size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
                 <input
                   id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  required placeholder="ton@email.com" style={inputStyle}
+                  required placeholder="ton@email.com" autoComplete="email" style={inputStyle}
                   onFocus={e => e.currentTarget.style.borderColor = '#A78BFA'}
                   onBlur={e => e.currentTarget.style.borderColor = inputBorder}
                 />
@@ -168,7 +170,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
             {/* Password */}
             <div>
               <label htmlFor="password" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
-                Mot de passe
+                {t('auth.password')}
               </label>
               <div style={{ position: 'relative' }}>
                 <Lock size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
@@ -181,7 +183,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
                   onBlur={e => e.currentTarget.style.borderColor = inputBorder}
                 />
                 <button type="button" onClick={() => setShowPassword(p => !p)}
-                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                   style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
                     background: 'none', border: 'none', cursor: 'pointer', color: iconColor, padding: 2, display: 'flex' }}>
                   {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
@@ -195,7 +197,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
               {isLogin && (
                 <div style={{ textAlign: 'right', marginTop: 6 }}>
                   <Link to="/forgot-password" style={{ color: linkColor, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-                    Mot de passe oublié ?
+                    {t('auth.forgotPassword')}
                   </Link>
                 </div>
               )}
@@ -205,7 +207,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
             {isLogin && resetSuccess && (
               <div role="status" style={{ padding: '10px 14px', borderRadius: 12, background: successBg,
                 border: `1px solid ${successBorder}`, color: successColor, fontSize: 13 }}>
-                Mot de passe mis à jour. Tu peux te connecter.
+                {t('auth.passwordResetSuccess')}
               </div>
             )}
 
@@ -229,7 +231,7 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
                 marginTop: 4,
               }}>
               {loading
-                ? <output aria-label="Chargement"><div aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /></output>
+                ? <output aria-label={t('common.loading')}><div aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /></output>
                 : submitLabel
               }
             </button>
@@ -238,12 +240,12 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
           {/* Switch mode */}
           <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: switchColor }}>
             {isLogin ? (
-              <>Pas encore de compte ?{' '}
-                <Link to="/register" style={{ color: linkColor, fontWeight: 700, textDecoration: 'none' }}>S'inscrire</Link>
+              <>{t('auth.noAccount')}{' '}
+                <Link to="/register" style={{ color: linkColor, fontWeight: 700, textDecoration: 'none' }}>{t('auth.register')}</Link>
               </>
             ) : (
-              <>Déjà un compte ?{' '}
-                <Link to="/login" style={{ color: linkColor, fontWeight: 700, textDecoration: 'none' }}>Se connecter</Link>
+              <>{t('auth.hasAccount')}{' '}
+                <Link to="/login" style={{ color: linkColor, fontWeight: 700, textDecoration: 'none' }}>{t('auth.login')}</Link>
               </>
             )}
           </div>

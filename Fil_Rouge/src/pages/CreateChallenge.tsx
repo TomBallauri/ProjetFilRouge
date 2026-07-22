@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -8,34 +9,39 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-// ── Category meta (icon + gradient + glow) ────────────────────────────────────
-const CAT_META: Record<string, { label: string; grad: string; glow: string; Icon: LucideIcon }> = {
-  GAMING:     { label: 'Gaming',     grad: 'linear-gradient(135deg,#A78BFA,#EC4899)', glow: 'rgba(167,139,250,0.55)', Icon: Gamepad2 },
-  SPORT:      { label: 'Sport',      grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.55)',  Icon: Activity },
-  CUISINE:    { label: 'Cuisine',    grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(251,146,60,0.55)',  Icon: UtensilsCrossed },
-  FITNESS:    { label: 'Fitness',    grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.55)',  Icon: Dumbbell },
-  CREATIVITY: { label: 'Créativité', grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.55)',  Icon: Palette },
-  KNOWLEDGE:  { label: 'Savoir',     grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.55)',  Icon: BookOpen },
-  SOCIAL:     { label: 'Social',     grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(250,204,21,0.55)',  Icon: Users },
-  NATURE:     { label: 'Nature',     grad: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.55)',  Icon: Leaf },
-  MUSIC:      { label: 'Musique',    grad: 'linear-gradient(135deg,#F472B6,#A78BFA)', glow: 'rgba(244,114,182,0.55)', Icon: Music },
-  WELLNESS:   { label: 'Bien-être',  grad: 'linear-gradient(135deg,#6EE7B7,#3B82F6)', glow: 'rgba(110,231,183,0.55)', Icon: Heart },
-  DIY:        { label: 'DIY',        grad: 'linear-gradient(135deg,#FB923C,#D97706)', glow: 'rgba(251,146,60,0.55)',  Icon: Wrench },
-  OTHERS:     { label: 'Autres',     grad: 'linear-gradient(135deg,#94A3B8,#64748B)', glow: 'rgba(148,163,184,0.55)', Icon: LayoutGrid },
+// ── Category meta (icon + gradient + glow) — le libellé affiché vient de
+// common.category.<clé> (voir CatTile), pour rester traduisible. ──────────────
+const CAT_META: Record<string, { grad: string; glow: string; Icon: LucideIcon }> = {
+  GAMING:     { grad: 'linear-gradient(135deg,#A78BFA,#EC4899)', glow: 'rgba(167,139,250,0.55)', Icon: Gamepad2 },
+  SPORT:      { grad: 'linear-gradient(135deg,#34D399,#38BDF8)', glow: 'rgba(52,211,153,0.55)',  Icon: Activity },
+  CUISINE:    { grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(251,146,60,0.55)',  Icon: UtensilsCrossed },
+  FITNESS:    { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.55)',  Icon: Dumbbell },
+  CREATIVITY: { grad: 'linear-gradient(135deg,#EC4899,#A78BFA)', glow: 'rgba(236,72,153,0.55)',  Icon: Palette },
+  KNOWLEDGE:  { grad: 'linear-gradient(135deg,#38BDF8,#A78BFA)', glow: 'rgba(56,189,248,0.55)',  Icon: BookOpen },
+  SOCIAL:     { grad: 'linear-gradient(135deg,#FACC15,#FB923C)', glow: 'rgba(250,204,21,0.55)',  Icon: Users },
+  NATURE:     { grad: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.55)',  Icon: Leaf },
+  MUSIC:      { grad: 'linear-gradient(135deg,#F472B6,#A78BFA)', glow: 'rgba(244,114,182,0.55)', Icon: Music },
+  WELLNESS:   { grad: 'linear-gradient(135deg,#6EE7B7,#3B82F6)', glow: 'rgba(110,231,183,0.55)', Icon: Heart },
+  DIY:        { grad: 'linear-gradient(135deg,#FB923C,#D97706)', glow: 'rgba(251,146,60,0.55)',  Icon: Wrench },
+  OTHERS:     { grad: 'linear-gradient(135deg,#94A3B8,#64748B)', glow: 'rgba(148,163,184,0.55)', Icon: LayoutGrid },
 };
 
+// Idem : le libellé vient de common.difficulty.<value en minuscule>.
 const DIFFICULTIES = [
-  { value: 'EASY',   label: 'Facile',    coins: 50,  xp: 100,  border: 'border-green-400',  bg: 'bg-green-50 dark:bg-green-900/20',   text: 'text-green-600 dark:text-green-400' },
-  { value: 'MEDIUM', label: 'Moyen',     coins: 150, xp: 300,  border: 'border-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20', text: 'text-yellow-600 dark:text-yellow-400' },
-  { value: 'HARD',   label: 'Difficile', coins: 350, xp: 700,  border: 'border-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-600 dark:text-orange-400' },
-  { value: 'EXPERT', label: 'Expert',    coins: 700, xp: 1500, border: 'border-red-400',    bg: 'bg-red-50 dark:bg-red-900/20',       text: 'text-red-600 dark:text-red-400' },
+  { value: 'EASY',   coins: 50,  xp: 100,  border: 'border-green-400',  bg: 'bg-green-50 dark:bg-green-900/20',   text: 'text-green-600 dark:text-green-400' },
+  { value: 'MEDIUM', coins: 150, xp: 300,  border: 'border-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20', text: 'text-yellow-600 dark:text-yellow-400' },
+  { value: 'HARD',   coins: 350, xp: 700,  border: 'border-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-600 dark:text-orange-400' },
+  { value: 'EXPERT', coins: 700, xp: 1500, border: 'border-red-400',    bg: 'bg-red-50 dark:bg-red-900/20',       text: 'text-red-600 dark:text-red-400' },
 ];
 
-type ChallengeForm = { title: string; description: string; category: string; difficulty: string };
-const emptyChallenge = (): ChallengeForm => ({ title: '', description: '', category: 'GAMING', difficulty: 'MEDIUM' });
+// L'id est purement local (clé React stable pour que supprimer une carte au milieu de la
+// liste ne mélange pas l'état des cartes suivantes) — jamais envoyé au serveur, voir handleSubmit.
+type ChallengeForm = { id: string; title: string; description: string; category: string; difficulty: string };
+const emptyChallenge = (): ChallengeForm => ({ id: crypto.randomUUID(), title: '', description: '', category: 'GAMING', difficulty: 'MEDIUM' });
 
 // ── Category icon tile ─────────────────────────────────────────────────────────
 function CatTile({ value, selected, onClick }: { value: string; selected: boolean; onClick: () => void }) {
+  const { t } = useTranslation();
   const meta = CAT_META[value];
   const Icon = meta.Icon;
   return (
@@ -64,7 +70,7 @@ function CatTile({ value, selected, onClick }: { value: string; selected: boolea
       <span className={`text-[10px] font-semibold text-center leading-tight transition-colors ${
         selected ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
       }`}>
-        {meta.label}
+        {t(`common.category.${value}`)}
       </span>
     </button>
   );
@@ -78,6 +84,7 @@ function ChallengeCard({
   index: number; total: number; data: ChallengeForm; darkMode: boolean;
   onChange: (f: ChallengeForm) => void; onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   const diff = DIFFICULTIES.find(d => d.value === data.difficulty)!;
   const inputClass = `w-full px-3 py-2.5 rounded-xl border outline-none text-sm transition-colors
     ${darkMode
@@ -89,7 +96,7 @@ function ChallengeCard({
       {/* Card header */}
       <div className="flex items-center justify-between">
         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>
-          Défi {index + 1}
+          {t('createChallenge.challengeNumber', { number: index + 1 })}
         </span>
         {total > 1 && (
           <button type="button" onClick={onRemove}
@@ -101,26 +108,26 @@ function ChallengeCard({
 
       {/* Titre */}
       <div data-tour="create-title">
-        <label className="block text-xs font-semibold mb-1 opacity-70">Titre</label>
+        <label className="block text-xs font-semibold mb-1 opacity-70">{t('createChallenge.titleLabel')}</label>
         <input type="text" maxLength={80} value={data.title}
           onChange={e => onChange({ ...data, title: e.target.value })}
-          placeholder={total > 1 ? `Ex: Jour ${index + 1}: Courir 5km` : "Ex: Courir 5km sans s'arrêter"}
+          placeholder={total > 1 ? t('createChallenge.titlePlaceholderMulti', { number: index + 1 }) : t('createChallenge.titlePlaceholderSingle')}
           className={inputClass} />
       </div>
 
       {/* Description */}
       <div data-tour="create-description">
-        <label className="block text-xs font-semibold mb-1 opacity-70">Description</label>
+        <label className="block text-xs font-semibold mb-1 opacity-70">{t('createChallenge.descriptionLabel')}</label>
         <textarea rows={2} maxLength={500} value={data.description}
           onChange={e => onChange({ ...data, description: e.target.value })}
-          placeholder="Décris clairement ce qu'il faut accomplir..."
+          placeholder={t('createChallenge.descriptionPlaceholder')}
           className={`${inputClass} resize-none`} />
         <p className="text-right text-[10px] mt-0.5 opacity-40">{data.description.length}/500</p>
       </div>
 
       {/* Catégorie */}
       <div data-tour="create-category">
-        <p className="text-xs font-semibold mb-2 opacity-70">Catégorie</p>
+        <p className="text-xs font-semibold mb-2 opacity-70">{t('createChallenge.categoryLabel')}</p>
         <div className="grid grid-cols-4 gap-2">
           {Object.keys(CAT_META).map(v => (
             <CatTile key={v} value={v} selected={data.category === v}
@@ -131,19 +138,19 @@ function ChallengeCard({
 
       {/* Difficulté */}
       <div>
-        <p className="text-xs font-semibold mb-2 opacity-70">Difficulté</p>
+        <p className="text-xs font-semibold mb-2 opacity-70">{t('createChallenge.difficultyLabel')}</p>
         <div className="grid grid-cols-4 gap-1.5">
           {DIFFICULTIES.map(d => (
             <button key={d.value} type="button"
               onClick={() => onChange({ ...data, difficulty: d.value })}
               className={`py-2 rounded-xl border-2 text-center transition-all active:scale-95 text-xs font-bold
                 ${data.difficulty === d.value ? `${d.border} ${d.bg} ${d.text}` : darkMode ? 'border-gray-600 hover:border-gray-500 text-gray-300' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
-              {d.label}
+              {t(`common.difficulty.${d.value.toLowerCase()}`)}
             </button>
           ))}
         </div>
         <p className={`text-xs mt-1.5 text-center font-semibold ${diff.text}`}>
-          <span className="flex items-center justify-center gap-1"><CircleDollarSign size={11} aria-hidden="true" /> {diff.coins} coins <span style={{ opacity: 0.5 }}>·</span> <Zap size={11} aria-hidden="true" /> {diff.xp} XP</span>
+          <span className="flex items-center justify-center gap-1"><CircleDollarSign size={11} aria-hidden="true" /> {t('createChallenge.coinsAmount', { count: diff.coins })} <span style={{ opacity: 0.5 }}>·</span> <Zap size={11} aria-hidden="true" /> {diff.xp} XP</span>
         </p>
       </div>
     </div>
@@ -154,6 +161,7 @@ function ChallengeCard({
 const CreateChallenge: React.FC = () => {
   const { user, darkMode } = useStore();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [challenges, setChallenges] = useState<ChallengeForm[]>([emptyChallenge()]);
   const [seriesName, setSeriesName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -173,12 +181,12 @@ const CreateChallenge: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const invalid = challenges.find(c => !c.title.trim() || !c.description.trim());
-    if (invalid) { setError('Titre et description requis pour chaque défi.'); return; }
+    if (invalid) { setError(t('createChallenge.missingFields')); return; }
     setLoading(true);
     setError('');
     try {
       const token = localStorage.getItem('token');
-      const toSave = challenges.map(c => ({ ...c, isPublic }));
+      const toSave = challenges.map(({ id: _id, ...c }) => ({ ...c, isPublic }));
       const endpoint = challenges.length === 1 ? '/api/challenges' : '/api/challenges/bulk-save';
       const trimmedSeries = seriesName.trim();
       const body = challenges.length === 1
@@ -190,9 +198,9 @@ const CreateChallenge: React.FC = () => {
         body,
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Erreur lors de la création'); return; }
+      if (!res.ok) { setError(data.error || t('createChallenge.createError')); return; }
       navigate('/challenges');
-    } catch { setError('Erreur réseau'); }
+    } catch { setError(t('createChallenge.networkError')); }
     finally { setLoading(false); }
   };
 
@@ -201,7 +209,7 @@ const CreateChallenge: React.FC = () => {
 
       <button onClick={() => navigate('/challenges')}
         className={`flex items-center gap-1.5 mb-5 text-sm font-medium ${darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'} transition-colors`}>
-        <ArrowLeft size={16} /> Retour aux défis
+        <ArrowLeft size={16} /> {t('createChallenge.backToChallenges')}
       </button>
 
       <div className="max-w-lg mx-auto">
@@ -209,12 +217,12 @@ const CreateChallenge: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Trophy className="text-yellow-500" size={22} />
-            Créer {challenges.length > 1 ? `${challenges.length} défis` : 'un défi'}
+            {challenges.length > 1 ? t('createChallenge.createMultiple', { count: challenges.length }) : t('createChallenge.createSingle')}
           </h1>
           <button onClick={() => navigate('/challenges/ai-create')}
             data-tour="create-ai"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 transition-opacity">
-            <Sparkles size={13} /> IA
+            <Sparkles size={13} /> {t('createChallenge.aiButton')}
           </button>
         </div>
 
@@ -222,7 +230,7 @@ const CreateChallenge: React.FC = () => {
 
           {/* Liste des défis */}
           {challenges.map((c, i) => (
-            <ChallengeCard key={i} index={i} total={challenges.length}
+            <ChallengeCard key={c.id} index={i} total={challenges.length}
               data={c} darkMode={darkMode}
               onChange={f => updateChallenge(i, f)}
               onRemove={() => removeChallenge(i)} />
@@ -232,7 +240,7 @@ const CreateChallenge: React.FC = () => {
           {challenges.length > 1 && (
             <div className={`rounded-xl border p-3 ${darkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
               <label htmlFor="series-name" className="block text-xs font-semibold mb-1.5 opacity-70">
-                Nom de la série <span className="opacity-50 font-normal">(optionnel)</span>
+                {t('createChallenge.seriesNameLabel')} <span className="opacity-50 font-normal">({t('createChallenge.optional')})</span>
               </label>
               <input
                 id="series-name"
@@ -240,14 +248,14 @@ const CreateChallenge: React.FC = () => {
                 maxLength={80}
                 value={seriesName}
                 onChange={e => setSeriesName(e.target.value)}
-                placeholder="Ex: Challenge 30 jours de sport"
+                placeholder={t('createChallenge.seriesNamePlaceholder')}
                 className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm transition-colors ${
                   darkMode
                     ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
                     : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:bg-white'
                 }`}
               />
-              <p className="text-xs mt-1 opacity-40">Regroupe ces défis en une série accessible à tous</p>
+              <p className="text-xs mt-1 opacity-40">{t('createChallenge.seriesNameHint')}</p>
             </div>
           )}
 
@@ -255,7 +263,7 @@ const CreateChallenge: React.FC = () => {
           <button type="button" onClick={addChallenge}
             className={`w-full py-3 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 text-sm font-semibold transition-all hover:scale-[1.01] active:scale-[0.99]
               ${darkMode ? 'border-gray-600 text-gray-400 hover:border-blue-500 hover:text-blue-400' : 'border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-600'}`}>
-            <Plus size={16} /> Ajouter un défi
+            <Plus size={16} /> {t('createChallenge.addChallenge')}
           </button>
 
           {/* Visibilité */}
@@ -269,9 +277,9 @@ const CreateChallenge: React.FC = () => {
                 ? <Globe size={16} className="text-blue-400 shrink-0" />
                 : <Lock size={16} className={`shrink-0 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />}
               <div className="text-left">
-                <p className="text-sm font-semibold">{isPublic ? 'Public' : 'Privé'}</p>
+                <p className="text-sm font-semibold">{isPublic ? t('createChallenge.public') : t('createChallenge.private')}</p>
                 <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {isPublic ? 'Visible par tous' : 'Visible uniquement par toi'}
+                  {isPublic ? t('createChallenge.visibleByAll') : t('createChallenge.visibleByYouOnly')}
                 </p>
               </div>
             </div>
@@ -284,9 +292,9 @@ const CreateChallenge: React.FC = () => {
 
           <button type="submit" disabled={loading}
             className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 text-sm active:scale-95">
-            {loading ? 'Création...' : isPublic
-              ? <span className="flex items-center justify-center gap-1.5"><Rocket size={15} /> Publier {challenges.length > 1 ? `${challenges.length} défis` : 'le défi'}</span>
-              : <span className="flex items-center justify-center gap-1.5"><Lock size={15} /> Créer en privé</span>}
+            {loading ? t('createChallenge.creating') : isPublic
+              ? <span className="flex items-center justify-center gap-1.5"><Rocket size={15} /> {challenges.length > 1 ? t('createChallenge.publishMultiple', { count: challenges.length }) : t('createChallenge.publishSingle')}</span>
+              : <span className="flex items-center justify-center gap-1.5"><Lock size={15} /> {t('createChallenge.createPrivate')}</span>}
           </button>
         </form>
       </div>

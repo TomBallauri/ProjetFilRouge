@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, Check, X, Users, Trophy, Flame, Search, Clock, AlertTriangle } from 'lucide-react';
@@ -36,6 +37,7 @@ const token = () => localStorage.getItem('token') ?? '';
 const TOUR_ID_BY_TAB: Record<string, string> = { search: 'friends-search', requests: 'friends-requests' };
 
 const FriendsPage: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const { user } = useStore();
   const navigate = useNavigate();
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -54,6 +56,7 @@ const FriendsPage: React.FC = () => {
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
     fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchAll = async () => {
@@ -76,13 +79,26 @@ const FriendsPage: React.FC = () => {
     fetchAll();
   };
 
+  // Accepter directement depuis l'onglet recherche (au lieu de devoir aller sur l'onglet
+  // Demandes) : le bouton "Accepter" y était affiché mais ne faisait rien au clic.
+  const acceptFromSearch = async (u: SearchUser) => {
+    if (!u.friendshipId) return;
+    const res = await fetch(`/api/friends/accept/${u.friendshipId}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token()}` },
+    });
+    if (res.ok) {
+      setSearchResults(prev => prev.map(s => s.id === u.id ? { ...s, friendStatus: 'ACCEPTED' } : s));
+      fetchAll();
+    }
+  };
+
   const declineOrRemove = async (id: number) => {
     await fetch(`/api/friends/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
     fetchAll();
   };
 
   const removeFriend = async (id: number, username: string) => {
-    if (!globalThis.confirm(`Retirer ${username} de tes amis ?`)) return;
+    if (!globalThis.confirm(t('friends.confirmRemove', { username }))) return;
     await declineOrRemove(id);
   };
 
@@ -117,14 +133,14 @@ const FriendsPage: React.FC = () => {
           headers: { Authorization: `Bearer ${token()}` },
         });
         if (!res.ok) {
-          setSearchError('Une erreur est survenue, réessaie dans quelques instants.');
+          setSearchError(t('friends.searchServerError'));
           setSearchResults([]);
           return;
         }
         const data = await res.json();
         setSearchResults(Array.isArray(data) ? data : []);
       } catch {
-        setSearchError('Impossible de joindre le serveur.');
+        setSearchError(t('friends.searchUnreachable'));
         setSearchResults([]);
       }
       finally { setSearchLoading(false); }
@@ -134,13 +150,13 @@ const FriendsPage: React.FC = () => {
   if (!user) return null;
 
   const tabs: { id: typeof tab; label: React.ReactNode }[] = [
-    { id: 'friends', label: `Mes amis (${friends.length})` },
-    { id: 'search', label: <span className="flex items-center gap-1.5"><Search size={13} aria-hidden="true" />Rechercher</span> },
+    { id: 'friends', label: t('friends.myFriendsTab', { count: friends.length }) },
+    { id: 'search', label: <span className="flex items-center gap-1.5"><Search size={13} aria-hidden="true" />{t('friends.searchTab')}</span> },
     {
       id: 'requests',
       label: (
         <span className="flex items-center gap-1.5">
-          Demandes
+          {t('friends.requestsTab')}
           {requests.length > 0 && (
             <span className="w-4 h-4 rounded-full bg-[var(--q-accent)] text-white text-[10px] font-bold flex items-center justify-center">
               {requests.length}
@@ -162,11 +178,11 @@ const FriendsPage: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Users size={24} aria-hidden="true" style={{ color: 'var(--q-accent)', flexShrink: 0 }} />
               <div style={{ fontSize: 24, fontFamily: 'var(--q-display)', color: 'var(--q-text)', fontWeight: 700, letterSpacing: -0.3 }}>
-                Amis
+                {t('sidebar.friends')}
               </div>
             </div>
             <div style={{ fontSize: 13, color: 'var(--q-text2)', marginTop: 3 }}>
-              {friends.length} ami{friends.length !== 1 ? 's' : ''} · Recherche par pseudo
+              {t('friends.headerSubtitle', { count: friends.length })}
             </div>
           </div>
         </div>
@@ -206,18 +222,18 @@ const FriendsPage: React.FC = () => {
             borderRadius: 18, background: 'var(--q-chrome)', border: '1px solid var(--q-line)',
             boxShadow: 'var(--q-shadow)', marginBottom: 14 }}>
             <Search size={16} aria-hidden="true" style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
-            <label htmlFor="friend-search" className="sr-only">Rechercher un joueur par pseudo</label>
+            <label htmlFor="friend-search" className="sr-only">{t('friends.searchLabel')}</label>
             <input
               id="friend-search"
               value={query}
               onChange={e => handleQueryChange(e.target.value)}
-              placeholder="Recherche par pseudo…"
+              placeholder={t('friends.searchPlaceholder')}
               autoFocus
               style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none',
                 fontSize: 14, color: 'var(--q-text)', fontFamily: 'inherit' }}
             />
             {query && (
-              <button onClick={() => { setQuery(''); setSearchResults([]); }} aria-label="Effacer"
+              <button onClick={() => { setQuery(''); setSearchResults([]); }} aria-label={t('common.clear')}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', padding: 2 }}>
                 <X size={14} aria-hidden="true" />
               </button>
@@ -241,12 +257,12 @@ const FriendsPage: React.FC = () => {
           {!searchLoading && query.trim().length >= 2 && searchResults.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 18px', color: 'var(--q-text3)' }}>
               <Users size={36} style={{ margin: '0 auto 10px', opacity: 0.3 }} aria-hidden="true" />
-              <p style={{ fontSize: 14 }}>Aucun joueur trouvé pour « {query} »</p>
+              <p style={{ fontSize: 14 }}>{t('friends.noPlayerFound', { query })}</p>
             </div>
           )}
           {!searchLoading && query.trim().length < 2 && query.length > 0 && (
             <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--q-text3)', padding: '20px 0' }}>
-              Tape au moins 2 caractères
+              {t('friends.typeAtLeast2')}
             </p>
           )}
           {!searchLoading && searchResults.length > 0 && (
@@ -270,11 +286,11 @@ const FriendsPage: React.FC = () => {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                           <span style={{ fontSize: 11, color: 'var(--q-text2)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <Trophy size={10} aria-hidden="true" /> Niv. {u.level}
+                            <Trophy size={10} aria-hidden="true" /> {t('navbar.level', { level: u.level })}
                           </span>
                           {u.currentStreak > 0 && (
                             <span style={{ fontSize: 11, color: '#FB923C', display: 'flex', alignItems: 'center', gap: 3 }}>
-                              <Flame size={10} aria-hidden="true" /> {u.currentStreak}j
+                              <Flame size={10} aria-hidden="true" /> {t('common.daysAbbrev', { count: u.currentStreak })}
                             </span>
                           )}
                         </div>
@@ -284,26 +300,26 @@ const FriendsPage: React.FC = () => {
                     {u.friendStatus === 'ACCEPTED' && (
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#34D399', padding: '4px 10px',
                         borderRadius: 999, background: 'rgba(52,211,153,0.12)', flexShrink: 0 }}>
-                        ✓ Ami
+                        ✓ {t('friends.friendBadge')}
                       </span>
                     )}
                     {u.friendStatus === 'PENDING' && u.isSender && (
                       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-text3)', padding: '4px 10px',
                         borderRadius: 999, background: 'var(--q-line)', flexShrink: 0,
                         display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Clock size={10} aria-hidden="true" /> En attente
+                        <Clock size={10} aria-hidden="true" /> {t('friends.pending')}
                       </span>
                     )}
                     {u.friendStatus === 'PENDING' && !u.isSender && (
-                      <button onClick={() => { /* accepter depuis search */ }}
+                      <button onClick={() => acceptFromSearch(u)}
                         style={{ fontSize: 11, fontWeight: 700, color: '#fff', padding: '6px 12px',
                           borderRadius: 999, background: 'var(--q-accent)', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
-                        Accepter
+                        {t('userProfile.accept')}
                       </button>
                     )}
                     {u.friendStatus === 'NONE' && (
                       <button onClick={() => sendRequest(u.id)} disabled={isLoading}
-                        aria-label={`Ajouter ${u.username} en ami`}
+                        aria-label={t('friends.addAsFriend', { username: u.username })}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700,
                           color: '#fff', padding: '7px 13px', borderRadius: 999, flexShrink: 0,
                           background: isLoading ? 'var(--q-line)' : 'linear-gradient(135deg,#A78BFA,#EC4899)',
@@ -312,7 +328,7 @@ const FriendsPage: React.FC = () => {
                           transition: 'all 0.15s ease' }}>
                         {isLoading
                           ? <Clock size={12} aria-hidden="true" />
-                          : <><UserPlus size={12} aria-hidden="true" /> Ajouter</>
+                          : <><UserPlus size={12} aria-hidden="true" /> {t('friends.add')}</>
                         }
                       </button>
                     )}
@@ -331,14 +347,13 @@ const FriendsPage: React.FC = () => {
         ) : friends.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '50px 18px', color: 'var(--q-text3)' }}>
             <Users size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} aria-hidden="true" />
-            <p style={{ fontWeight: 600, color: 'var(--q-text2)', marginBottom: 6 }}>Aucun ami pour l'instant</p>
+            <p style={{ fontWeight: 600, color: 'var(--q-text2)', marginBottom: 6 }}>{t('friends.noFriendsYet')}</p>
             <p style={{ fontSize: 13 }}>
-              <button onClick={() => setTab('search')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--q-accent)', fontWeight: 700, fontSize: 13 }}>
-                Recherche un joueur
-              </button>
-              {' '}par son pseudo pour l'ajouter !
+              <Trans i18nKey="friends.noFriendsHint" components={{
+                btn: <button onClick={() => setTab('search')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--q-accent)', fontWeight: 700, fontSize: 13 }} />
+              }} />
             </p>
           </div>
         ) : (
@@ -360,14 +375,14 @@ const FriendsPage: React.FC = () => {
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 2,
                       display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Trophy size={10} aria-hidden="true" /> Niv. {f.level}
+                      <Trophy size={10} aria-hidden="true" /> {t('navbar.level', { level: f.level })}
                       <span style={{ color: 'var(--q-line)' }}>·</span>
-                      {f.xp.toLocaleString('fr')} XP
+                      {f.xp.toLocaleString(i18n.language)} XP
                     </div>
                   </div>
                 </button>
                 <button onClick={() => removeFriend(friendshipId, f.username)}
-                  aria-label={`Retirer ${f.username} de mes amis`}
+                  aria-label={t('friends.removeFromFriends', { username: f.username })}
                   style={{ background: 'none', border: 'none', cursor: 'pointer',
                     color: 'var(--q-text3)', padding: 6, borderRadius: 10,
                     transition: 'color 0.15s' }}
@@ -388,7 +403,7 @@ const FriendsPage: React.FC = () => {
         ) : requests.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '50px 18px', color: 'var(--q-text3)' }}>
             <UserPlus size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} aria-hidden="true" />
-            <p style={{ fontWeight: 600, color: 'var(--q-text2)' }}>Aucune demande en attente</p>
+            <p style={{ fontWeight: 600, color: 'var(--q-text2)' }}>{t('friends.noPendingRequests')}</p>
           </div>
         ) : (
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -405,7 +420,7 @@ const FriendsPage: React.FC = () => {
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--q-text)' }}>{req.sender.username}</div>
                     <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 2 }}>
-                      Niv. {req.sender.level}
+                      {t('navbar.level', { level: req.sender.level })}
                     </div>
                   </div>
                 </button>
@@ -415,10 +430,10 @@ const FriendsPage: React.FC = () => {
                       borderRadius: 999, background: 'var(--q-accent)', color: '#fff',
                       fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
                       boxShadow: '0 4px 12px rgba(167,139,250,0.4)' }}>
-                    <Check size={13} aria-hidden="true" /> Accepter
+                    <Check size={13} aria-hidden="true" /> {t('userProfile.accept')}
                   </button>
                   <button onClick={() => declineOrRemove(req.id)}
-                    aria-label="Refuser la demande"
+                    aria-label={t('friends.declineRequest')}
                     style={{ padding: 8, borderRadius: 10, background: 'var(--q-line)',
                       border: 'none', cursor: 'pointer', color: 'var(--q-text3)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

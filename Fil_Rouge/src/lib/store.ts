@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, UserSettings } from '../types/User';
 import { syncSettingsToServer } from './settingsSync';
+import i18n from './i18n';
 
 export type NotifToggles = { defis: boolean; messages: boolean; updates: boolean };
 
@@ -19,7 +20,12 @@ const applyReduceMotionToDom = (on: boolean) => {
   document.documentElement.classList.toggle('reduce-motion', on);
 };
 const applyLanguageToDom = (lang: string) => {
-  document.documentElement.lang = LANGUAGE_TO_HTML_LANG[lang] ?? 'fr';
+  const code = LANGUAGE_TO_HTML_LANG[lang] ?? 'fr';
+  document.documentElement.lang = code;
+  // Espagnol/Allemand ne sont pas encore traduits (voir src/lib/i18n.ts) — i18next retombe
+  // sur le français dans ce cas plutôt que d'afficher des clés brutes à l'écran.
+  localStorage.setItem('appLanguageCode', code);
+  i18n.changeLanguage(code);
 };
 
 export type NotifGroup = { groupId: number; seriesName: string; latestMessageId: number | null; latestMessageUserId: number | null };
@@ -29,25 +35,6 @@ export type NotifData = {
   streakAtRisk: boolean;
   streakDays: number;
   groups: NotifGroup[];
-};
-
-type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
-
-export type Task = {
-  id: string;
-  title: string;
-  description?: string;
-  completed: boolean;
-  priority: Priority;
-  dueDate?: Date;
-  tags: Tag[];
-  userId: string;
-};
-
-export type Tag = {
-  id: string;
-  name: string;
-  color: string;
 };
 
 interface StoreState {
@@ -66,17 +53,6 @@ interface StoreState {
   setLanguage: (lang: string) => void;
   /* Applique les réglages reçus du compte (au login/chargement) sans les repousser au serveur. */
   applyServerSettings: (settings: UserSettings | null | undefined) => void;
-
-  tasks: Task[];
-  loading: boolean;
-  error: string | null;
-
-  setTasks: (tasks: Task[]) => void;
-  addTask: (task: Task) => void;
-  updateTask: (task: Task) => void;
-  deleteTask: (id: string) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
 
   /* Notification state (not persisted) */
   notifData:      NotifData | null;
@@ -149,21 +125,6 @@ export const useStore = create<StoreState>()(
         }
         return patch;
       }),
-
-      tasks: [],
-      loading: false,
-      error: null,
-      
-      setTasks: (tasks) => set({ tasks }),
-      addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
-      updateTask: (task) => set((state) => ({
-        tasks: state.tasks.map((t) => (t.id === task.id ? task : t))
-      })),
-      deleteTask: (id) => set((state) => ({
-        tasks: state.tasks.filter((t) => t.id !== id)
-      })),
-      setLoading: (loading) => set({ loading }),
-      setError: (error) => set({ error }),
 
       notifData:     null,
       notifCount:    0,

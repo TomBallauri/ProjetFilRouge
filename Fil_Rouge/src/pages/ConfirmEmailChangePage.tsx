@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { Mail, Zap } from 'lucide-react';
 import BackButton from '../components/BackButton';
@@ -8,11 +9,12 @@ const ConfirmEmailChangePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
   const { darkMode, user, setUser } = useStore();
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) { setStatus('error'); setError('Lien invalide — le token est manquant.'); return; }
+    if (!token) { setStatus('error'); setError(t('resetPassword.invalidToken')); return; }
     fetch('/api/auth/confirm-email-change', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -20,12 +22,12 @@ const ConfirmEmailChangePage: React.FC = () => {
     })
       .then(async res => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Une erreur est survenue.');
+        if (!res.ok) throw new Error(data.error || t('auth.genericError'));
         if (user && data.user) setUser({ ...user, ...data.user });
         setStatus('success');
       })
       .catch(err => {
-        setError(err.message || 'Une erreur est survenue.');
+        setError(err.message || t('auth.genericError'));
         setStatus('error');
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,10 +74,10 @@ const ConfirmEmailChangePage: React.FC = () => {
             <Zap size={28} color="#fff" aria-hidden="true" />
           </div>
           <div style={{ fontSize: 28, fontFamily: '"DM Serif Display", Georgia, serif', color: titleColor, letterSpacing: -0.5 }}>
-            Changement d'email
+            {t('confirmEmailChange.title')}
           </div>
           <div style={{ fontSize: 13, color: subColor, marginTop: 4, fontWeight: 500 }}>
-            Confirmation de ta nouvelle adresse
+            {t('confirmEmailChange.subtitle')}
           </div>
         </div>
 
@@ -86,7 +88,7 @@ const ConfirmEmailChangePage: React.FC = () => {
           {status === 'loading' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '12px 0' }}>
               <div aria-hidden="true" style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid rgba(124,58,237,0.25)', borderTopColor: '#7C3AED', animation: 'spin 0.8s linear infinite' }} />
-              <p style={{ fontSize: 13, color: subColor }}>Confirmation en cours...</p>
+              <p style={{ fontSize: 13, color: subColor }}>{t('confirmEmailChange.inProgress')}</p>
             </div>
           )}
 
@@ -96,10 +98,10 @@ const ConfirmEmailChangePage: React.FC = () => {
                 border: `1px solid ${successBorder}`, color: successColor, fontSize: 13, marginBottom: 20,
                 display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
                 <Mail size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
-                Ton adresse email a bien été mise à jour.
+                {t('confirmEmailChange.success')}
               </div>
               <Link to="/profile" style={{ color: linkColor, fontWeight: 700, textDecoration: 'none', fontSize: 13 }}>
-                Retour à mon profil
+                {t('confirmEmailChange.backToProfile')}
               </Link>
             </div>
           )}
@@ -111,7 +113,7 @@ const ConfirmEmailChangePage: React.FC = () => {
                 {error}
               </div>
               <Link to="/profile" style={{ color: linkColor, fontWeight: 700, textDecoration: 'none', fontSize: 13 }}>
-                Retour à mon profil
+                {t('confirmEmailChange.backToProfile')}
               </Link>
             </div>
           )}

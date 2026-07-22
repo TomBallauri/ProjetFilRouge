@@ -13,6 +13,7 @@ import {
   GROUP_LIST_INCLUDE,
 } from '../lib/groupHelpers.js';
 import { planGroups, paginateKeys, orderRowsByKeys } from '../lib/seriesPagination.js';
+import { aiGenerateLimiter } from '../lib/rateLimiters.js';
 
 const DAILY_BONUS_MULTIPLIER = 1.5;
 
@@ -51,7 +52,7 @@ router.get('/api/challenges', async (req, res) => {
       ...visibilityClause,
       ...(category   ? { category }                       : {}),
       ...(difficulty ? { difficulty }                     : {}),
-      ...(search     ? { title: { contains: search } }   : {}),
+      ...(search     ? { title: { contains: search, mode: 'insensitive' } } : {}),
     };
 
     // Phase 1 (légère) : juste de quoi déterminer l'ordre et le regroupement par série,
@@ -251,6 +252,14 @@ router.post('/api/challenges/:id/start', async (req, res) => {
   try {
     const decoded = jwt.verify(token, SECRET);
     const challengeId = Number(req.params.id);
+    const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } });
+    if (!challenge) return res.status(404).json({ error: "Défi non trouvé" });
+    // isPublic ne filtre que l'affichage dans la liste : sans ce contrôle, n'importe quel
+    // utilisateur connecté peut démarrer/compléter un défi privé d'un autre en devinant son
+    // id (séquentiel) et en tirer coins/xp, alors qu'il ne devrait même pas pouvoir le voir.
+    if (!challenge.isPublic && challenge.createdBy !== decoded.userId) {
+      return res.status(403).json({ error: "Défi non accessible" });
+    }
     const existing = await prisma.userChallenge.findUnique({
       where: { userId_challengeId: { userId: decoded.userId, challengeId } }
     });
@@ -504,15 +513,12 @@ FORMAT DE RÉPONSE — JSON uniquement, rien d'autre:
 Question: {"type":"question","content":"Ta question"}
 Défis: {"type":"challenges","challenges":[{"title":"...","description":"...","category":"...","difficulty":"..."}]}`;
 
-router.post('/api/challenges/ai-generate', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+router.post('/api/challenges/ai-generate', authMiddleware, aiGenerateLimiter, async (req, res) => {
   const { history } = req.body;
   if (!history || !Array.isArray(history) || history.length === 0) {
     return res.status(400).json({ error: 'Historique de conversation requis' });
   }
   try {
-    jwt.verify(authHeader.split(' ')[1], SECRET);
     const response = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       max_tokens: 2048,
@@ -542,6 +548,11 @@ router.post('/api/challenges/bulk-save', async (req, res) => {
   const { challenges, seriesName } = req.body;
   if (!challenges || !Array.isArray(challenges) || challenges.length === 0) {
     return res.status(400).json({ error: 'Défis requis' });
+  }
+  // Aucune série légitime ne dépasse quelques semaines : sans plafond, un body forgé
+  // pourrait déclencher des milliers de créations concurrentes en un seul appel.
+  if (challenges.length > 50) {
+    return res.status(400).json({ error: 'Trop de défis en une seule fois (50 maximum).' });
   }
   try {
     const decoded = jwt.verify(token, SECRET);

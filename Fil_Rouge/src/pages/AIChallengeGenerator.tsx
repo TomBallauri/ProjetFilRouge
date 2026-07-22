@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Sparkles, Check, Trophy, ChevronDown, ChevronUp, Globe, Lock, CircleDollarSign, Zap } from 'lucide-react';
@@ -15,11 +16,12 @@ interface GeneratedChallenge {
   difficulty: string;
 }
 
-const DIFFICULTY_STYLES: Record<string, { label: string; coins: number; xp: number; border: string; bg: string; text: string; badge: string }> = {
-  EASY:   { label: 'Facile',    coins: 50,  xp: 100,  border: 'border-green-500/60',  bg: 'bg-green-500/10',   text: 'text-green-400',  badge: 'bg-green-500/20 text-green-400' },
-  MEDIUM: { label: 'Moyen',     coins: 150, xp: 300,  border: 'border-yellow-500/60', bg: 'bg-yellow-500/10', text: 'text-yellow-400', badge: 'bg-yellow-500/20 text-yellow-400' },
-  HARD:   { label: 'Difficile', coins: 350, xp: 700,  border: 'border-orange-500/60', bg: 'bg-orange-500/10', text: 'text-orange-400', badge: 'bg-orange-500/20 text-orange-400' },
-  EXPERT: { label: 'Expert',    coins: 700, xp: 1500, border: 'border-red-500/60',    bg: 'bg-red-500/10',    text: 'text-red-400',    badge: 'bg-red-500/20 text-red-400' },
+// Le libellé de difficulté vient de common.difficulty.<clé en minuscule>.
+const DIFFICULTY_STYLES: Record<string, { coins: number; xp: number; border: string; bg: string; text: string; badge: string }> = {
+  EASY:   { coins: 50,  xp: 100,  border: 'border-green-500/60',  bg: 'bg-green-500/10',   text: 'text-green-400',  badge: 'bg-green-500/20 text-green-400' },
+  MEDIUM: { coins: 150, xp: 300,  border: 'border-yellow-500/60', bg: 'bg-yellow-500/10', text: 'text-yellow-400', badge: 'bg-yellow-500/20 text-yellow-400' },
+  HARD:   { coins: 350, xp: 700,  border: 'border-orange-500/60', bg: 'bg-orange-500/10', text: 'text-orange-400', badge: 'bg-orange-500/20 text-orange-400' },
+  EXPERT: { coins: 700, xp: 1500, border: 'border-red-500/60',    bg: 'bg-red-500/10',    text: 'text-red-400',    badge: 'bg-red-500/20 text-red-400' },
 };
 
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -30,6 +32,7 @@ const CATEGORY_EMOJIS: Record<string, string> = {
 
 
 const AIChallengeGenerator: React.FC = () => {
+  const { t } = useTranslation();
   const { user, darkMode } = useStore();
   const navigate = useNavigate();
 
@@ -89,8 +92,8 @@ const AIChallengeGenerator: React.FC = () => {
           setMessages(prev => [...prev, {
             role: 'assistant',
             content: phase === 'selection'
-              ? `Plan mis à jour ! Voici tes ${arr.length} nouveaux défis.`
-              : `J'ai créé ${arr.length} défis personnalisés pour toi !`,
+              ? t('aiGenerator.planUpdated', { count: arr.length })
+              : t('aiGenerator.challengesCreated', { count: arr.length }),
           }]);
           setChallenges(arr);
           setSelected(new Set(arr.map((_: GeneratedChallenge, i: number) => i)));
@@ -102,7 +105,7 @@ const AIChallengeGenerator: React.FC = () => {
         }
       }
     } catch {
-      setError('Erreur de connexion. Réessaie.');
+      setError(t('aiGenerator.connectionError'));
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -139,7 +142,7 @@ const AIChallengeGenerator: React.FC = () => {
       if (!res.ok) throw new Error(data.error);
       navigate('/challenges');
     } catch {
-      setError('Erreur lors de la sauvegarde.');
+      setError(t('aiGenerator.saveError'));
     } finally {
       setSaving(false);
     }
@@ -161,8 +164,8 @@ const AIChallengeGenerator: React.FC = () => {
         <Sparkles size={15} className="text-white" />
       </div>
       <div className="flex-1 min-w-0">
-        <h1 className="font-bold text-sm leading-tight">Générateur IA</h1>
-        <p className={`text-xs ${textMuted}`}>Défis personnalisés</p>
+        <h1 className="font-bold text-sm leading-tight">{t('aiGenerator.title')}</h1>
+        <p className={`text-xs ${textMuted}`}>{t('aiGenerator.subtitle')}</p>
       </div>
       {phase === 'selection' && (
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${darkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
@@ -172,6 +175,8 @@ const AIChallengeGenerator: React.FC = () => {
     </div>
   );
 
+  const suggestionKeys = ['sport', 'cooking', 'gaming', 'reading'] as const;
+
   // JSX partagé : messages
   const messagesJSX = (extraPb: string) => (
     <div className={`px-4 pt-4 space-y-3 ${extraPb}`}>
@@ -180,14 +185,14 @@ const AIChallengeGenerator: React.FC = () => {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mx-auto mb-3">
             <Sparkles size={22} className="text-white" />
           </div>
-          <h2 className="font-bold text-base mb-1">Quel est ton objectif ?</h2>
-          <p className={`text-sm ${textMuted} mb-4`}>Décris ce que tu veux accomplir et je vais te créer des défis sur mesure.</p>
+          <h2 className="font-bold text-base mb-1">{t('aiGenerator.emptyTitle')}</h2>
+          <p className={`text-sm ${textMuted} mb-4`}>{t('aiGenerator.emptySubtitle')}</p>
           <div className="flex flex-wrap gap-2 justify-center">
-            {['Me mettre au sport 🏋️', 'Apprendre à cuisiner 🍳', 'Progresser en gaming 🎮', 'Lire plus 📚'].map(s => (
-              <button key={s} onClick={() => { setInput(s); inputRef.current?.focus(); }}
+            {suggestionKeys.map(key => (
+              <button key={key} onClick={() => { setInput(t(`aiGenerator.suggestions.${key}`)); inputRef.current?.focus(); }}
                 className={`text-xs px-3 py-1.5 rounded-full border transition-colors
                   ${darkMode ? 'border-gray-600 hover:border-purple-400 hover:text-purple-400 text-gray-300' : 'border-gray-200 hover:border-purple-400 hover:text-purple-600 text-gray-600'}`}>
-                {s}
+                {t(`aiGenerator.suggestions.${key}`)}
               </button>
             ))}
           </div>
@@ -236,7 +241,7 @@ const AIChallengeGenerator: React.FC = () => {
         className={`w-full flex items-center justify-between px-4 py-2.5 transition-colors ${darkMode ? 'hover:bg-gray-700/40' : 'hover:bg-gray-50'}`}>
         <div className="flex items-center gap-2">
           <Trophy size={14} className="text-blue-400" />
-          <span className="text-sm font-semibold">Défis générés</span>
+          <span className="text-sm font-semibold">{t('aiGenerator.generatedChallenges')}</span>
           <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
             {selected.size}/{challenges.length}
           </span>
@@ -245,7 +250,7 @@ const AIChallengeGenerator: React.FC = () => {
           <button
             onClick={e => { e.stopPropagation(); toggleAll(); }}
             className={`text-xs font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-            {selected.size === challenges.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+            {selected.size === challenges.length ? t('aiGenerator.deselectAll') : t('aiGenerator.selectAll')}
           </button>
           {panelOpen ? <ChevronDown size={16} className={textMuted} /> : <ChevronUp size={16} className={textMuted} />}
         </div>
@@ -255,6 +260,7 @@ const AIChallengeGenerator: React.FC = () => {
         <div className="overflow-y-auto max-h-[32vh] px-3 pb-1 space-y-1.5">
           {challenges.map((ch, i) => {
             const diff = DIFFICULTY_STYLES[ch.difficulty] ?? DIFFICULTY_STYLES.EASY;
+            const diffLabel = t(`common.difficulty.${ch.difficulty.toLowerCase()}`);
             const isSelected = selected.has(i);
             const isExpanded = expandedCards.has(i);
             return (
@@ -269,7 +275,7 @@ const AIChallengeGenerator: React.FC = () => {
                   <span className="text-sm font-medium truncate flex-1">
                     {CATEGORY_EMOJIS[ch.category] ?? '🎯'} {ch.title}
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${diff.badge}`}>{diff.label}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${diff.badge}`}>{diffLabel}</span>
                   <button
                     onClick={e => { e.stopPropagation(); setExpandedCards(prev => { const next = new Set(prev); isExpanded ? next.delete(i) : next.add(i); return next; }); }}
                     className={`shrink-0 p-1 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}>
@@ -279,7 +285,7 @@ const AIChallengeGenerator: React.FC = () => {
                 {isExpanded && (
                   <div className={`px-3 pb-3 border-t ${darkMode ? 'border-gray-700/60' : 'border-gray-200/60'}`}>
                     <p className={`text-xs leading-relaxed pt-2 mb-1.5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{ch.description}</p>
-                    <p className={`text-xs font-semibold flex items-center gap-1 ${diff.text}`}><CircleDollarSign size={11} aria-hidden="true" /> {diff.coins} coins <span style={{ opacity: 0.5 }}>·</span> <Zap size={11} aria-hidden="true" /> {diff.xp} XP</p>
+                    <p className={`text-xs font-semibold flex items-center gap-1 ${diff.text}`}><CircleDollarSign size={11} aria-hidden="true" /> {t('createChallenge.coinsAmount', { count: diff.coins })} <span style={{ opacity: 0.5 }}>·</span> <Zap size={11} aria-hidden="true" /> {diff.xp} XP</p>
                   </div>
                 )}
               </div>
@@ -300,9 +306,9 @@ const AIChallengeGenerator: React.FC = () => {
             {isPublic
               ? <Globe size={14} className="text-blue-400 shrink-0" />
               : <Lock size={14} className={`shrink-0 ${textMuted}`} />}
-            <span className="text-xs font-semibold">{isPublic ? 'Public' : 'Privé'}</span>
+            <span className="text-xs font-semibold">{isPublic ? t('createChallenge.public') : t('createChallenge.private')}</span>
             <span className={`text-xs ${textMuted}`}>
-              {isPublic ? '— visible par tous' : '— visible uniquement par toi'}
+              {isPublic ? t('aiGenerator.visibleByAll') : t('aiGenerator.visibleByYouOnly')}
             </span>
           </div>
           <div className={`w-9 h-5 rounded-full transition-colors shrink-0 relative ${isPublic ? 'bg-blue-500' : darkMode ? 'bg-gray-600' : 'bg-gray-300'}`}>
@@ -314,7 +320,11 @@ const AIChallengeGenerator: React.FC = () => {
         <button onClick={saveSelected} disabled={saving || selected.size === 0}
           className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold rounded-xl hover:from-blue-700 hover:to-blue-600 transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2">
           <Trophy size={15} />
-          {saving ? 'Sauvegarde...' : `${isPublic ? 'Publier' : 'Créer en privé'} · ${selected.size} défi${selected.size > 1 ? 's' : ''}`}
+          {saving
+            ? t('aiGenerator.saving')
+            : isPublic
+              ? t('aiGenerator.publishCount', { count: selected.size })
+              : t('aiGenerator.createPrivateCount', { count: selected.size })}
         </button>
       </div>
     </div>
@@ -335,7 +345,7 @@ const AIChallengeGenerator: React.FC = () => {
             e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
           }}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-          placeholder={phase === 'selection' ? 'Modifie le plan, demande des ajustements...' : 'Décris ton objectif...'}
+          placeholder={phase === 'selection' ? t('aiGenerator.placeholderSelection') : t('aiGenerator.placeholderChat')}
           className={`flex-1 bg-transparent outline-none text-sm resize-none leading-relaxed py-1 ${darkMode ? 'text-white placeholder-gray-500' : 'text-gray-900 placeholder-gray-400'}`}
           style={{ minHeight: 32, maxHeight: 100 }}
         />

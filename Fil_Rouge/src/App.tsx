@@ -8,7 +8,6 @@ import { useStore } from './lib/store';
 // réservé à une poignée d'utilisateurs) finissait dans le même bundle JS de départ.
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const UQuail = lazy(() => import('./pages/UQuail'));
-const TasksPage = lazy(() => import('./pages/TasksPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
@@ -72,7 +71,6 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<UQuail />} />
-            <Route path="tasks" element={<TasksPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="settings" element={<div className="p-4">Settings (Coming Soon)</div>} />
             <Route path="challenges" element={<ChallengePage />} />

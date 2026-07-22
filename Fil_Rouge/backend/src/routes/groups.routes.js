@@ -43,8 +43,10 @@ router.post('/api/groups', authMiddleware, async (req, res) => {
     });
     res.json(group);
   } catch (error) {
+    // Le détail (error.message, potentiellement une erreur Prisma exposant noms de
+    // table/colonne) reste dans les logs serveur — jamais renvoyé tel quel au client.
     console.error('[groups] création:', error?.message ?? error);
-    res.status(500).json({ error: error?.message ?? 'Erreur lors de la création du groupe' });
+    res.status(500).json({ error: 'Erreur lors de la création du groupe' });
   }
 });
 

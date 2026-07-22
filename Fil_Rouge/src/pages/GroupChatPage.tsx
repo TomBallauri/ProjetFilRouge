@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { useVisibilityPausedInterval } from '../hooks/useVisibilityPausedInterval';
 import { ArrowLeft, Send, Users, Loader2 } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
 
@@ -23,7 +25,8 @@ type GroupData = {
 const token = () => localStorage.getItem('token') ?? '';
 
 const GroupChatPage: React.FC = () => {
-  usePageTitle('Tchat de groupe');
+  const { t, i18n } = useTranslation();
+  usePageTitle(t('groupChat.pageTitle'));
   const { groupId } = useParams<{ groupId: string }>();
   const navigate     = useNavigate();
   const { user }     = useStore();
@@ -43,7 +46,7 @@ const GroupChatPage: React.FC = () => {
     if (!user || !gid) return;
     fetch(`/api/series-groups/${gid}`, { headers: { Authorization: `Bearer ${token()}` } })
       .then(async r => {
-        if (!r.ok) { setError('Impossible de charger ce groupe.'); return; }
+        if (!r.ok) { setError(t('groupChat.loadError')); return; }
         const data: GroupData = await r.json();
         setGroup(data);
         setMessages(data.messages);
@@ -53,29 +56,27 @@ const GroupChatPage: React.FC = () => {
           localStorage.setItem(`sg_lm_${gid}`, String(last));
         }
       })
-      .catch(() => setError('Erreur réseau.'))
+      .catch(() => setError(t('groupChat.networkError')))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gid, user]);
 
   // Polling toutes les 8s pour les nouveaux messages
-  useEffect(() => {
-    if (!gid || !user) return;
-    const id = setInterval(() => {
-      fetch(`/api/series-groups/${gid}/messages`, { headers: { Authorization: `Bearer ${token()}` } })
-        .then(r => r.ok ? r.json() : null)
-        .then((data: Msg[] | null) => {
-          if (!data || !Array.isArray(data)) return;
-          const newest = data[data.length - 1]?.id ?? 0;
-          if (newest > lastMsgIdRef.current) {
-            setMessages(data);
-            lastMsgIdRef.current = newest;
-            localStorage.setItem(`sg_lm_${gid}`, String(newest));
-          }
-        })
-        .catch(() => {});
-    }, 8_000);
-    return () => clearInterval(id);
-  }, [gid, user]);
+  useVisibilityPausedInterval(() => {
+    if (!gid) return;
+    fetch(`/api/series-groups/${gid}/messages`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: Msg[] | null) => {
+        if (!data || !Array.isArray(data)) return;
+        const newest = data[data.length - 1]?.id ?? 0;
+        if (newest > lastMsgIdRef.current) {
+          setMessages(data);
+          lastMsgIdRef.current = newest;
+          localStorage.setItem(`sg_lm_${gid}`, String(newest));
+        }
+      })
+      .catch(() => {});
+  }, 8_000, !!gid && !!user);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -128,7 +129,7 @@ const GroupChatPage: React.FC = () => {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: 'var(--q-text3)', fontFamily: 'var(--q-font)' }}>
         <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', marginRight: 10 }} />
-        Chargement…
+        {t('common.loading')}
       </div>
     );
   }
@@ -136,9 +137,9 @@ const GroupChatPage: React.FC = () => {
   if (error || !group) {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--q-text3)', fontFamily: 'var(--q-font)' }}>
-        <p style={{ marginBottom: 16 }}>{error || 'Groupe introuvable.'}</p>
+        <p style={{ marginBottom: 16 }}>{error || t('groupChat.notFound')}</p>
         <button onClick={() => navigate(-1)} style={{ background: 'var(--q-accent)', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 20px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
-          Retour
+          {t('common.back')}
         </button>
       </div>
     );
@@ -153,7 +154,7 @@ const GroupChatPage: React.FC = () => {
         padding: '12px 0 12px', borderBottom: '1px solid var(--q-line)',
         flexShrink: 0,
       }}>
-        <button onClick={() => navigate(-1)} aria-label="Retour" style={{
+        <button onClick={() => navigate(-1)} aria-label={t('common.back')} style={{
           background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 12,
           color: 'var(--q-text2)', display: 'flex', alignItems: 'center',
         }}>
@@ -165,7 +166,7 @@ const GroupChatPage: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, fontSize: 12, color: 'var(--q-text3)' }}>
             <Users size={12} aria-hidden="true" />
-            {joined.length} membre{joined.length > 1 ? 's' : ''}
+            {t('groupChat.memberCount', { count: joined.length })}
           </div>
         </div>
         {/* Avatars des membres */}
@@ -182,14 +183,14 @@ const GroupChatPage: React.FC = () => {
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--q-text3)', fontSize: 13, marginTop: 40 }}>
-            Aucun message pour l'instant. Soyez le premier !
+            {t('groupChat.noMessages')}
           </div>
         )}
         {messages.map((msg, i) => {
           const isMe = msg.userId === user?.id;
           const prev = messages[i - 1];
           const showAvatar = !isMe && (!prev || prev.userId !== msg.userId);
-          const time = new Date(msg.createdAt).toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' });
+          const time = new Date(msg.createdAt).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
 
           return (
             <div key={msg.id} style={{
@@ -239,9 +240,9 @@ const GroupChatPage: React.FC = () => {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder="Envoyer un message…"
+            placeholder={t('groupChat.sendMessagePlaceholder')}
             rows={1}
-            aria-label="Message"
+            aria-label={t('groupChat.messageLabel')}
             style={{
               flex: 1, resize: 'none', border: '1.5px solid var(--q-line)',
               borderRadius: 16, padding: '10px 14px', fontSize: 14, lineHeight: 1.5,
@@ -252,7 +253,7 @@ const GroupChatPage: React.FC = () => {
           <button
             onClick={handleSend}
             disabled={!input.trim() || sending}
-            aria-label="Envoyer"
+            aria-label={t('groupChat.send')}
             style={{
               width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
               background: input.trim() && !sending ? 'var(--q-accent)' : 'var(--q-bg-flat)',
@@ -268,7 +269,7 @@ const GroupChatPage: React.FC = () => {
         </div>
       ) : (
         <div style={{ padding: '12px 0', borderTop: '1px solid var(--q-line)', textAlign: 'center', fontSize: 13, color: 'var(--q-text3)' }}>
-          Rejoins ce groupe pour participer au tchat.
+          {t('groupChat.joinToParticipate')}
         </div>
       )}
     </div>

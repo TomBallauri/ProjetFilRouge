@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useNavigate, Link } from 'react-router-dom';
@@ -41,13 +42,15 @@ type TopUser = { id: number; username: string; avatar?: string; currentStreak: n
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function getLevelTitle(level: number): string {
-  if (level < 3)  return 'Novice';
-  if (level < 7)  return 'Apprenti';
-  if (level < 12) return 'Disciple';
-  if (level < 18) return 'Expert';
-  if (level < 25) return 'Vétéran';
-  return 'Maître';
+// Retourne une clé de traduction (voir uquail.levelTitles.*) plutôt que le texte
+// directement — cette fonction est appelée hors composant, sans accès à `t`.
+function getLevelTitleKey(level: number): string {
+  if (level < 3)  return 'uquail.levelTitles.novice';
+  if (level < 7)  return 'uquail.levelTitles.apprentice';
+  if (level < 12) return 'uquail.levelTitles.disciple';
+  if (level < 18) return 'uquail.levelTitles.expert';
+  if (level < 25) return 'uquail.levelTitles.veteran';
+  return 'uquail.levelTitles.master';
 }
 
 
@@ -71,27 +74,25 @@ const GLOW: Record<string, string> = {
   butter:   'rgba(250,204,21,0.55)',  rose:   'rgba(236,72,153,0.55)',
 };
 
-// ── Category metadata ───────────────────────────────────────────────────────
+// ── Category metadata (le libellé vient de common.category.<clé>) ──────────
 
-type CatMeta = { grad: string; glow: string; icon: React.ReactNode; label: string };
+type CatMeta = { grad: string; glow: string; icon: React.ReactNode };
 
 const CAT_META: Record<string, CatMeta> = {
-  GAMING:     { grad: GRAD.sky,      glow: GLOW.sky,      icon: <Gamepad2 size={22} />,        label: 'Gaming' },
-  SPORT:      { grad: GRAD.mint,     glow: GLOW.mint,     icon: <Activity size={22} />,         label: 'Sport' },
-  CUISINE:    { grad: GRAD.peach,    glow: GLOW.peach,    icon: <UtensilsCrossed size={22} />,  label: 'Cuisine' },
-  FITNESS:    { grad: GRAD.sky,      glow: GLOW.sky,      icon: <Dumbbell size={22} />,         label: 'Fitness' },
-  CREATIVITY: { grad: GRAD.rose,     glow: GLOW.rose,     icon: <Palette size={22} />,          label: 'Créativité' },
-  KNOWLEDGE:  { grad: GRAD.sky,      glow: GLOW.sky,      icon: <BookOpen size={22} />,         label: 'Savoir' },
-  SOCIAL:     { grad: GRAD.butter,   glow: GLOW.butter,   icon: <Users size={22} />,            label: 'Social' },
-  NATURE:     { grad: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.5)',  icon: <Leaf size={22} />,   label: 'Nature' },
-  MUSIC:      { grad: GRAD.rose,     glow: GLOW.rose,     icon: <Music size={22} />,            label: 'Musique' },
-  WELLNESS:   { grad: GRAD.mint,     glow: GLOW.mint,     icon: <Heart size={22} />,            label: 'Bien-être' },
-  DIY:        { grad: GRAD.peach,    glow: GLOW.peach,    icon: <Wrench size={22} />,           label: 'DIY' },
-  OTHERS:     { grad: GRAD.lavender, glow: GLOW.lavender, icon: <LayoutGrid size={22} />,       label: 'Autres' },
+  GAMING:     { grad: GRAD.sky,      glow: GLOW.sky,      icon: <Gamepad2 size={22} /> },
+  SPORT:      { grad: GRAD.mint,     glow: GLOW.mint,     icon: <Activity size={22} /> },
+  CUISINE:    { grad: GRAD.peach,    glow: GLOW.peach,    icon: <UtensilsCrossed size={22} /> },
+  FITNESS:    { grad: GRAD.sky,      glow: GLOW.sky,      icon: <Dumbbell size={22} /> },
+  CREATIVITY: { grad: GRAD.rose,     glow: GLOW.rose,     icon: <Palette size={22} /> },
+  KNOWLEDGE:  { grad: GRAD.sky,      glow: GLOW.sky,      icon: <BookOpen size={22} /> },
+  SOCIAL:     { grad: GRAD.butter,   glow: GLOW.butter,   icon: <Users size={22} /> },
+  NATURE:     { grad: 'linear-gradient(135deg,#4ADE80,#16A34A)', glow: 'rgba(74,222,128,0.5)',  icon: <Leaf size={22} /> },
+  MUSIC:      { grad: GRAD.rose,     glow: GLOW.rose,     icon: <Music size={22} /> },
+  WELLNESS:   { grad: GRAD.mint,     glow: GLOW.mint,     icon: <Heart size={22} /> },
+  DIY:        { grad: GRAD.peach,    glow: GLOW.peach,    icon: <Wrench size={22} /> },
+  OTHERS:     { grad: GRAD.lavender, glow: GLOW.lavender, icon: <LayoutGrid size={22} /> },
 };
-const DEFAULT_CAT: CatMeta = { grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={22} />, label: 'Défi' };
-
-const DIFF_LABEL: Record<string, string> = { EASY: 'Facile', MEDIUM: 'Moyen', HARD: 'Difficile', EXPERT: 'Expert' };
+const DEFAULT_CAT: CatMeta = { grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={22} /> };
 
 // ── Podium (widget "Classement" accueil) ────────────────────────────────────
 // Ordre d'affichage : 2e à gauche, 1er au centre, 3e à droite.
@@ -156,7 +157,8 @@ const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const UQuail: React.FC = () => {
-  usePageTitle('Accueil');
+  const { t, i18n } = useTranslation();
+  usePageTitle(t('uquail.pageTitle'));
   const { user, notifData, notifCount, setNotifCount } = useStore();
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<UserChallenge[]>([]);
@@ -223,6 +225,11 @@ const UQuail: React.FC = () => {
   // ── Not logged in ──────────────────────────────────────────────────────
 
   if (!user) {
+    const features = [
+      { grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} aria-hidden="true" />, title: t('uquail.feature1Title'), desc: t('uquail.feature1Desc') },
+      { grad: GRAD.butter,   glow: GLOW.butter,   icon: <Zap size={20} aria-hidden="true" />,    title: t('uquail.feature2Title'), desc: t('uquail.feature2Desc') },
+      { grad: GRAD.mint,     glow: GLOW.mint,     icon: <ShoppingBag size={20} aria-hidden="true" />, title: t('uquail.feature3Title'), desc: t('uquail.feature3Desc') },
+    ];
     return (
       <div style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
         {/* Hero gradient card */}
@@ -236,21 +243,21 @@ const UQuail: React.FC = () => {
             <p className="text-xs font-bold text-white/80 uppercase tracking-widest mb-3">ChallengeHub</p>
             <h1 className="text-3xl md:text-5xl font-bold text-white mb-4"
               style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.5, lineHeight: 1.08 }}>
-              Relevez des défis,<br />évoluez ensemble.
+              {t('uquail.heroTitleLine1')}<br />{t('uquail.heroTitleLine2')}
             </h1>
             <p className="text-white/80 text-sm md:text-base mb-6 max-w-lg leading-relaxed">
-              Rejoignez la communauté, complétez des défis, gagnez des récompenses et grimpez dans le classement.
+              {t('uquail.heroSubtitle')}
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/register"
                 className="q-press px-6 py-3 rounded-2xl text-sm font-bold"
                 style={{ background: '#fff', color: '#7C3AED' }}>
-                S'inscrire gratuitement
+                {t('uquail.registerFree')}
               </Link>
               <Link to="/login"
                 className="q-press px-6 py-3 rounded-2xl text-sm font-bold text-white"
                 style={{ background: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.40)' }}>
-                Se connecter
+                {t('auth.login')}
               </Link>
             </div>
           </div>
@@ -258,11 +265,7 @@ const UQuail: React.FC = () => {
 
         {/* Feature cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} aria-hidden="true" />, title: 'Défis variés', desc: 'Gaming, sport, musique, science — des centaines de défis pour tous les goûts.' },
-            { grad: GRAD.butter,   glow: GLOW.butter,   icon: <Zap size={20} aria-hidden="true" />,    title: 'Montez de niveau', desc: 'Progressez, gagnez de l\'XP et débloquez des cosmétiques exclusifs.' },
-            { grad: GRAD.mint,     glow: GLOW.mint,     icon: <ShoppingBag size={20} aria-hidden="true" />, title: 'Boutique', desc: 'Dépensez vos coins pour personnaliser votre profil avec des cadres et titres rares.' },
-          ].map(({ grad, glow, icon, title, desc }) => (
+          {features.map(({ grad, glow, icon, title, desc }) => (
             <div key={title} className="rounded-3xl p-5 relative overflow-hidden"
               style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-3 text-white"
@@ -299,7 +302,7 @@ const UQuail: React.FC = () => {
       }
       return 0;
     });
-  const levelTitle = getLevelTitle(user.level ?? 1);
+  const levelTitle = t(getLevelTitleKey(user.level ?? 1));
 
   const streak = (user as any).currentStreak ?? 0;
   const multiplier = Math.min(3, Math.round((1 + Math.floor(streak / 7) * 0.05) * 100) / 100);
@@ -315,7 +318,7 @@ const UQuail: React.FC = () => {
         <div className="flex items-center gap-3">
           <UserAvatar avatar={user.avatar} username={user.username ?? ''} cosmetics={homeCosmetics} size="md" />
           <div>
-            <div style={{ fontSize: 13, color: 'var(--q-text2)', fontWeight: 500 }}>Bonjour,</div>
+            <div style={{ fontSize: 13, color: 'var(--q-text2)', fontWeight: 500 }}>{t('uquail.greeting')}</div>
             <div style={{ fontSize: 20, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.2, lineHeight: 1.1 }}>
               {user.username}
             </div>
@@ -329,10 +332,10 @@ const UQuail: React.FC = () => {
               color: '#fff', padding: '6px 12px', borderRadius: 999,
               fontWeight: 700, fontSize: 13, fontVariantNumeric: 'tabular-nums',
               textDecoration: 'none', boxShadow: '0 4px 12px -2px rgba(251,146,60,0.45)' }}>
-            <CircleDollarSign size={14} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString('fr')}
+            <CircleDollarSign size={14} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString(i18n.language)}
           </Link>
           <div data-tour="home-notif" style={{ position: 'relative' }}>
-            <button className="q-press" aria-label="Notifications" onClick={() => {
+            <button className="q-press" aria-label={t('common.notifications')} onClick={() => {
               const willOpen = !notifPanelOpen;
               setNotifPanelOpen(willOpen);
               if (willOpen && notifData && user) {
@@ -366,7 +369,7 @@ const UQuail: React.FC = () => {
               <Bell size={18} style={{ color: 'var(--q-amber-text)' }} aria-hidden="true" />
             </button>
             {notifCount > 0 && (
-              <span aria-label={`${notifCount} notification${notifCount > 1 ? 's' : ''}`} style={{
+              <span aria-label={t('uquail.notifCount', { count: notifCount })} style={{
                 position: 'absolute', top: -4, right: -4,
                 width: 18, height: 18, borderRadius: '50%',
                 background: '#EF4444',
@@ -377,7 +380,7 @@ const UQuail: React.FC = () => {
               }}>{notifCount > 9 ? '9+' : notifCount}</span>
             )}
             {notifPanelOpen && (
-              <div role="dialog" aria-label="Notifications" style={{
+              <div role="dialog" aria-label={t('common.notifications')} style={{
                 position: 'absolute', top: 48, right: 0, zIndex: 200,
                 width: 290, borderRadius: 18,
                 background: 'var(--q-chrome)', border: '1px solid var(--q-line)',
@@ -385,8 +388,8 @@ const UQuail: React.FC = () => {
                 overflow: 'hidden',
               }}>
                 <div style={{ padding: '12px 14px 8px', borderBottom: '1px solid var(--q-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--q-text)' }}>Notifications</span>
-                  <button onClick={() => setNotifPanelOpen(false)} aria-label="Fermer" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', padding: 0, fontSize: 16, lineHeight: 1 }}>✕</button>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--q-text)' }}>{t('common.notifications')}</span>
+                  <button onClick={() => setNotifPanelOpen(false)} aria-label={t('common.close')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', padding: 0, fontSize: 16, lineHeight: 1 }}>✕</button>
                 </div>
 
                 {/* Streak at risk */}
@@ -395,8 +398,8 @@ const UQuail: React.FC = () => {
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(251,146,60,0.08)', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
                     <Flame size={16} color="#FB923C" aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--q-text)' }}>Ta streak est en danger !</div>
-                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>{notifData.streakDays}j de serie — fais un defi aujourd'hui pour ne pas la perdre.</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--q-text)' }}>{t('uquail.streakAtRiskTitle')}</div>
+                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>{t('uquail.streakAtRiskDesc', { count: notifData.streakDays })}</div>
                     </div>
                   </button>
                 )}
@@ -408,7 +411,7 @@ const UQuail: React.FC = () => {
                     <MessageSquare size={15} color="var(--q-accent)" aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.seriesName}</div>
-                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>Nouveaux messages dans le groupe</div>
+                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>{t('uquail.newGroupMessages')}</div>
                     </div>
                   </button>
                 ))}
@@ -419,8 +422,8 @@ const UQuail: React.FC = () => {
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
                     <Users size={15} color="var(--q-accent)" aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--q-text)' }}>{notifData!.pendingFriendRequests} demande{notifData!.pendingFriendRequests > 1 ? 's' : ''} d'ami</div>
-                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>En attente de ta reponse</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--q-text)' }}>{t('uquail.friendRequestCount', { count: notifData!.pendingFriendRequests })}</div>
+                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>{t('uquail.awaitingYourResponse')}</div>
                     </div>
                   </button>
                 )}
@@ -431,8 +434,8 @@ const UQuail: React.FC = () => {
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
                     <Trophy size={15} color="var(--q-accent)" aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--q-text)' }}>{notifData!.pendingSeriesInvites} invitation{notifData!.pendingSeriesInvites > 1 ? 's' : ''} de groupe</div>
-                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>Rejoins une serie en groupe</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--q-text)' }}>{t('uquail.groupInviteCount', { count: notifData!.pendingSeriesInvites })}</div>
+                      <div style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 1 }}>{t('uquail.joinGroupSeries')}</div>
                     </div>
                   </button>
                 )}
@@ -440,7 +443,7 @@ const UQuail: React.FC = () => {
                 {/* Empty state */}
                 {!notifData?.streakAtRisk && (notifData?.pendingFriendRequests ?? 0) === 0 && (notifData?.pendingSeriesInvites ?? 0) === 0 && panelUnreadGroups.length === 0 && (
                   <div style={{ padding: '20px 14px', fontSize: 13, color: 'var(--q-text3)', textAlign: 'center' }}>
-                    Tout est a jour !
+                    {t('uquail.allCaughtUp')}
                   </div>
                 )}
               </div>
@@ -458,14 +461,14 @@ const UQuail: React.FC = () => {
         <div className="flex items-start justify-between relative z-10">
           <div className="flex-1 pr-3">
             <div className="text-xs font-bold uppercase tracking-widest opacity-90 mb-1" style={{ color: 'rgba(255,255,255,0.9)' }}>
-              Niveau {user.level ?? 1} · {levelTitle}
+              {t('userProfile.level', { level: user.level ?? 1 })} · {levelTitle}
             </div>
             <div className="text-xl md:text-2xl font-bold text-white"
               style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, lineHeight: 1.15 }}>
-              Encore {1000 - xpInLevel} XP<br />pour le niveau {(user.level ?? 1) + 1}
+              <Trans i18nKey="uquail.xpToNextLevel" values={{ xp: 1000 - xpInLevel, level: (user.level ?? 1) + 1 }} components={{ br: <br /> }} />
             </div>
           </div>
-          <div role="img" aria-label={`Progression : ${Math.round(xpPercent * 100)}% vers le niveau ${(user.level ?? 1) + 1}`}>
+          <div role="img" aria-label={t('uquail.progressLabel', { percent: Math.round(xpPercent * 100), level: (user.level ?? 1) + 1 })}>
             <XpRing value={xpPercent} size={54} stroke={5} color="#fff" trackColor="rgba(255,255,255,0.25)">
               <div className="text-xs font-bold text-white" aria-hidden="true">{Math.round(xpPercent * 100)}%</div>
             </XpRing>
@@ -483,11 +486,11 @@ const UQuail: React.FC = () => {
         <div className="flex gap-5 mt-3 text-xs font-medium relative z-10" style={{ color: 'rgba(255,255,255,0.85)' }}>
           <span className="flex items-center gap-1.5">
             <Flame size={13} style={{ color: '#FFE57C' }} aria-hidden="true" />
-            <b className="text-white">{inProgress.length}</b> défi{inProgress.length === 1 ? '' : 's'} en cours
+            <Trans i18nKey="uquail.challengesInProgress" count={inProgress.length} components={{ b: <b className="text-white" /> }} />
           </span>
           <span className="flex items-center gap-1.5">
             <Zap size={13} style={{ color: '#FFE57C' }} aria-hidden="true" />
-            <b className="text-white">{xpInLevel}</b> XP ce niveau
+            <Trans i18nKey="uquail.xpThisLevel" values={{ xp: xpInLevel }} components={{ b: <b className="text-white" /> }} />
           </span>
         </div>
       </div>
@@ -516,7 +519,7 @@ const UQuail: React.FC = () => {
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-base font-bold" style={{ color: 'var(--q-text)' }}>
-                {streak > 0 ? `${streak} jour${streak > 1 ? 's' : ''} de suite !` : 'Pas encore de streak'}
+                {streak > 0 ? t('uquail.streakDaysInARow', { count: streak }) : t('uquail.noStreakYet')}
               </span>
               {multiplier > 1 && (
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full"
@@ -527,8 +530,8 @@ const UQuail: React.FC = () => {
             </div>
             <div className="text-xs mt-0.5" style={{ color: 'var(--q-text2)' }}>
               {streak > 0
-                ? `Prochain palier : ${nextMilestone}j · +0.05× tous les 7 jours`
-                : 'Complète un défi aujourd\'hui pour démarrer !'}
+                ? t('uquail.nextMilestone', { count: nextMilestone })
+                : t('uquail.completeToStart')}
             </div>
             {/* Barre progression vers le prochain palier de 7j */}
             <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(251,146,60,0.2)' }}>
@@ -541,12 +544,12 @@ const UQuail: React.FC = () => {
         {/* Paliers */}
         <div className="px-4 pb-3 flex gap-2 overflow-x-auto">
           {([
-            { days: 7,   Icon: Zap,    label: '7j'   },
-            { days: 14,  Icon: Star,   label: '14j'  },
-            { days: 30,  Icon: Award,  label: '30j'  },
-            { days: 60,  Icon: Crown,  label: '60j'  },
-            { days: 100, Icon: Trophy, label: '100j' },
-          ] as const).map(({ days, Icon, label }) => {
+            { days: 7,   Icon: Zap },
+            { days: 14,  Icon: Star },
+            { days: 30,  Icon: Award },
+            { days: 60,  Icon: Crown },
+            { days: 100, Icon: Trophy },
+          ] as const).map(({ days, Icon }) => {
             const done = streak >= days;
             const isCurrent = streak < days && (days === nextMilestone);
             return (
@@ -562,7 +565,7 @@ const UQuail: React.FC = () => {
                 <Icon size={16} color={done ? '#fff' : isCurrent ? '#FB923C' : 'var(--q-text3)'} />
                 <span className="text-[10px] font-bold"
                   style={{ color: done ? '#fff' : isCurrent ? '#FB923C' : 'var(--q-text2)' }}>
-                  {label}
+                  {t('common.daysAbbrev', { count: days })}
                 </span>
               </div>
             );
@@ -575,11 +578,11 @@ const UQuail: React.FC = () => {
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="text-xl font-bold"
           style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
-          Ta journée
+          {t('uquail.yourDay')}
         </h2>
         {inProgress.length > 0 && (
           <Link to="/challenges" className="text-xs font-semibold hover:underline" style={{ color: 'var(--q-accent)' }}>
-            Voir tout
+            {t('uquail.seeAll')}
           </Link>
         )}
       </div>
@@ -608,10 +611,10 @@ const UQuail: React.FC = () => {
           </div>
           <div>
             <p className="text-sm font-bold" style={{ color: 'var(--q-text)' }}>
-              Aucun défi en cours
+              {t('uquail.noChallengeInProgress')}
             </p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--q-text2)' }}>
-              Commence un défi dès maintenant !
+              {t('uquail.startNow')}
             </p>
           </div>
           <ChevronRight size={16} className="ml-auto flex-shrink-0" style={{ color: 'var(--q-text3)' }} aria-hidden="true" />
@@ -620,12 +623,13 @@ const UQuail: React.FC = () => {
         <div className="flex flex-col gap-3 mb-5">
           {inProgress.slice(0, 3).map((uc, i) => {
             const meta = CAT_META[uc.challenge.category] ?? DEFAULT_CAT;
+            const catLabel = t(`common.category.${uc.challenge.category}`, { defaultValue: t('uquail.defaultChallenge') });
             const day = daysSince(uc.startedAt);
             const total = 30;
             const progress = Math.min(1, day / total);
             return (
               <button key={uc.id} onClick={() => navigate('/challenges')}
-                aria-label={`Voir le défi : ${uc.challenge.title}`}
+                aria-label={t('uquail.viewChallenge', { title: uc.challenge.title })}
                 className="q-press rounded-3xl w-full text-left flex gap-3 items-center p-3.5"
                 style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
                   animationDelay: `${i * 70}ms`, cursor: 'pointer' }}>
@@ -636,11 +640,11 @@ const UQuail: React.FC = () => {
                       style={{ background: meta.grad, boxShadow: `0 3px 10px -2px ${meta.glow}` }}>
                       <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff',
                         boxShadow: '0 0 4px rgba(255,255,255,0.7)', flexShrink: 0, display: 'inline-block' }} />
-                      {meta.label}
+                      {catLabel}
                     </span>
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
                       style={{ background: '#FFDDC2', color: '#D46B0F', border: '1px solid #FFDDC2' }}>
-                      <Flame size={10} style={{ color: '#D46B0F' }} aria-hidden="true" /> {day}j
+                      <Flame size={10} style={{ color: '#D46B0F' }} aria-hidden="true" /> {t('common.daysAbbrev', { count: day })}
                     </span>
                   </div>
                   <div className="text-sm font-bold mb-1.5 truncate" style={{ color: 'var(--q-text)', letterSpacing: -0.1 }}>
@@ -652,7 +656,7 @@ const UQuail: React.FC = () => {
                         style={{ width: `${progress * 100}%`, background: meta.grad }} />
                     </div>
                     <span className="text-[11px] font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--q-text2)' }}>
-                      J{day}/{total}
+                      {t('uquail.dayOf', { day, total })}
                     </span>
                   </div>
                 </div>
@@ -669,9 +673,9 @@ const UQuail: React.FC = () => {
       {inProgress.length > 0 ? (
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
-            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={18} aria-hidden="true" />, label: 'Défis' },
-            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={18} aria-hidden="true" />, label: 'Classement' },
-            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={18} aria-hidden="true" />, label: 'Boutique' },
+            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={18} aria-hidden="true" />, label: t('sidebar.challenges') },
+            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={18} aria-hidden="true" />, label: t('sidebar.leaderboard') },
+            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={18} aria-hidden="true" />, label: t('sidebar.shop') },
           ].map(({ to, grad, glow, icon, label }) => (
             <Link key={to} to={to}
               className="q-press rounded-2xl p-3 flex flex-col items-center gap-1.5 transition-opacity hover:opacity-90"
@@ -687,9 +691,9 @@ const UQuail: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
           {[
-            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} aria-hidden="true" />, label: 'Découvrir les défis', sub: 'Relever un nouveau challenge' },
-            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={20} aria-hidden="true" />, label: 'Classement', sub: 'Voir les meilleurs joueurs' },
-            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={20} aria-hidden="true" />, label: 'Boutique', sub: 'Dépenser tes coins' },
+            { to: '/challenges', grad: GRAD.lavender, glow: GLOW.lavender, icon: <Trophy size={20} aria-hidden="true" />, label: t('uquail.discoverChallenges'), sub: t('uquail.tryNewChallenge') },
+            { to: '/leaderboard', grad: GRAD.butter, glow: GLOW.butter, icon: <Zap size={20} aria-hidden="true" />, label: t('sidebar.leaderboard'), sub: t('uquail.seeTopPlayers') },
+            { to: '/shop', grad: GRAD.mint, glow: GLOW.mint, icon: <ShoppingBag size={20} aria-hidden="true" />, label: t('sidebar.shop'), sub: t('uquail.spendYourCoins') },
           ].map(({ to, grad, glow, icon, label, sub }) => (
             <Link key={to} to={to}
               className="q-press rounded-3xl p-4 flex items-center gap-3 transition-opacity hover:opacity-90"
@@ -714,10 +718,10 @@ const UQuail: React.FC = () => {
         <div className="flex items-baseline justify-between mb-3">
           <h2 className="text-xl font-bold"
             style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
-            Classement
+            {t('sidebar.leaderboard')}
           </h2>
           <Link to="/leaderboard" className="text-xs font-semibold hover:underline" style={{ color: 'var(--q-accent)' }}>
-            Voir le classement
+            {t('uquail.seeLeaderboard')}
           </Link>
         </div>
         <Link to="/leaderboard"
@@ -747,7 +751,7 @@ const UQuail: React.FC = () => {
                       {u.username}
                     </div>
                     <div className="text-[10px] mb-2 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--q-mono)' }}>
-                      <Flame size={9} aria-hidden="true" /> {u.currentStreak}j
+                      <Flame size={9} aria-hidden="true" /> {t('common.daysAbbrev', { count: u.currentStreak })}
                     </div>
                     <div className="w-full flex items-center justify-center font-black"
                       style={{ height: PODIUM_BAR_H[rank], background: 'rgba(255,255,255,0.25)',
@@ -772,7 +776,7 @@ const UQuail: React.FC = () => {
                     {u.username}
                   </span>
                   <span className="flex items-center gap-1 text-xs font-bold text-white/90">
-                    <Flame size={12} color="#fff" aria-hidden="true" /> {u.currentStreak}j
+                    <Flame size={12} color="#fff" aria-hidden="true" /> {t('common.daysAbbrev', { count: u.currentStreak })}
                   </span>
                 </div>
               ))}
@@ -784,8 +788,8 @@ const UQuail: React.FC = () => {
                 <Trophy size={22} color="#fff" aria-hidden="true" />
               </div>
               <div>
-                <p className="text-white font-bold text-sm">Voir les meilleurs joueurs</p>
-                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.8)' }}>Classé par streak</p>
+                <p className="text-white font-bold text-sm">{t('uquail.seeTopPlayers')}</p>
+                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.8)' }}>{t('uquail.rankedByStreak')}</p>
               </div>
               <ChevronRight size={18} color="rgba(255,255,255,0.8)" className="ml-auto flex-shrink-0" aria-hidden="true" />
             </div>
@@ -798,12 +802,12 @@ const UQuail: React.FC = () => {
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="text-xl font-bold"
           style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)' }}>
-          Suggestion du jour
+          {t('sidebar.dailySuggestion')}
         </h2>
         {dailyChallenge && (
           <Link to={`/challenges?daily=${dailyChallenge.id}`}
             className="text-xs font-semibold hover:underline" style={{ color: 'var(--q-accent)' }}>
-            Voir le défi
+            {t('uquail.seeChallenge')}
           </Link>
         )}
       </div>
@@ -826,19 +830,19 @@ const UQuail: React.FC = () => {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                  Défi recommandé
+                  {t('uquail.recommendedChallenge')}
                 </span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-amber-900">
-                  <Sparkles size={9} aria-hidden="true" style={{ color: '#fff' }} /> +50% récompenses
+                  <Sparkles size={9} aria-hidden="true" style={{ color: '#fff' }} /> {t('uquail.bonusRewards')}
                 </span>
                 {dailyStatus === 'completed' && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400 text-emerald-900">
-                    Complété !
+                    {t('uquail.completed')}
                   </span>
                 )}
                 {dailyStatus === 'in_progress' && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-400 text-sky-900">
-                    En cours
+                    {t('uquail.inProgress')}
                   </span>
                 )}
               </div>
@@ -848,9 +852,9 @@ const UQuail: React.FC = () => {
               </p>
               <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.85)' }}>
                 <span className="px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(255,255,255,0.2)' }}>
-                  {DIFF_LABEL[dailyChallenge.difficulty] ?? dailyChallenge.difficulty}
+                  {t(`common.difficulty.${dailyChallenge.difficulty.toLowerCase()}`, { defaultValue: dailyChallenge.difficulty })}
                 </span>
-                <span>{dailyChallenge.coinReward} coins · {dailyChallenge.xpReward} XP</span>
+                <span>{t('sidebar.dailyRewards', { coins: dailyChallenge.coinReward, xp: dailyChallenge.xpReward })}</span>
               </div>
             </div>
             <ChevronRight size={18} style={{ color: 'rgba(255,255,255,0.8)', flexShrink: 0, marginTop: 2 }} aria-hidden="true" />

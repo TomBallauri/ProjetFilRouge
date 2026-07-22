@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
@@ -22,12 +23,12 @@ type LeaderboardUser = {
   cosmetics: EquippedCosmetic[];
 };
 
-function getSeason(): string {
+function getSeasonKey(): string {
   const m = new Date().getMonth();
-  if (m >= 2 && m <= 4) return 'Saison de printemps';
-  if (m >= 5 && m <= 7) return "Saison d'été";
-  if (m >= 8 && m <= 10) return "Saison d'automne";
-  return "Saison d'hiver";
+  if (m >= 2 && m <= 4) return 'leaderboard.seasonSpring';
+  if (m >= 5 && m <= 7) return 'leaderboard.seasonSummer';
+  if (m >= 8 && m <= 10) return 'leaderboard.seasonFall';
+  return 'leaderboard.seasonWinter';
 }
 
 function getUserTitle(cosmetics: EquippedCosmetic[]): React.ReactNode {
@@ -53,7 +54,8 @@ const MEDAL_COLOR: Record<number, { bg: string; border: string; color: string }>
 const token = () => localStorage.getItem('token') ?? '';
 
 const LeaderboardPage: React.FC = () => {
-  usePageTitle('Classement');
+  const { t } = useTranslation();
+  usePageTitle(t('leaderboard.pageTitle'));
   const { user } = useStore();
   const navigate = useNavigate();
   const [globalUsers, setGlobalUsers] = useState<LeaderboardUser[]>([]);
@@ -101,14 +103,14 @@ const LeaderboardPage: React.FC = () => {
           <BackButton />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-text3)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 1 }}>
-              Classement
+              {t('leaderboard.eyebrow')}
             </div>
             <div style={{ fontSize: 22, fontFamily: 'var(--q-display)', color: 'var(--q-text)', fontWeight: 700, letterSpacing: -0.4, lineHeight: 1.15 }}>
-              {getSeason()}
+              {t(getSeasonKey())}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--q-text3)', marginTop: 2 }}>
               <Flame size={11} color="#FB923C" aria-hidden="true" />
-              Classé par série de jours (streak)
+              {t('leaderboard.rankedByStreak')}
             </div>
           </div>
           {myRank > 0 && (
@@ -120,7 +122,7 @@ const LeaderboardPage: React.FC = () => {
               boxShadow: '0 4px 10px -2px rgba(251,146,60,0.5)',
             }}>
               <Flame size={13} aria-hidden="true" />
-              {myStreak > 0 ? `${myStreak}j` : `#${myRank}`}
+              {myStreak > 0 ? t('common.daysAbbrev', { count: myStreak }) : `#${myRank}`}
             </div>
           )}
         </div>
@@ -134,8 +136,8 @@ const LeaderboardPage: React.FC = () => {
           boxShadow: 'var(--q-shadow)', border: '1px solid var(--q-line)',
         }}>
           {([
-            { id: 'amis',  label: 'Amis',  Icon: Users },
-            { id: 'monde', label: 'Monde', Icon: Globe },
+            { id: 'amis',  label: t('leaderboard.friendsTab'),  Icon: Users },
+            { id: 'monde', label: t('leaderboard.worldTab'), Icon: Globe },
           ] as const).map(({ id, label, Icon }) => {
             const on = scope === id;
             return (
@@ -159,7 +161,7 @@ const LeaderboardPage: React.FC = () => {
       </div>
 
       {/* ── Loading ── */}
-      {isLoading && <PageLoader message="Chargement du classement..." />}
+      {isLoading && <PageLoader message={t('leaderboard.loading')} />}
 
       {/* ── Empty ── */}
       {!isLoading && users.length === 0 && (
@@ -170,7 +172,7 @@ const LeaderboardPage: React.FC = () => {
               : <Globe size={48} style={{ margin: '0 auto', color: 'var(--q-text3)' }} aria-hidden="true" />}
           </div>
           <p style={{ fontSize: 14, color: 'var(--q-text3)', fontWeight: 600 }}>
-            {scope === 'amis' ? 'Ajoute des amis pour les voir ici !' : "Aucun joueur classé pour l'instant."}
+            {scope === 'amis' ? t('leaderboard.emptyFriends') : t('leaderboard.emptyWorld')}
           </p>
         </div>
       )}
@@ -200,7 +202,7 @@ const LeaderboardPage: React.FC = () => {
                     const avatarSize = rank === 1 ? 'lg' : 'md';
                     return (
                       <button key={u.id} onClick={() => goToProfile(u)}
-                        aria-label={`Profil de ${u.username} — rang ${rank}`}
+                        aria-label={t('leaderboard.profileRankLabel', { username: u.username, rank })}
                         style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0, gap: 0 }}>
 
                         {/* Avatar + rank badge */}
@@ -241,7 +243,7 @@ const LeaderboardPage: React.FC = () => {
                         {/* Streak — c'est le critère de classement, pas l'XP */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--q-mono)', marginBottom: 8 }}>
                           <Flame size={11} aria-hidden="true" />
-                          {u.currentStreak}j
+                          {t('common.daysAbbrev', { count: u.currentStreak })}
                         </div>
 
                         {/* Step bar */}
@@ -282,7 +284,9 @@ const LeaderboardPage: React.FC = () => {
                     const isMe = user?.id === u.id;
                     return (
                       <button key={u.id} onClick={() => goToProfile(u)}
-                        aria-label={`${u.username}${isMe ? ' (vous)' : ''}, rang ${rank}`}
+                        aria-label={isMe
+                          ? t('leaderboard.rowLabelMe', { username: u.username, rank })
+                          : t('leaderboard.rowLabel', { username: u.username, rank })}
                         style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 12,
                           padding: '12px 14px',
@@ -317,14 +321,14 @@ const LeaderboardPage: React.FC = () => {
                             {u.username}
                             {isMe && (
                               <span style={{ fontSize: 10, color: 'var(--q-accent)', fontWeight: 700, flexShrink: 0 }}>
-                                (toi)
+                                {t('leaderboard.you')}
                               </span>
                             )}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
                             <Flame size={10} color={u.currentStreak > 0 ? '#FB923C' : 'var(--q-text3)'} aria-hidden="true" />
                             <span style={{ color: u.currentStreak > 0 ? '#FB923C' : 'var(--q-text3)', fontWeight: 600 }}>
-                              {u.currentStreak}j
+                              {t('common.daysAbbrev', { count: u.currentStreak })}
                             </span>
                           </div>
                         </div>
