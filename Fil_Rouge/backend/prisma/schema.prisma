@@ -201,6 +201,7 @@ model ChallengeGroupMember {
   user        User           @relation(fields: [userId], references: [id])
 
   @@unique([groupId, userId])
+  @@index([userId])
 }
 
 model GroupMessage {
@@ -211,4 +212,6 @@ model GroupMessage {
   createdAt DateTime       @default(now())
   group     ChallengeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user      User           @relation(fields: [userId], references: [id])
+
+  @@index([groupId, createdAt])
 }

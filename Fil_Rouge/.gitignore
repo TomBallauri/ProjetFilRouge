@@ -17,6 +17,11 @@ dist
 dist-ssr
 *.local
 .claude
+.next
+
+# Backend uploads (legacy: uploads now live in Postgres, not disk) and local db
+backend/uploads/
+backend/prisma/dev.db
 
 # Editor directories and files
 .vscode/*

@@ -135,8 +135,25 @@ export function useNotificationPolling() {
         .catch(() => {});
     };
 
+    // 20s (au lieu de 5s) : un poll toutes les 5s par onglet ouvert multipliait
+    // inutilement la charge serveur pour un besoin qui n'est pas temps réel.
+    // On coupe aussi l'intervalle en arrière-plan — un onglet caché n'a pas besoin
+    // de vérifier les notifications, et on relance immédiatement au retour au premier plan.
+    let id: ReturnType<typeof setInterval> | null = null;
+    const start = () => { if (!id) id = setInterval(load, 20_000); };
+    const stop  = () => { if (id) { clearInterval(id); id = null; } };
+    const onVisibilityChange = () => {
+      if (document.hidden) { stop(); return; }
+      load();
+      start();
+    };
+
     load();
-    const id = setInterval(load, 5_000);
-    return () => clearInterval(id);
+    start();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [user?.id, setNotifData, setNotifCount]);
 }
