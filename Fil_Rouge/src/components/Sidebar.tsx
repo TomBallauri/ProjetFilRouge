@@ -40,7 +40,7 @@ const DIFF_ICONS: Record<string, typeof Zap> = {
 
 const Sidebar: React.FC = () => {
   const { darkMode, user, notifCount } = useStore();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
 
@@ -48,11 +48,12 @@ const Sidebar: React.FC = () => {
   useNotificationPolling();
 
   useEffect(() => {
-    fetch('/api/challenges/daily-suggestion')
+    const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
+    fetch(`/api/challenges/daily-suggestion${langParam}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => setDailyChallenge(data))
       .catch(() => {});
-  }, []);
+  }, [i18n.language]);
 
   const menuItems: TabItem[] = [
     { path: '/',            labelKey: 'sidebar.home',        icon: <Home size={20} />,         end: true },

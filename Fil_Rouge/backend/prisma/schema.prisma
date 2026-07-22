@@ -83,9 +83,11 @@ model Friend {
 }
 
 model Challenge {
-  id           Int              @id @default(autoincrement())
-  title        String
-  description  String
+  id            Int              @id @default(autoincrement())
+  title         String
+  description   String
+  titleEn       String?
+  descriptionEn String?
   difficulty   String // EASY, MEDIUM, HARD, EXPERT
   category     String // GAMING, SPORT, CUISINE, FITNESS, CREATIVITY, KNOWLEDGE, SOCIAL
   coinReward   Int
@@ -117,9 +119,11 @@ model UserChallenge {
 }
 
 model Cosmetic {
-  id          Int            @id @default(autoincrement())
-  name        String
-  description String
+  id            Int            @id @default(autoincrement())
+  name          String
+  description   String
+  nameEn        String?
+  descriptionEn String?
   type        String // AVATAR_FRAME, BANNER, BADGE, TITLE
   imageUrl    String?
   price       Int

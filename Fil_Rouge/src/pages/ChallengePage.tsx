@@ -1289,7 +1289,7 @@ const ChallengePage: React.FC = () => {
 
   const token = localStorage.getItem('token');
 
-  useEffect(() => { fetchChallenges(0); }, [search, selectedCategory, selectedDifficulty, location.key]);
+  useEffect(() => { fetchChallenges(0); }, [search, selectedCategory, selectedDifficulty, location.key, i18n.language]);
   useEffect(() => {
     if (!user || !token) return;
     setGroupsLoading(true);
@@ -1328,7 +1328,8 @@ const ChallengePage: React.FC = () => {
   const fetchSeriesChallenges = async (name: string) => {
     if (!token) return;
     try {
-      const res = await fetch(`/api/challenges/by-series/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
+      const res = await fetch(`/api/challenges/by-series/${encodeURIComponent(name)}${langParam}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (Array.isArray(data)) setSeriesFullChallenges(prev => ({ ...prev, [name]: data }));
     } catch { /* silencieux */ }
@@ -1351,7 +1352,8 @@ const ChallengePage: React.FC = () => {
   }, [challenges, inProgressItems, completedItems, mySeriesGroups, user]);
 
   useEffect(() => {
-    fetch('/api/challenges/daily-suggestion')
+    const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
+    fetch(`/api/challenges/daily-suggestion${langParam}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.id) {
@@ -1360,7 +1362,7 @@ const ChallengePage: React.FC = () => {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [i18n.language]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1384,6 +1386,7 @@ const ChallengePage: React.FC = () => {
       if (search) params.set('search', search);
       params.set('skip', String(skip));
       params.set('limit', '10');
+      if (i18n.language !== 'fr') params.set('lang', i18n.language);
       const res = await fetch(`/api/challenges?${params}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

@@ -180,7 +180,8 @@ const UQuail: React.FC = () => {
           const list = Array.isArray(data) ? data : (data.challenges ?? []);
           setChallenges(list);
 
-          fetch('/api/challenges/daily-suggestion', { headers: { Authorization: `Bearer ${token}` } })
+          const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
+          fetch(`/api/challenges/daily-suggestion${langParam}`, { headers: { Authorization: `Bearer ${token}` } })
             .then(r => r.ok ? r.json() : null)
             .then((daily: PublicChallenge | null) => {
               if (daily?.id) {
@@ -200,7 +201,7 @@ const UQuail: React.FC = () => {
       .then(r => r.json())
       .then(data => setTopUsers(Array.isArray(data) ? data.slice(0, 3) : []))
       .catch(() => {});
-  }, [user]);
+  }, [user, i18n.language]);
 
   useEffect(() => {
     if (!user?.id) { setHomeCosmetics([]); return; }

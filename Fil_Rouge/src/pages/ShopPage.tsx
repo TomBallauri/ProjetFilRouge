@@ -197,11 +197,15 @@ const ShopPage: React.FC = () => {
 
   const token = localStorage.getItem('token');
 
-  useEffect(() => { fetchCosmetics(); if (user) fetchOwned(); }, []);
+  useEffect(() => { fetchCosmetics(); if (user) fetchOwned(); }, [i18n.language]);
 
   const fetchCosmetics = async () => {
     setLoading(true);
-    try { const r = await fetch('/api/cosmetics'); setCosmetics(await r.json()); }
+    try {
+      const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
+      const r = await fetch(`/api/cosmetics${langParam}`);
+      setCosmetics(await r.json());
+    }
     finally { setLoading(false); }
   };
 

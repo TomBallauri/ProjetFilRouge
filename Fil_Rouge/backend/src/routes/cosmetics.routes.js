@@ -3,12 +3,14 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
 import { SECRET, authMiddleware, isAdmin } from '../lib/auth.js';
 import { sanitizeUser } from '../lib/userUtils.js';
+import { withTranslatedCosmetics } from '../lib/translateContent.js';
 
 const router = Router();
 
 router.get('/api/cosmetics', async (req, res) => {
   try {
-    const cosmetics = await prisma.cosmetic.findMany({ orderBy: { price: 'asc' } });
+    const rows = await prisma.cosmetic.findMany({ orderBy: { price: 'asc' } });
+    const cosmetics = await withTranslatedCosmetics(rows, req.query.lang);
     res.json(cosmetics);
   } catch (error) {
     res.status(500).json({ error: "Erreur lors de la récupération des cosmétiques" });

@@ -14,6 +14,7 @@ import {
 } from '../lib/groupHelpers.js';
 import { planGroups, paginateKeys, orderRowsByKeys } from '../lib/seriesPagination.js';
 import { aiGenerateLimiter } from '../lib/rateLimiters.js';
+import { withTranslatedChallenge, withTranslatedChallenges } from '../lib/translateContent.js';
 
 const DAILY_BONUS_MULTIPLIER = 1.5;
 
@@ -97,7 +98,8 @@ router.get('/api/challenges', async (req, res) => {
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
-    const challenges = orderRowsByKeys(pageRows, keyOf, pageKeys);
+    const ordered = orderRowsByKeys(pageRows, keyOf, pageKeys);
+    const challenges = await withTranslatedChallenges(ordered, req.query.lang);
 
     res.json({ challenges, total, hasMore });
   } catch (error) {
@@ -118,13 +120,14 @@ router.get('/api/challenges/by-series/:seriesName', async (req, res) => {
     const visibilityClause = currentUserId
       ? { OR: [{ isPublic: true }, { createdBy: currentUserId }] }
       : { isPublic: true };
-    const challenges = await prisma.challenge.findMany({
+    const rows = await prisma.challenge.findMany({
       where: { seriesName, ...visibilityClause },
       include: {
         creator: { select: { id: true, username: true, avatar: true } },
         _count: { select: { participants: true } }
       }
     });
+    const challenges = await withTranslatedChallenges(rows, req.query.lang);
     res.json(challenges);
   } catch (error) {
     res.status(500).json({ error: 'Erreur' });
@@ -139,7 +142,8 @@ router.get('/api/challenges/daily-suggestion', async (req, res) => {
       where: { id: daily.id },
       include: { creator: { select: { id: true, username: true, avatar: true } } }
     });
-    res.json({ ...full, dailyBonusMultiplier: DAILY_BONUS_MULTIPLIER });
+    const translated = await withTranslatedChallenge(full, req.query.lang);
+    res.json({ ...translated, dailyBonusMultiplier: DAILY_BONUS_MULTIPLIER });
   } catch (error) {
     res.status(500).json({ error: "Erreur lors de la récupération du défi du jour" });
   }
@@ -155,7 +159,7 @@ router.get('/api/challenges/:id', async (req, res) => {
       }
     });
     if (!challenge) return res.status(404).json({ error: "Défi non trouvé" });
-    res.json(challenge);
+    res.json(await withTranslatedChallenge(challenge, req.query.lang));
   } catch (error) {
     res.status(400).json({ error: "Erreur lors de la récupération du défi" });
   }
