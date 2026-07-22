@@ -1392,7 +1392,10 @@ const ChallengePage: React.FC = () => {
       const newChallenges: Challenge[] = Array.isArray(data) ? data : (data.challenges ?? []);
       const more = Array.isArray(data) ? false : (data.hasMore ?? false);
       if (isAppend) {
-        setChallenges(prev => sortChallenges([...prev, ...newChallenges]));
+        // On trie le nouveau lot entre eux, mais on l'ajoute après ce qui est déjà affiché
+        // au lieu de re-trier toute la liste : sinon les nouvelles cartes s'intercalaient au
+        // milieu/en haut de la liste déjà visible au lieu d'apparaître en bas de page.
+        setChallenges(prev => [...prev, ...sortChallenges(newChallenges)]);
       } else {
         setChallenges(sortChallenges(newChallenges));
       }
