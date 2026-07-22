@@ -14,7 +14,7 @@ import {
 } from '../lib/groupHelpers.js';
 import { planGroups, paginateKeys, orderRowsByKeys } from '../lib/seriesPagination.js';
 import { aiGenerateLimiter } from '../lib/rateLimiters.js';
-import { withTranslatedChallenge, withTranslatedChallenges } from '../lib/translateContent.js';
+import { withTranslatedChallenge, withTranslatedChallenges, withTranslatedUserChallenges } from '../lib/translateContent.js';
 
 const DAILY_BONUS_MULTIPLIER = 1.5;
 
@@ -400,7 +400,8 @@ router.get('/api/users/me/challenges', async (req, res) => {
       include: { challenge: true },
       orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
     });
-    const challenges = orderRowsByKeys(pageRows, keyOf, pageKeys);
+    const ordered = orderRowsByKeys(pageRows, keyOf, pageKeys);
+    const challenges = await withTranslatedUserChallenges(ordered, req.query.lang);
 
     res.json({ challenges, total, totalCompleted, totalInProgress, hasMore });
   } catch (error) {
@@ -447,7 +448,8 @@ router.get('/api/users/me/dashboard', authMiddleware, async (req, res) => {
         include: { challenge: true },
         orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       });
-      return { challenges: orderRowsByKeys(pageRows, keyOf, pageKeys), total, hasMore };
+      const ordered = orderRowsByKeys(pageRows, keyOf, pageKeys);
+      return { challenges: await withTranslatedUserChallenges(ordered, req.query.lang), total, hasMore };
     };
 
     const [inProgress, completed, allStatuses, groups, pendingSeriesInvites] = await Promise.all([

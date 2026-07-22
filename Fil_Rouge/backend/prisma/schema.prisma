@@ -95,6 +95,7 @@ model Challenge {
   isDefault    Boolean          @default(false)
   isPublic     Boolean          @default(true)
   seriesName   String?
+  seriesNameEn String?
   createdBy    Int?
   createdAt    DateTime         @default(now())
   creator      User?            @relation(fields: [createdBy], references: [id])

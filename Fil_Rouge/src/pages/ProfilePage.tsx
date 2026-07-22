@@ -1111,7 +1111,7 @@ const EditProfile: React.FC = () => {
                 <select value={language} onChange={e => setLanguage(e.target.value)}
                   className="text-sm rounded-xl px-3 py-1.5 focus:outline-none"
                   style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)', border: '1px solid var(--q-line)', fontFamily: 'inherit' }}>
-                  {['Français', 'English', 'Español', 'Deutsch'].map(l => <option key={l} value={l}>{l}</option>)}
+                  {['Français', 'English'].map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
               </div>
               <div className="flex items-center justify-between">

@@ -22,6 +22,7 @@ type Challenge = {
   isDefault: boolean;
   createdAt: string;
   seriesName?: string | null;
+  seriesNameEn?: string | null;
   creator?: { id: number; username: string; avatar?: string };
   _count?: { participants: number };
 };
@@ -489,6 +490,7 @@ type PendingSeriesInvite = { id: number; seriesName: string; creator: { id: numb
 
 const SeriesDropdown: React.FC<{
   name: string;
+  displayName?: string;
   challenges: Challenge[];
   actionLoading: number | null;
   getUserStatus: (id: number) => string | null;
@@ -497,8 +499,11 @@ const SeriesDropdown: React.FC<{
   user: User | null;
   onJoined?: () => void;
   onGroupChange?: () => void;
-}> = ({ name, challenges, actionLoading, getUserStatus, onStart, onComplete, user, onJoined, onGroupChange }) => {
+}> = ({ name, displayName, challenges, actionLoading, getUserStatus, onStart, onComplete, user, onJoined, onGroupChange }) => {
   const { t, i18n } = useTranslation();
+  // `name` reste la clé stable (FR) utilisée pour les endpoints by-series/series-groups
+  // (join/invite/kick/chat...) ; `label` est uniquement pour l'affichage traduit.
+  const label = displayName ?? name;
   const [open, setOpen] = useState(false);
   const [group, setGroup] = useState<SeriesGroupData | null | undefined>(undefined); // undefined=loading, null=none
   const [friends, setFriends] = useState<FriendEntry[]>([]);
@@ -783,7 +788,7 @@ const SeriesDropdown: React.FC<{
       }}>
         <Sparkles size={15} color="var(--q-accent)" aria-hidden="true" style={{ flexShrink: 0 }} />
         <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {name}
+          {label}
         </span>
         <span style={{ fontSize: 11, color: 'var(--q-text3)', fontFamily: 'var(--q-mono)', flexShrink: 0, marginRight: 4 }}>
           {doneCount}/{challenges.length}
@@ -1058,7 +1063,7 @@ const SeriesDropdown: React.FC<{
                     </div>
                     <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--q-text)', marginBottom: 8 }}>{t('challengePage.series.leaveConfirmTitle')}</div>
                     <div style={{ fontSize: 13, color: 'var(--q-text2)', marginBottom: 24, lineHeight: 1.5 }}>
-                      <Trans i18nKey="challengePage.series.leaveConfirmBody" values={{ name }} components={{ strong: <strong style={{ color: 'var(--q-text)' }} /> }} />
+                      <Trans i18nKey="challengePage.series.leaveConfirmBody" values={{ name: label }} components={{ strong: <strong style={{ color: 'var(--q-text)' }} /> }} />
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
                       <button type="button" onClick={() => setConfirmLeave(false)} style={{
@@ -1103,7 +1108,7 @@ const SeriesDropdown: React.FC<{
                         <MessageCircle size={17} color="#fff" aria-hidden="true" />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
                         <div style={{ fontSize: 11, color: 'var(--q-text3)' }}>{t('challengePage.seriesInvites.membersJoined', { count: group?.members.filter(m => m.status === 'JOINED').length ?? 0 })}</div>
                       </div>
                       <button type="button" onClick={() => setShowChat(false)} style={{
@@ -1293,7 +1298,8 @@ const ChallengePage: React.FC = () => {
   useEffect(() => {
     if (!user || !token) return;
     setGroupsLoading(true);
-    fetch('/api/users/me/dashboard', { headers: { Authorization: `Bearer ${token}` } })
+    const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
+    fetch(`/api/users/me/dashboard${langParam}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(data => {
         setUserChallenges(Array.isArray(data.challenges) ? data.challenges : []);
@@ -1309,7 +1315,7 @@ const ChallengePage: React.FC = () => {
       .catch(() => {})
       .finally(() => setGroupsLoading(false));
     fetchMySeriesGroups();
-  }, [user, location.key]);
+  }, [user, location.key, i18n.language]);
 
   // Groupes de série de l'utilisateur — sert uniquement à savoir si une série a un groupe
   // encore non validé (completedAt null), pour la garder dans "En cours" tant que
@@ -1420,7 +1426,8 @@ const ChallengePage: React.FC = () => {
     if (!token) return;
     if (skip > 0) setLoadingMoreInProgress(true);
     try {
-      const res = await fetch(`/api/users/me/challenges?status=IN_PROGRESS&limit=10&skip=${skip}`, { headers: { Authorization: `Bearer ${token}` } });
+      const langParam = i18n.language !== 'fr' ? `&lang=${i18n.language}` : '';
+      const res = await fetch(`/api/users/me/challenges?status=IN_PROGRESS&limit=10&skip=${skip}${langParam}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       const items: UserChallengeWithData[] = Array.isArray(data) ? data : (data.challenges ?? []);
       if (skip > 0) setInProgressItems(prev => [...prev, ...items]);
@@ -1437,7 +1444,8 @@ const ChallengePage: React.FC = () => {
     if (!token) return;
     if (skip > 0) setLoadingMoreCompleted(true);
     try {
-      const res = await fetch(`/api/users/me/challenges?status=COMPLETED&limit=10&skip=${skip}`, { headers: { Authorization: `Bearer ${token}` } });
+      const langParam = i18n.language !== 'fr' ? `&lang=${i18n.language}` : '';
+      const res = await fetch(`/api/users/me/challenges?status=COMPLETED&limit=10&skip=${skip}${langParam}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       const items: UserChallengeWithData[] = Array.isArray(data) ? data : (data.challenges ?? []);
       if (skip > 0) setCompletedItems(prev => [...prev, ...items]);
@@ -2543,7 +2551,7 @@ const ChallengePage: React.FC = () => {
                   {inProgressSeriesEntries.length > 0 && (
                     <div className="flex flex-col gap-2 mb-3">
                       {inProgressSeriesEntries.map(([name, seriesChallenges]) => (
-                        <SeriesDropdown key={name} name={name} challenges={seriesChallenges}
+                        <SeriesDropdown key={name} name={name} displayName={seriesChallenges[0]?.seriesNameEn ?? undefined} challenges={seriesChallenges}
                           actionLoading={actionLoading} getUserStatus={getUserStatus}
                           onStart={handleStart} onComplete={handleComplete} user={user}
                           onJoined={async () => { await fetchUserChallenges(); await fetchInProgressItems(0); }}
@@ -2582,7 +2590,7 @@ const ChallengePage: React.FC = () => {
                   {seriesEntries.length > 0 && (
                     <div className="flex flex-col gap-2 mb-3">
                       {seriesEntries.map(([name, seriesChallenges]) => (
-                        <SeriesDropdown key={name} name={name} challenges={seriesChallenges}
+                        <SeriesDropdown key={name} name={name} displayName={seriesChallenges[0]?.seriesNameEn ?? undefined} challenges={seriesChallenges}
                           actionLoading={actionLoading} getUserStatus={getUserStatus}
                           onStart={handleStart} onComplete={handleComplete} user={user}
                           onJoined={async () => { await fetchUserChallenges(); await fetchInProgressItems(0); }}
@@ -2622,7 +2630,7 @@ const ChallengePage: React.FC = () => {
                   {completedSeriesEntries.length > 0 && (
                     <div className="flex flex-col gap-2 mb-3">
                       {completedSeriesEntries.map(([name, seriesChallenges]) => (
-                        <SeriesDropdown key={name} name={name} challenges={seriesChallenges}
+                        <SeriesDropdown key={name} name={name} displayName={seriesChallenges[0]?.seriesNameEn ?? undefined} challenges={seriesChallenges}
                           actionLoading={actionLoading} getUserStatus={getUserStatus}
                           onStart={handleStart} onComplete={handleComplete} user={user}
                           onJoined={async () => { await fetchUserChallenges(); await fetchInProgressItems(0); }}

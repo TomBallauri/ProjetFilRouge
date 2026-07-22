@@ -2,19 +2,24 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, UserSettings } from '../types/User';
 import { syncSettingsToServer } from './settingsSync';
-import i18n from './i18n';
+import i18n, { detectBrowserLanguageCode } from './i18n';
 
 export type NotifToggles = { defis: boolean; messages: boolean; updates: boolean };
 
 const DEFAULT_NOTIF_TOGGLES: NotifToggles = { defis: true, messages: true, updates: false };
 const LANGUAGE_TO_HTML_LANG: Record<string, string> = { 'Français': 'fr', 'English': 'en', 'Español': 'es', 'Deutsch': 'de' };
+// Inverse de LANGUAGE_TO_HTML_LANG, limité à FR/EN (seules langues réellement détectables
+// au premier lancement — voir detectBrowserLanguageCode dans src/lib/i18n.ts).
+const CODE_TO_LANGUAGE_NAME: Record<'fr' | 'en', string> = { fr: 'Français', en: 'English' };
 
 const readNotifToggles = (): NotifToggles => {
   try { return JSON.parse(localStorage.getItem('notifToggles') ?? 'null') ?? DEFAULT_NOTIF_TOGGLES; }
   catch { return DEFAULT_NOTIF_TOGGLES; }
 };
 const readReduceMotion = (): boolean => localStorage.getItem('reduceMotion') === 'true';
-const readLanguage = (): string => localStorage.getItem('appLanguage') ?? 'Français';
+// Si l'utilisateur n'a jamais choisi de langue, on affiche dans les réglages celle
+// détectée par i18n.ts au démarrage, pour que le sélecteur reste cohérent avec l'UI affichée.
+const readLanguage = (): string => localStorage.getItem('appLanguage') ?? CODE_TO_LANGUAGE_NAME[detectBrowserLanguageCode()];
 
 const applyReduceMotionToDom = (on: boolean) => {
   document.documentElement.classList.toggle('reduce-motion', on);
