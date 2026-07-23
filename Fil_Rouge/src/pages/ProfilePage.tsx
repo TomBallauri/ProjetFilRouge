@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut, ChevronLeft, Lock, HelpCircle, History } from 'lucide-react';
+import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, ChevronRight, LogOut, ChevronLeft, Lock, HelpCircle, History } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';

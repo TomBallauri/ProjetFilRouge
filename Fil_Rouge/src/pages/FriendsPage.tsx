@@ -350,7 +350,7 @@ const FriendsPage: React.FC = () => {
             <p style={{ fontWeight: 600, color: 'var(--q-text2)', marginBottom: 6 }}>{t('friends.noFriendsYet')}</p>
             <p style={{ fontSize: 13 }}>
               <Trans i18nKey="friends.noFriendsHint" components={{
-                btn: <button onClick={() => setTab('search')}
+                btn: <button onClick={() => setTab('search')} aria-label={t('friends.searchTab')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer',
                     color: 'var(--q-accent)', fontWeight: 700, fontSize: 13 }} />
               }} />
