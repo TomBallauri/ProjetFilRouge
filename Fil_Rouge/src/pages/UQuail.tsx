@@ -311,6 +311,105 @@ const UQuail: React.FC = () => {
   const nextMilestone = [7, 14, 30, 60, 100].find(m => m > streak) ?? 100;
   const streakProgress = (streak % 7) / 7;
 
+  // Extracted so the loadingMain ternary below isn't a nested conditional.
+  const todayFallback = inProgress.length === 0 ? (
+    <button onClick={() => navigate('/challenges')}
+      className="q-press w-full rounded-3xl flex items-center gap-4 p-4 mb-5 text-left"
+      style={{ background: 'var(--q-chrome)', border: '1px dashed var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+        style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)', boxShadow: '0 6px 14px -4px rgba(167,139,250,0.5)' }}>
+        <Trophy size={22} className="text-white" aria-hidden="true" />
+      </div>
+      <div>
+        <p className="text-sm font-bold" style={{ color: 'var(--q-text)' }}>
+          {t('uquail.noChallengeInProgress')}
+        </p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--q-text2)' }}>
+          {t('uquail.startNow')}
+        </p>
+      </div>
+      <ChevronRight size={16} className="ml-auto flex-shrink-0" style={{ color: 'var(--q-text3)' }} aria-hidden="true" />
+    </button>
+  ) : (
+    <div className="flex flex-col gap-3 mb-5">
+      {inProgress.slice(0, 3).map((uc, i) => {
+        const meta = CAT_META[uc.challenge.category] ?? DEFAULT_CAT;
+        const catLabel = t(`common.category.${uc.challenge.category}`, { defaultValue: t('uquail.defaultChallenge') });
+        const day = daysSince(uc.startedAt);
+        const total = 30;
+        const progress = Math.min(1, day / total);
+        return (
+          <button key={uc.id} onClick={() => navigate('/challenges')}
+            aria-label={t('uquail.viewChallenge', { title: uc.challenge.title })}
+            className="q-press rounded-3xl w-full text-left flex gap-3 items-center p-3.5"
+            style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
+              animationDelay: `${i * 70}ms`, cursor: 'pointer' }}>
+            <IconTile cat={uc.challenge.category} size={50} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white px-2.5 py-0.5 rounded-full uppercase tracking-wide"
+                  style={{ background: meta.grad, boxShadow: `0 3px 10px -2px ${meta.glow}` }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff',
+                    boxShadow: '0 0 4px rgba(255,255,255,0.7)', flexShrink: 0, display: 'inline-block' }} />
+                  {catLabel}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: '#FFDDC2', color: '#D46B0F', border: '1px solid #FFDDC2' }}>
+                  <Flame size={10} style={{ color: '#D46B0F' }} aria-hidden="true" /> {t('common.daysAbbrev', { count: day })}
+                </span>
+              </div>
+              <div className="text-sm font-bold mb-1.5 truncate" style={{ color: 'var(--q-text)', letterSpacing: -0.1 }}>
+                {uc.challenge.title}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(42,42,51,0.08)' }}>
+                  <div className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${progress * 100}%`, background: meta.grad }} />
+                </div>
+                <span className="text-[11px] font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--q-text2)' }}>
+                  {t('uquail.dayOf', { day, total })}
+                </span>
+              </div>
+            </div>
+            <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  // Extracted so the "≥3 users" ternary below isn't a nested conditional.
+  const leaderboardFallback = topUsers.length > 0 ? (
+    <div className="relative z-10 flex flex-col gap-2.5">
+      {topUsers.map((u, i) => (
+        <div key={u.id} className="flex items-center gap-3">
+          <span className="text-white font-black w-5 text-center" style={{ fontFamily: 'var(--q-display)', fontSize: 15, opacity: i === 0 ? 1 : 0.75 }}>
+            {i + 1}
+          </span>
+          <UserAvatar avatar={u.avatar} username={u.username} cosmetics={u.cosmetics ?? []} size="sm" />
+          <span className="flex-1 font-bold text-sm text-white truncate" style={{ opacity: i === 0 ? 1 : 0.85 }}>
+            {u.username}
+          </span>
+          <span className="flex items-center gap-1 text-xs font-bold text-white/90">
+            <Flame size={12} color="#fff" aria-hidden="true" /> {t('common.daysAbbrev', { count: u.currentStreak })}
+          </span>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="relative z-10 flex items-center gap-3">
+      <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: 'rgba(255,255,255,0.25)' }}>
+        <Trophy size={22} color="#fff" aria-hidden="true" />
+      </div>
+      <div>
+        <p className="text-white font-bold text-sm">{t('uquail.seeTopPlayers')}</p>
+        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.8)' }}>{t('uquail.rankedByStreak')}</p>
+      </div>
+      <ChevronRight size={18} color="rgba(255,255,255,0.8)" className="ml-auto flex-shrink-0" aria-hidden="true" />
+    </div>
+  );
+
   return (
     <div style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)', paddingBottom: 32 }}>
 
@@ -554,19 +653,20 @@ const UQuail: React.FC = () => {
           ] as const).map(({ days, Icon }) => {
             const done = streak >= days;
             const isCurrent = streak < days && (days === nextMilestone);
+            const idleBg = isCurrent ? 'rgba(251,146,60,0.15)' : 'rgba(148,163,184,0.08)';
+            const idleIconColor = isCurrent ? '#FB923C' : 'var(--q-text3)';
+            const idleLabelColor = isCurrent ? '#FB923C' : 'var(--q-text2)';
             return (
               <div key={days}
                 className="flex flex-col items-center gap-1.5 shrink-0 px-3 py-2 rounded-xl text-center transition-all"
                 style={{
-                  background: done
-                    ? 'linear-gradient(135deg,#FB923C,#FACC15)'
-                    : isCurrent ? 'rgba(251,146,60,0.15)' : 'rgba(148,163,184,0.08)',
+                  background: done ? 'linear-gradient(135deg,#FB923C,#FACC15)' : idleBg,
                   minWidth: 56,
                   border: isCurrent ? '1px solid rgba(251,146,60,0.4)' : '1px solid transparent',
                 }}>
-                <Icon size={16} color={done ? '#fff' : isCurrent ? '#FB923C' : 'var(--q-text3)'} />
+                <Icon size={16} color={done ? '#fff' : idleIconColor} />
                 <span className="text-[10px] font-bold"
-                  style={{ color: done ? '#fff' : isCurrent ? '#FB923C' : 'var(--q-text2)' }}>
+                  style={{ color: done ? '#fff' : idleLabelColor }}>
                   {t('common.daysAbbrev', { count: days })}
                 </span>
               </div>
@@ -603,71 +703,7 @@ const UQuail: React.FC = () => {
             </div>
           ))}
         </div>
-      ) : inProgress.length === 0 ? (
-        <button onClick={() => navigate('/challenges')}
-          className="q-press w-full rounded-3xl flex items-center gap-4 p-4 mb-5 text-left"
-          style={{ background: 'var(--q-chrome)', border: '1px dashed var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)', boxShadow: '0 6px 14px -4px rgba(167,139,250,0.5)' }}>
-            <Trophy size={22} className="text-white" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-sm font-bold" style={{ color: 'var(--q-text)' }}>
-              {t('uquail.noChallengeInProgress')}
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--q-text2)' }}>
-              {t('uquail.startNow')}
-            </p>
-          </div>
-          <ChevronRight size={16} className="ml-auto flex-shrink-0" style={{ color: 'var(--q-text3)' }} aria-hidden="true" />
-        </button>
-      ) : (
-        <div className="flex flex-col gap-3 mb-5">
-          {inProgress.slice(0, 3).map((uc, i) => {
-            const meta = CAT_META[uc.challenge.category] ?? DEFAULT_CAT;
-            const catLabel = t(`common.category.${uc.challenge.category}`, { defaultValue: t('uquail.defaultChallenge') });
-            const day = daysSince(uc.startedAt);
-            const total = 30;
-            const progress = Math.min(1, day / total);
-            return (
-              <button key={uc.id} onClick={() => navigate('/challenges')}
-                aria-label={t('uquail.viewChallenge', { title: uc.challenge.title })}
-                className="q-press rounded-3xl w-full text-left flex gap-3 items-center p-3.5"
-                style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
-                  animationDelay: `${i * 70}ms`, cursor: 'pointer' }}>
-                <IconTile cat={uc.challenge.category} size={50} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white px-2.5 py-0.5 rounded-full uppercase tracking-wide"
-                      style={{ background: meta.grad, boxShadow: `0 3px 10px -2px ${meta.glow}` }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff',
-                        boxShadow: '0 0 4px rgba(255,255,255,0.7)', flexShrink: 0, display: 'inline-block' }} />
-                      {catLabel}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: '#FFDDC2', color: '#D46B0F', border: '1px solid #FFDDC2' }}>
-                      <Flame size={10} style={{ color: '#D46B0F' }} aria-hidden="true" /> {t('common.daysAbbrev', { count: day })}
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold mb-1.5 truncate" style={{ color: 'var(--q-text)', letterSpacing: -0.1 }}>
-                    {uc.challenge.title}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(42,42,51,0.08)' }}>
-                      <div className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${progress * 100}%`, background: meta.grad }} />
-                    </div>
-                    <span className="text-[11px] font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--q-text2)' }}>
-                      {t('uquail.dayOf', { day, total })}
-                    </span>
-                  </div>
-                </div>
-                <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
-              </button>
-            );
-          })}
-        </div>
-      )}
+      ) : todayFallback}
       </div>
 
       {/* ── Quick nav cards — desktop only (mobile has bottom tab bar) ── */}
@@ -766,36 +802,7 @@ const UQuail: React.FC = () => {
                 );
               })}
             </div>
-          ) : topUsers.length > 0 ? (
-            <div className="relative z-10 flex flex-col gap-2.5">
-              {topUsers.map((u, i) => (
-                <div key={u.id} className="flex items-center gap-3">
-                  <span className="text-white font-black w-5 text-center" style={{ fontFamily: 'var(--q-display)', fontSize: 15, opacity: i === 0 ? 1 : 0.75 }}>
-                    {i + 1}
-                  </span>
-                  <UserAvatar avatar={u.avatar} username={u.username} cosmetics={u.cosmetics ?? []} size="sm" />
-                  <span className="flex-1 font-bold text-sm text-white truncate" style={{ opacity: i === 0 ? 1 : 0.85 }}>
-                    {u.username}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs font-bold text-white/90">
-                    <Flame size={12} color="#fff" aria-hidden="true" /> {t('common.daysAbbrev', { count: u.currentStreak })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="relative z-10 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(255,255,255,0.25)' }}>
-                <Trophy size={22} color="#fff" aria-hidden="true" />
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm">{t('uquail.seeTopPlayers')}</p>
-                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.8)' }}>{t('uquail.rankedByStreak')}</p>
-              </div>
-              <ChevronRight size={18} color="rgba(255,255,255,0.8)" className="ml-auto flex-shrink-0" aria-hidden="true" />
-            </div>
-          )}
+          ) : leaderboardFallback}
         </Link>
       </div>
 

@@ -6,6 +6,135 @@ import { Eye, EyeOff, Lock, Zap } from 'lucide-react';
 import BackButton from '../components/BackButton';
 import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordPolicy';
 
+const LIGHT = {
+  pageBg: 'radial-gradient(circle, rgba(0,0,0,0.04) 1.4px, transparent 1.7px) 0 0/16px 16px, linear-gradient(180deg, #F4F4FB 0%, #EAEAF5 100%)',
+  cardBg: '#FFFFFF',
+  cardBorder: 'rgba(0,0,0,0.08)',
+  cardShadow: '0 1px 0 rgba(255,255,255,0.8) inset, 0 24px 48px -12px rgba(0,0,0,0.12)',
+  titleColor: '#1F2030',
+  subColor: '#6B6B7A',
+  labelColor: '#6B6B7A',
+  inputBg: 'rgba(0,0,0,0.04)',
+  inputBorder: 'rgba(0,0,0,0.12)',
+  inputColor: '#1F2030',
+  iconColor: '#A0A0B0',
+  linkColor: '#7C3AED',
+  errorBg: 'rgba(239,68,68,0.07)',
+  errorBorder: 'rgba(239,68,68,0.25)',
+  errorColor: '#DC2626',
+};
+
+const DARK = {
+  pageBg: 'radial-gradient(circle, rgba(255,255,255,0.07) 1.4px, transparent 1.7px) 0 0/16px 16px, linear-gradient(180deg, #1F2030 0%, #16172A 100%)',
+  cardBg: '#2A2B3F',
+  cardBorder: 'rgba(255,255,255,0.08)',
+  cardShadow: '0 1px 0 rgba(255,255,255,0.05) inset, 0 24px 48px -12px rgba(0,0,0,0.55)',
+  titleColor: '#EAEAF2',
+  subColor: '#9B9BAA',
+  labelColor: '#9B9BAA',
+  inputBg: 'rgba(255,255,255,0.05)',
+  inputBorder: 'rgba(255,255,255,0.10)',
+  inputColor: '#EAEAF2',
+  iconColor: '#5A5A6A',
+  linkColor: '#C8B3FF',
+  errorBg: 'rgba(239,68,68,0.12)',
+  errorBorder: 'rgba(239,68,68,0.30)',
+  errorColor: '#FCA5A5',
+};
+
+type Theme = typeof LIGHT;
+
+type ResetPasswordFormProps = {
+  theme: Theme;
+  inputStyle: React.CSSProperties;
+  password: string;
+  setPassword: (value: string) => void;
+  confirmPassword: string;
+  setConfirmPassword: (value: string) => void;
+  showPassword: boolean;
+  setShowPassword: (updater: (prev: boolean) => boolean) => void;
+  error: string | null;
+  loading: boolean;
+  onSubmit: (e: React.FormEvent) => void;
+  t: (key: string) => string;
+};
+
+const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
+  theme, inputStyle, password, setPassword, confirmPassword, setConfirmPassword,
+  showPassword, setShowPassword, error, loading, onSubmit, t,
+}) => {
+  const { labelColor, iconColor, inputBorder, errorBg, errorBorder, errorColor } = theme;
+  const passwordFieldType = showPassword ? 'text' : 'password';
+
+  return (
+    <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <label htmlFor="password" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
+          {t('resetPassword.newPassword')}
+        </label>
+        <div style={{ position: 'relative' }}>
+          <Lock size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
+          <input
+            id="password" type={passwordFieldType} value={password} onChange={e => setPassword(e.target.value)}
+            required placeholder="••••••••" autoComplete="new-password"
+            style={{ ...inputStyle, padding: '11px 42px 11px 38px' }}
+            onFocus={e => e.currentTarget.style.borderColor = '#A78BFA'}
+            onBlur={e => e.currentTarget.style.borderColor = inputBorder}
+          />
+          <button type="button" onClick={() => setShowPassword(p => !p)}
+            aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer', color: iconColor, padding: 2, display: 'flex' }}>
+            {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+          </button>
+        </div>
+        <p style={{ fontSize: 11, color: labelColor, marginTop: 6, lineHeight: 1.4 }}>
+          {PASSWORD_REQUIREMENTS_TEXT}
+        </p>
+      </div>
+
+      <div>
+        <label htmlFor="confirmPassword" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
+          {t('resetPassword.confirmPassword')}
+        </label>
+        <div style={{ position: 'relative' }}>
+          <Lock size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
+          <input
+            id="confirmPassword" type={passwordFieldType} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+            required placeholder="••••••••" autoComplete="new-password"
+            style={inputStyle}
+            onFocus={e => e.currentTarget.style.borderColor = '#A78BFA'}
+            onBlur={e => e.currentTarget.style.borderColor = inputBorder}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <div role="alert" aria-live="assertive" style={{ padding: '10px 14px', borderRadius: 12, background: errorBg,
+          border: `1px solid ${errorBorder}`, color: errorColor, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
+      <button type="submit" disabled={loading} aria-busy={loading}
+        style={{
+          width: '100%', height: 48, borderRadius: 16, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+          background: 'linear-gradient(135deg, #00DDFF 0%, #067DBA 35%, #2B1FD0 65%, #B71AEB 100%)',
+          color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'inherit',
+          opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s ease',
+          boxShadow: '0 4px 16px rgba(167,139,250,0.40)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          marginTop: 4,
+        }}>
+        {loading
+          ? <output aria-label={t('common.loading')}><div aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /></output>
+          : t('resetPassword.submit')
+        }
+      </button>
+    </form>
+  );
+};
+
 const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -18,12 +147,18 @@ const ResetPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const getValidationError = (): string | null => {
+    if (!token) return t('resetPassword.invalidToken');
+    if (!isStrongPassword(password)) return `${t('auth.weakPassword')} ${PASSWORD_REQUIREMENTS_TEXT}`;
+    if (password !== confirmPassword) return t('resetPassword.passwordsDontMatch');
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!token) { setError(t('resetPassword.invalidToken')); return; }
-    if (!isStrongPassword(password)) { setError(`${t('auth.weakPassword')} ${PASSWORD_REQUIREMENTS_TEXT}`); return; }
-    if (password !== confirmPassword) { setError(t('resetPassword.passwordsDontMatch')); return; }
+    const validationError = getValidationError();
+    if (validationError) { setError(validationError); return; }
 
     setLoading(true);
     try {
@@ -43,25 +178,11 @@ const ResetPasswordPage: React.FC = () => {
   };
 
   const dk = darkMode;
-  const pageBg = dk
-    ? 'radial-gradient(circle, rgba(255,255,255,0.07) 1.4px, transparent 1.7px) 0 0/16px 16px, linear-gradient(180deg, #1F2030 0%, #16172A 100%)'
-    : 'radial-gradient(circle, rgba(0,0,0,0.04) 1.4px, transparent 1.7px) 0 0/16px 16px, linear-gradient(180deg, #F4F4FB 0%, #EAEAF5 100%)';
-  const cardBg      = dk ? '#2A2B3F' : '#FFFFFF';
-  const cardBorder  = dk ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-  const cardShadow  = dk
-    ? '0 1px 0 rgba(255,255,255,0.05) inset, 0 24px 48px -12px rgba(0,0,0,0.55)'
-    : '0 1px 0 rgba(255,255,255,0.8) inset, 0 24px 48px -12px rgba(0,0,0,0.12)';
-  const titleColor  = dk ? '#EAEAF2' : '#1F2030';
-  const subColor    = dk ? '#9B9BAA' : '#6B6B7A';
-  const labelColor  = dk ? '#9B9BAA' : '#6B6B7A';
-  const inputBg     = dk ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
-  const inputBorder = dk ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.12)';
-  const inputColor  = dk ? '#EAEAF2' : '#1F2030';
-  const iconColor   = dk ? '#5A5A6A' : '#A0A0B0';
-  const linkColor   = dk ? '#C8B3FF' : '#7C3AED';
-  const errorBg     = dk ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.07)';
-  const errorBorder = dk ? 'rgba(239,68,68,0.30)' : 'rgba(239,68,68,0.25)';
-  const errorColor  = dk ? '#FCA5A5' : '#DC2626';
+  const theme = dk ? DARK : LIGHT;
+  const {
+    pageBg, cardBg, cardBorder, cardShadow, titleColor, subColor, linkColor,
+    inputBg, inputBorder, inputColor, errorBg, errorBorder, errorColor,
+  } = theme;
 
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
@@ -115,71 +236,20 @@ const ResetPasswordPage: React.FC = () => {
               </Link>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <label htmlFor="password" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
-                  {t('resetPassword.newPassword')}
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Lock size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
-                  <input
-                    id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
-                    required placeholder="••••••••" autoComplete="new-password"
-                    style={{ ...inputStyle, padding: '11px 42px 11px 38px' }}
-                    onFocus={e => e.currentTarget.style.borderColor = '#A78BFA'}
-                    onBlur={e => e.currentTarget.style.borderColor = inputBorder}
-                  />
-                  <button type="button" onClick={() => setShowPassword(p => !p)}
-                    aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                      background: 'none', border: 'none', cursor: 'pointer', color: iconColor, padding: 2, display: 'flex' }}>
-                    {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-                  </button>
-                </div>
-                <p style={{ fontSize: 11, color: labelColor, marginTop: 6, lineHeight: 1.4 }}>
-                  {PASSWORD_REQUIREMENTS_TEXT}
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="confirmPassword" style={{ display: 'block', fontSize: 12, fontWeight: 700, color: labelColor, marginBottom: 6, letterSpacing: 0.3 }}>
-                  {t('resetPassword.confirmPassword')}
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Lock size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
-                  <input
-                    id="confirmPassword" type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                    required placeholder="••••••••" autoComplete="new-password"
-                    style={inputStyle}
-                    onFocus={e => e.currentTarget.style.borderColor = '#A78BFA'}
-                    onBlur={e => e.currentTarget.style.borderColor = inputBorder}
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div role="alert" aria-live="assertive" style={{ padding: '10px 14px', borderRadius: 12, background: errorBg,
-                  border: `1px solid ${errorBorder}`, color: errorColor, fontSize: 13 }}>
-                  {error}
-                </div>
-              )}
-
-              <button type="submit" disabled={loading} aria-busy={loading}
-                style={{
-                  width: '100%', height: 48, borderRadius: 16, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
-                  background: 'linear-gradient(135deg, #00DDFF 0%, #067DBA 35%, #2B1FD0 65%, #B71AEB 100%)',
-                  color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'inherit',
-                  opacity: loading ? 0.7 : 1, transition: 'opacity 0.15s ease',
-                  boxShadow: '0 4px 16px rgba(167,139,250,0.40)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  marginTop: 4,
-                }}>
-                {loading
-                  ? <output aria-label={t('common.loading')}><div aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /></output>
-                  : t('resetPassword.submit')
-                }
-              </button>
-            </form>
+            <ResetPasswordForm
+              theme={theme}
+              inputStyle={inputStyle}
+              password={password}
+              setPassword={setPassword}
+              confirmPassword={confirmPassword}
+              setConfirmPassword={setConfirmPassword}
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
+              error={error}
+              loading={loading}
+              onSubmit={handleSubmit}
+              t={t}
+            />
           )}
         </div>
       </div>

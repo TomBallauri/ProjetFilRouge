@@ -148,10 +148,11 @@ const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, can
       </button>
     );
     const btnColor = canAfford ? 'bg-pink-600 hover:bg-pink-700' : 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed';
+    const buyLabel = canAfford ? t('shop.buy') : t('shop.insufficient');
     return (
       <button onClick={() => onBuy(cosmetic)} disabled={!canAfford || isLoading}
         className={`w-full py-1.5 rounded-lg text-white text-xs font-bold transition-all active:scale-95 ${btnColor} disabled:opacity-60`}>
-        {isLoading ? '...' : canAfford ? t('shop.buy') : t('shop.insufficient')}
+        {isLoading ? '...' : buyLabel}
       </button>
     );
   };
@@ -242,6 +243,40 @@ const ShopPage: React.FC = () => {
   const card = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
   const filterBtnInactive = darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600';
   const filterBtnClass = filtersOpen || activeFilters > 0 ? 'bg-pink-600 text-white' : filterBtnInactive;
+  // Style des puces de filtre inactives (type et rareté) — un seul calcul réutilisé
+  // partout au lieu d'un ternaire dark/light dupliqué à chaque bouton.
+  const inactiveChipClass = darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200';
+
+  let content: React.ReactNode;
+  if (loading) {
+    content = <PageLoader message={t('shop.loading')} />;
+  } else if (filtered.length === 0) {
+    content = (
+      <div className="text-center py-16 text-gray-400">
+        <ShoppingBag size={44} className="mx-auto mb-3 opacity-30" aria-hidden="true" />
+        <p>{t('shop.noItems')}</p>
+      </div>
+    );
+  } else {
+    content = (
+      <div data-tour="shop-items" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {filtered.map(cosmetic => (
+          <CosmeticCard
+            key={cosmetic.id}
+            cosmetic={cosmetic}
+            alreadyOwned={isOwned(cosmetic.id)}
+            canAfford={(user?.coins ?? 0) >= cosmetic.price}
+            isLoading={buyLoading === cosmetic.id}
+            user={user}
+            darkMode={darkMode}
+            card={card}
+            onBuy={handleBuy}
+            onLogin={() => navigate('/login')}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={`px-3 py-4 md:p-6 min-h-screen ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -311,14 +346,14 @@ const ShopPage: React.FC = () => {
             <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">{t('shop.typeLabel')}</p>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setFilterType('')}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterType ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterType ? 'bg-pink-600 text-white' : inactiveChipClass}`}>
                 {t('shop.allTypes')}
               </button>
               {TYPES.map(ty => {
                 const TypeIcon = TYPE[ty]?.icon ?? Package;
                 return (
                   <button key={ty} onClick={() => setFilterType(ty === filterType ? '' : ty)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterType === ty ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterType === ty ? 'bg-pink-600 text-white' : inactiveChipClass}`}>
                     <TypeIcon size={13} aria-hidden="true" /> {t(`shop.type.${ty}`)}
                   </button>
                 );
@@ -329,14 +364,14 @@ const ShopPage: React.FC = () => {
             <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">{t('shop.rarityLabel')}</p>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setFilterRarity('')}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterRarity ? 'bg-pink-600 text-white' : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterRarity ? 'bg-pink-600 text-white' : inactiveChipClass}`}>
                 {t('shop.allRarities')}
               </button>
               {RARITIES.map(r => {
                 const cfg = RARITY[r];
                 return (
                   <button key={r} onClick={() => setFilterRarity(r === filterRarity ? '' : r)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterRarity === r ? `${cfg.bg} ${cfg.color} border ${cfg.border}` : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterRarity === r ? `${cfg.bg} ${cfg.color} border ${cfg.border}` : inactiveChipClass}`}>
                     {t(`common.rarity.${r}`)}
                   </button>
                 );
@@ -346,31 +381,7 @@ const ShopPage: React.FC = () => {
         </div>
       )}
 
-      {loading ? (
-        <PageLoader message={t('shop.loading')} />
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <ShoppingBag size={44} className="mx-auto mb-3 opacity-30" aria-hidden="true" />
-          <p>{t('shop.noItems')}</p>
-        </div>
-      ) : (
-        <div data-tour="shop-items" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {filtered.map(cosmetic => (
-            <CosmeticCard
-              key={cosmetic.id}
-              cosmetic={cosmetic}
-              alreadyOwned={isOwned(cosmetic.id)}
-              canAfford={(user?.coins ?? 0) >= cosmetic.price}
-              isLoading={buyLoading === cosmetic.id}
-              user={user}
-              darkMode={darkMode}
-              card={card}
-              onBuy={handleBuy}
-              onLogin={() => navigate('/login')}
-            />
-          ))}
-        </div>
-      )}
+      {content}
     </div>
   );
 };

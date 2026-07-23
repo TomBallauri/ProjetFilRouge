@@ -39,6 +39,38 @@ const DIFFICULTIES = [
 type ChallengeForm = { id: string; title: string; description: string; category: string; difficulty: string };
 const emptyChallenge = (): ChallengeForm => ({ id: crypto.randomUUID(), title: '', description: '', category: 'GAMING', difficulty: 'MEDIUM' });
 
+type SubmitResult = { ok: true } | { ok: false; kind: 'network' } | { ok: false; kind: 'http'; error?: string };
+
+// Construit le endpoint + payload adaptés au cas mono ou multi défis.
+function buildSubmitRequest(challenges: ChallengeForm[], seriesName: string, isPublic: boolean) {
+  const toSave = challenges.map(({ id: _id, ...c }) => ({ ...c, isPublic }));
+  const endpoint = challenges.length === 1 ? '/api/challenges' : '/api/challenges/bulk-save';
+  const trimmedSeries = seriesName.trim();
+  const body = challenges.length === 1
+    ? JSON.stringify({ ...toSave[0] })
+    : JSON.stringify({ challenges: toSave, ...(trimmedSeries ? { seriesName: trimmedSeries } : {}) });
+  return { endpoint, body };
+}
+
+// Envoie la création au backend ; isolé du composant pour ne pas alourdir sa
+// complexité (try/catch + vérif réponse) — voir handleSubmit.
+async function submitChallenges(challenges: ChallengeForm[], seriesName: string, isPublic: boolean): Promise<SubmitResult> {
+  const token = localStorage.getItem('token');
+  const { endpoint, body } = buildSubmitRequest(challenges, seriesName, isPublic);
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body,
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, kind: 'http', error: data.error };
+    return { ok: true };
+  } catch {
+    return { ok: false, kind: 'network' };
+  }
+}
+
 // ── Category icon tile ─────────────────────────────────────────────────────────
 function CatTile({ value, selected, onClick }: { value: string; selected: boolean; onClick: () => void }) {
   const { t } = useTranslation();
@@ -90,6 +122,9 @@ function ChallengeCard({
     ${darkMode
       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
       : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:bg-white'}`;
+  const inactiveDifficultyClass = darkMode
+    ? 'border-gray-600 hover:border-gray-500 text-gray-300'
+    : 'border-gray-200 hover:border-gray-300 text-gray-600';
 
   return (
     <div className={`rounded-2xl border p-4 space-y-4 ${darkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
@@ -144,7 +179,7 @@ function ChallengeCard({
             <button key={d.value} type="button"
               onClick={() => onChange({ ...data, difficulty: d.value })}
               className={`py-2 rounded-xl border-2 text-center transition-all active:scale-95 text-xs font-bold
-                ${data.difficulty === d.value ? `${d.border} ${d.bg} ${d.text}` : darkMode ? 'border-gray-600 hover:border-gray-500 text-gray-300' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                ${data.difficulty === d.value ? `${d.border} ${d.bg} ${d.text}` : inactiveDifficultyClass}`}>
               {t(`common.difficulty.${d.value.toLowerCase()}`)}
             </button>
           ))}
@@ -170,6 +205,59 @@ const CreateChallenge: React.FC = () => {
 
   if (!user) { navigate('/login'); return null; }
 
+  // ── Constantes de thème (une seule bascule dark/light au lieu de ternaires
+  // dispersés dans tout le JSX) ────────────────────────────────────────────
+  const THEME = darkMode
+    ? {
+        text: 'text-white',
+        backLink: 'text-gray-400 hover:text-white',
+        card: 'bg-gray-800/60 border-gray-700',
+        input: 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500',
+        addChallengeBtn: 'border-gray-600 text-gray-400 hover:border-blue-500 hover:text-blue-400',
+        muted: 'text-gray-400',
+        lockIcon: 'text-gray-400',
+        toggleInactive: 'bg-gray-600',
+        visibilityActive: 'border-blue-500/50 bg-blue-500/10',
+        visibilityInactive: 'border-gray-600 bg-gray-700/40',
+      }
+    : {
+        text: 'text-gray-900',
+        backLink: 'text-gray-500 hover:text-gray-900',
+        card: 'bg-white border-gray-200 shadow-sm',
+        input: 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:bg-white',
+        addChallengeBtn: 'border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-600',
+        muted: 'text-gray-500',
+        lockIcon: 'text-gray-500',
+        toggleInactive: 'bg-gray-300',
+        visibilityActive: 'border-blue-200 bg-blue-50',
+        visibilityInactive: 'border-gray-200 bg-gray-50',
+      };
+
+  const visibilityBorderClass = isPublic ? THEME.visibilityActive : THEME.visibilityInactive;
+  const toggleTrackClass = isPublic ? 'bg-blue-500' : THEME.toggleInactive;
+
+  // ── Contenu dépendant de isPublic (une seule bascule au lieu de 4 ternaires) ──
+  const visibilityContent = isPublic
+    ? {
+        icon: <Globe size={16} className="text-blue-400 shrink-0" />,
+        label: t('createChallenge.public'),
+        description: t('createChallenge.visibleByAll'),
+        togglePos: 'left-5',
+      }
+    : {
+        icon: <Lock size={16} className={`shrink-0 ${THEME.lockIcon}`} />,
+        label: t('createChallenge.private'),
+        description: t('createChallenge.visibleByYouOnly'),
+        togglePos: 'left-0.5',
+      };
+
+  const publishLabel = challenges.length > 1
+    ? t('createChallenge.publishMultiple', { count: challenges.length })
+    : t('createChallenge.publishSingle');
+  const submitButtonContent = isPublic
+    ? <span className="flex items-center justify-center gap-1.5"><Rocket size={15} /> {publishLabel}</span>
+    : <span className="flex items-center justify-center gap-1.5"><Lock size={15} /> {t('createChallenge.createPrivate')}</span>;
+
   const updateChallenge = (i: number, f: ChallengeForm) =>
     setChallenges(prev => prev.map((c, idx) => idx === i ? f : c));
 
@@ -184,31 +272,20 @@ const CreateChallenge: React.FC = () => {
     if (invalid) { setError(t('createChallenge.missingFields')); return; }
     setLoading(true);
     setError('');
-    try {
-      const token = localStorage.getItem('token');
-      const toSave = challenges.map(({ id: _id, ...c }) => ({ ...c, isPublic }));
-      const endpoint = challenges.length === 1 ? '/api/challenges' : '/api/challenges/bulk-save';
-      const trimmedSeries = seriesName.trim();
-      const body = challenges.length === 1
-        ? JSON.stringify({ ...toSave[0] })
-        : JSON.stringify({ challenges: toSave, ...(trimmedSeries ? { seriesName: trimmedSeries } : {}) });
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body,
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || t('createChallenge.createError')); return; }
-      navigate('/challenges');
-    } catch { setError(t('createChallenge.networkError')); }
-    finally { setLoading(false); }
+    const result = await submitChallenges(challenges, seriesName, isPublic);
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.kind === 'network' ? t('createChallenge.networkError') : (result.error || t('createChallenge.createError')));
+      return;
+    }
+    navigate('/challenges');
   };
 
   return (
-    <div className={`px-3 py-4 md:p-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+    <div className={`px-3 py-4 md:p-6 ${THEME.text}`}>
 
       <button onClick={() => navigate('/challenges')}
-        className={`flex items-center gap-1.5 mb-5 text-sm font-medium ${darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'} transition-colors`}>
+        className={`flex items-center gap-1.5 mb-5 text-sm font-medium ${THEME.backLink} transition-colors`}>
         <ArrowLeft size={16} /> {t('createChallenge.backToChallenges')}
       </button>
 
@@ -238,7 +315,7 @@ const CreateChallenge: React.FC = () => {
 
           {/* Nom de la série (optionnel, quand plusieurs défis) */}
           {challenges.length > 1 && (
-            <div className={`rounded-xl border p-3 ${darkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+            <div className={`rounded-xl border p-3 ${THEME.card}`}>
               <label htmlFor="series-name" className="block text-xs font-semibold mb-1.5 opacity-70">
                 {t('createChallenge.seriesNameLabel')} <span className="opacity-50 font-normal">({t('createChallenge.optional')})</span>
               </label>
@@ -249,11 +326,7 @@ const CreateChallenge: React.FC = () => {
                 value={seriesName}
                 onChange={e => setSeriesName(e.target.value)}
                 placeholder={t('createChallenge.seriesNamePlaceholder')}
-                className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm transition-colors ${
-                  darkMode
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
-                    : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:bg-white'
-                }`}
+                className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm transition-colors ${THEME.input}`}
               />
               <p className="text-xs mt-1 opacity-40">{t('createChallenge.seriesNameHint')}</p>
             </div>
@@ -262,29 +335,24 @@ const CreateChallenge: React.FC = () => {
           {/* Bouton ajouter un défi */}
           <button type="button" onClick={addChallenge}
             className={`w-full py-3 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 text-sm font-semibold transition-all hover:scale-[1.01] active:scale-[0.99]
-              ${darkMode ? 'border-gray-600 text-gray-400 hover:border-blue-500 hover:text-blue-400' : 'border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-600'}`}>
+              ${THEME.addChallengeBtn}`}>
             <Plus size={16} /> {t('createChallenge.addChallenge')}
           </button>
 
           {/* Visibilité */}
           <button type="button" onClick={() => setIsPublic(p => !p)}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all
-              ${isPublic
-                ? darkMode ? 'border-blue-500/50 bg-blue-500/10' : 'border-blue-200 bg-blue-50'
-                : darkMode ? 'border-gray-600 bg-gray-700/40' : 'border-gray-200 bg-gray-50'}`}>
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${visibilityBorderClass}`}>
             <div className="flex items-center gap-3">
-              {isPublic
-                ? <Globe size={16} className="text-blue-400 shrink-0" />
-                : <Lock size={16} className={`shrink-0 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />}
+              {visibilityContent.icon}
               <div className="text-left">
-                <p className="text-sm font-semibold">{isPublic ? t('createChallenge.public') : t('createChallenge.private')}</p>
-                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {isPublic ? t('createChallenge.visibleByAll') : t('createChallenge.visibleByYouOnly')}
+                <p className="text-sm font-semibold">{visibilityContent.label}</p>
+                <p className={`text-xs ${THEME.muted}`}>
+                  {visibilityContent.description}
                 </p>
               </div>
             </div>
-            <div className={`w-10 h-5 rounded-full transition-colors shrink-0 relative ${isPublic ? 'bg-blue-500' : darkMode ? 'bg-gray-600' : 'bg-gray-300'}`}>
-              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${isPublic ? 'left-5' : 'left-0.5'}`} />
+            <div className={`w-10 h-5 rounded-full transition-colors shrink-0 relative ${toggleTrackClass}`}>
+              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${visibilityContent.togglePos}`} />
             </div>
           </button>
 
@@ -292,9 +360,7 @@ const CreateChallenge: React.FC = () => {
 
           <button type="submit" disabled={loading}
             className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 text-sm active:scale-95">
-            {loading ? t('createChallenge.creating') : isPublic
-              ? <span className="flex items-center justify-center gap-1.5"><Rocket size={15} /> {challenges.length > 1 ? t('createChallenge.publishMultiple', { count: challenges.length }) : t('createChallenge.publishSingle')}</span>
-              : <span className="flex items-center justify-center gap-1.5"><Lock size={15} /> {t('createChallenge.createPrivate')}</span>}
+            {loading ? t('createChallenge.creating') : submitButtonContent}
           </button>
         </form>
       </div>

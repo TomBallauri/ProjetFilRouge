@@ -167,6 +167,103 @@ const FriendsPage: React.FC = () => {
     },
   ];
 
+  // Extracted so the `loading ? ... : ...` ternaries below aren't nested conditionals.
+  const friendsListContent = friends.length === 0 ? (
+    <div style={{ textAlign: 'center', padding: '50px 18px', color: 'var(--q-text3)' }}>
+      <Users size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} aria-hidden="true" />
+      <p style={{ fontWeight: 600, color: 'var(--q-text2)', marginBottom: 6 }}>{t('friends.noFriendsYet')}</p>
+      <p style={{ fontSize: 13 }}>
+        <Trans i18nKey="friends.noFriendsHint" components={{
+          btn: <button onClick={() => setTab('search')} aria-label={t('friends.searchTab')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--q-accent)', fontWeight: 700, fontSize: 13 }} />
+        }} />
+      </p>
+    </div>
+  ) : (
+    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {friends.map(({ friendshipId, user: f }) => (
+        <div key={friendshipId} style={{
+          display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+          borderRadius: 20, background: 'var(--q-chrome)',
+          border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
+        }}>
+          <button onClick={() => navigate(`/user/${f.id}`)}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
+              background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+            <UserAvatar avatar={f.avatar} username={f.username} cosmetics={[]} size="sm" />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--q-text)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {f.username}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 2,
+                display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Trophy size={10} aria-hidden="true" /> {t('navbar.level', { level: f.level })}
+                <span style={{ color: 'var(--q-line)' }}>·</span>
+                {f.xp.toLocaleString(i18n.language)} XP
+              </div>
+            </div>
+          </button>
+          <button onClick={() => removeFriend(friendshipId, f.username)}
+            aria-label={t('friends.removeFromFriends', { username: f.username })}
+            style={{ background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--q-text3)', padding: 6, borderRadius: 10,
+              transition: 'color 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--q-text3)')}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
+  const requestsListContent = requests.length === 0 ? (
+    <div style={{ textAlign: 'center', padding: '50px 18px', color: 'var(--q-text3)' }}>
+      <UserPlus size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} aria-hidden="true" />
+      <p style={{ fontWeight: 600, color: 'var(--q-text2)' }}>{t('friends.noPendingRequests')}</p>
+    </div>
+  ) : (
+    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {requests.map(req => (
+        <div key={req.id} style={{
+          display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+          borderRadius: 20, background: 'var(--q-chrome)',
+          border: '1px solid var(--q-accent)', boxShadow: '0 0 0 2px rgba(167,139,250,0.15)',
+        }}>
+          <button onClick={() => navigate(`/user/${req.sender.id}`)}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
+              background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+            <UserAvatar avatar={req.sender.avatar} username={req.sender.username} cosmetics={[]} size="sm" />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--q-text)' }}>{req.sender.username}</div>
+              <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 2 }}>
+                {t('navbar.level', { level: req.sender.level })}
+              </div>
+            </div>
+          </button>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={() => acceptRequest(req.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px',
+                borderRadius: 999, background: 'var(--q-accent)', color: '#fff',
+                fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(167,139,250,0.4)' }}>
+              <Check size={13} aria-hidden="true" /> {t('userProfile.accept')}
+            </button>
+            <button onClick={() => declineOrRemove(req.id)}
+              aria-label={t('friends.declineRequest')}
+              style={{ padding: 8, borderRadius: 10, background: 'var(--q-line)',
+                border: 'none', cursor: 'pointer', color: 'var(--q-text3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={15} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div style={{ background: 'var(--q-bg)', minHeight: '100%', paddingBottom: 100, fontFamily: 'var(--q-font)' }}>
 
@@ -342,108 +439,12 @@ const FriendsPage: React.FC = () => {
 
       {/* ── LISTE AMIS ── */}
       {tab === 'friends' && (
-        loading ? (
-          <PageLoader />
-        ) : friends.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px 18px', color: 'var(--q-text3)' }}>
-            <Users size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} aria-hidden="true" />
-            <p style={{ fontWeight: 600, color: 'var(--q-text2)', marginBottom: 6 }}>{t('friends.noFriendsYet')}</p>
-            <p style={{ fontSize: 13 }}>
-              <Trans i18nKey="friends.noFriendsHint" components={{
-                btn: <button onClick={() => setTab('search')} aria-label={t('friends.searchTab')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--q-accent)', fontWeight: 700, fontSize: 13 }} />
-              }} />
-            </p>
-          </div>
-        ) : (
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {friends.map(({ friendshipId, user: f }) => (
-              <div key={friendshipId} style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-                borderRadius: 20, background: 'var(--q-chrome)',
-                border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
-              }}>
-                <button onClick={() => navigate(`/user/${f.id}`)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
-                    background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
-                  <UserAvatar avatar={f.avatar} username={f.username} cosmetics={[]} size="sm" />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--q-text)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {f.username}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 2,
-                      display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Trophy size={10} aria-hidden="true" /> {t('navbar.level', { level: f.level })}
-                      <span style={{ color: 'var(--q-line)' }}>·</span>
-                      {f.xp.toLocaleString(i18n.language)} XP
-                    </div>
-                  </div>
-                </button>
-                <button onClick={() => removeFriend(friendshipId, f.username)}
-                  aria-label={t('friends.removeFromFriends', { username: f.username })}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--q-text3)', padding: 6, borderRadius: 10,
-                    transition: 'color 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--q-text3)')}>
-                  <X size={16} aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )
+        loading ? <PageLoader /> : friendsListContent
       )}
 
       {/* ── DEMANDES REÇUES ── */}
       {tab === 'requests' && (
-        loading ? (
-          <PageLoader />
-        ) : requests.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px 18px', color: 'var(--q-text3)' }}>
-            <UserPlus size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} aria-hidden="true" />
-            <p style={{ fontWeight: 600, color: 'var(--q-text2)' }}>{t('friends.noPendingRequests')}</p>
-          </div>
-        ) : (
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {requests.map(req => (
-              <div key={req.id} style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-                borderRadius: 20, background: 'var(--q-chrome)',
-                border: '1px solid var(--q-accent)', boxShadow: '0 0 0 2px rgba(167,139,250,0.15)',
-              }}>
-                <button onClick={() => navigate(`/user/${req.sender.id}`)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
-                    background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
-                  <UserAvatar avatar={req.sender.avatar} username={req.sender.username} cosmetics={[]} size="sm" />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--q-text)' }}>{req.sender.username}</div>
-                    <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 2 }}>
-                      {t('navbar.level', { level: req.sender.level })}
-                    </div>
-                  </div>
-                </button>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                  <button onClick={() => acceptRequest(req.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px',
-                      borderRadius: 999, background: 'var(--q-accent)', color: '#fff',
-                      fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(167,139,250,0.4)' }}>
-                    <Check size={13} aria-hidden="true" /> {t('userProfile.accept')}
-                  </button>
-                  <button onClick={() => declineOrRemove(req.id)}
-                    aria-label={t('friends.declineRequest')}
-                    style={{ padding: 8, borderRadius: 10, background: 'var(--q-line)',
-                      border: 'none', cursor: 'pointer', color: 'var(--q-text3)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <X size={15} aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
+        loading ? <PageLoader /> : requestsListContent
       )}
     </div>
   );

@@ -24,6 +24,16 @@ type GroupData = {
 
 const token = () => localStorage.getItem('token') ?? '';
 
+const getSendButtonStyle = (canSend: boolean): React.CSSProperties => ({
+  width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
+  background: canSend ? 'var(--q-accent)' : 'var(--q-bg-flat)',
+  color: canSend ? '#fff' : 'var(--q-text3)',
+  cursor: canSend ? 'pointer' : 'default',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  transition: 'all 0.15s',
+  boxShadow: canSend ? '0 2px 8px rgba(124,58,237,0.35)' : 'none',
+});
+
 const GroupChatPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   usePageTitle(t('groupChat.pageTitle'));
@@ -124,6 +134,7 @@ const GroupChatPage: React.FC = () => {
 
   const joined = group?.members.filter(m => m.status === 'JOINED') ?? [];
   const myStatus = group?.members.find(m => m.userId === user?.id)?.status;
+  const canSend = !!input.trim() && !sending;
 
   if (loading) {
     return (
@@ -252,17 +263,9 @@ const GroupChatPage: React.FC = () => {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || sending}
+            disabled={!canSend}
             aria-label={t('groupChat.send')}
-            style={{
-              width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
-              background: input.trim() && !sending ? 'var(--q-accent)' : 'var(--q-bg-flat)',
-              color: input.trim() && !sending ? '#fff' : 'var(--q-text3)',
-              cursor: input.trim() && !sending ? 'pointer' : 'default',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.15s',
-              boxShadow: input.trim() && !sending ? '0 2px 8px rgba(124,58,237,0.35)' : 'none',
-            }}
+            style={getSendButtonStyle(canSend)}
           >
             <Send size={17} aria-hidden="true" />
           </button>

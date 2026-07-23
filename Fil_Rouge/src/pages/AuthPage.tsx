@@ -8,6 +8,50 @@ import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordPol
 
 type AuthMode = 'login' | 'register';
 
+const AUTH_THEME = {
+  dark: {
+    pageBg: 'radial-gradient(circle, rgba(255,255,255,0.07) 1.4px, transparent 1.7px) 0 0/16px 16px, linear-gradient(180deg, #1F2030 0%, #16172A 100%)',
+    cardBg: '#2A2B3F',
+    cardBorder: 'rgba(255,255,255,0.08)',
+    cardShadow: '0 1px 0 rgba(255,255,255,0.05) inset, 0 24px 48px -12px rgba(0,0,0,0.55)',
+    titleColor: '#EAEAF2',
+    subColor: '#9B9BAA',
+    labelColor: '#9B9BAA',
+    inputBg: 'rgba(255,255,255,0.05)',
+    inputBorder: 'rgba(255,255,255,0.10)',
+    inputColor: '#EAEAF2',
+    iconColor: '#5A5A6A',
+    linkColor: '#C8B3FF',
+    switchColor: '#9B9BAA',
+    errorBg: 'rgba(239,68,68,0.12)',
+    errorBorder: 'rgba(239,68,68,0.30)',
+    errorColor: '#FCA5A5',
+    successBg: 'rgba(52,211,153,0.12)',
+    successBorder: 'rgba(52,211,153,0.30)',
+    successColor: '#6EE7B7',
+  },
+  light: {
+    pageBg: 'radial-gradient(circle, rgba(0,0,0,0.04) 1.4px, transparent 1.7px) 0 0/16px 16px, linear-gradient(180deg, #F4F4FB 0%, #EAEAF5 100%)',
+    cardBg: '#FFFFFF',
+    cardBorder: 'rgba(0,0,0,0.08)',
+    cardShadow: '0 1px 0 rgba(255,255,255,0.8) inset, 0 24px 48px -12px rgba(0,0,0,0.12)',
+    titleColor: '#1F2030',
+    subColor: '#6B6B7A',
+    labelColor: '#6B6B7A',
+    inputBg: 'rgba(0,0,0,0.04)',
+    inputBorder: 'rgba(0,0,0,0.12)',
+    inputColor: '#1F2030',
+    iconColor: '#A0A0B0',
+    linkColor: '#7C3AED',
+    switchColor: '#6B6B7A',
+    errorBg: 'rgba(239,68,68,0.07)',
+    errorBorder: 'rgba(239,68,68,0.25)',
+    errorColor: '#DC2626',
+    successBg: 'rgba(52,211,153,0.08)',
+    successBorder: 'rgba(52,211,153,0.25)',
+    successColor: '#059669',
+  },
+} as const;
 
 const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
   const navigate = useNavigate();
@@ -58,31 +102,11 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
   const submitLabel = isLogin ? t('auth.login') : t('auth.createAccount');
 
   const dk = darkMode;
-
-  const pageBg = dk
-    ? 'radial-gradient(circle, rgba(255,255,255,0.07) 1.4px, transparent 1.7px) 0 0/16px 16px, linear-gradient(180deg, #1F2030 0%, #16172A 100%)'
-    : 'radial-gradient(circle, rgba(0,0,0,0.04) 1.4px, transparent 1.7px) 0 0/16px 16px, linear-gradient(180deg, #F4F4FB 0%, #EAEAF5 100%)';
-
-  const cardBg      = dk ? '#2A2B3F' : '#FFFFFF';
-  const cardBorder  = dk ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-  const cardShadow  = dk
-    ? '0 1px 0 rgba(255,255,255,0.05) inset, 0 24px 48px -12px rgba(0,0,0,0.55)'
-    : '0 1px 0 rgba(255,255,255,0.8) inset, 0 24px 48px -12px rgba(0,0,0,0.12)';
-  const titleColor  = dk ? '#EAEAF2' : '#1F2030';
-  const subColor    = dk ? '#9B9BAA' : '#6B6B7A';
-  const labelColor  = dk ? '#9B9BAA' : '#6B6B7A';
-  const inputBg     = dk ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
-  const inputBorder = dk ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.12)';
-  const inputColor  = dk ? '#EAEAF2' : '#1F2030';
-  const iconColor   = dk ? '#5A5A6A' : '#A0A0B0';
-  const linkColor   = dk ? '#C8B3FF' : '#7C3AED';
-  const switchColor = dk ? '#9B9BAA' : '#6B6B7A';
-  const errorBg     = dk ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.07)';
-  const errorBorder = dk ? 'rgba(239,68,68,0.30)' : 'rgba(239,68,68,0.25)';
-  const errorColor  = dk ? '#FCA5A5' : '#DC2626';
-  const successBg     = dk ? 'rgba(52,211,153,0.12)' : 'rgba(52,211,153,0.08)';
-  const successBorder = dk ? 'rgba(52,211,153,0.30)' : 'rgba(52,211,153,0.25)';
-  const successColor  = dk ? '#6EE7B7' : '#059669';
+  const {
+    pageBg, cardBg, cardBorder, cardShadow, titleColor, subColor, labelColor,
+    inputBg, inputBorder, inputColor, iconColor, linkColor, switchColor,
+    errorBg, errorBorder, errorColor, successBg, successBorder, successColor,
+  } = dk ? AUTH_THEME.dark : AUTH_THEME.light;
 
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
@@ -205,10 +229,10 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
 
             {/* Reset success */}
             {isLogin && resetSuccess && (
-              <div role="status" style={{ padding: '10px 14px', borderRadius: 12, background: successBg,
+              <output style={{ display: 'block', padding: '10px 14px', borderRadius: 12, background: successBg,
                 border: `1px solid ${successBorder}`, color: successColor, fontSize: 13 }}>
                 {t('auth.passwordResetSuccess')}
-              </div>
+              </output>
             )}
 
             {/* Error */}

@@ -1,13 +1,16 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { useStore } from '../lib/store';
+import type { NotifToggles } from '../lib/store';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, ChevronRight, LogOut, ChevronLeft, Lock, HelpCircle, History } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import type { NavigateFunction } from 'react-router-dom';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 import PageLoader from '../components/PageLoader';
 import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordPolicy';
+import type { User } from '../types/User';
 
 type OwnedCosmetic = EquippedCosmetic & { id: number; purchasedAt: string };
 
@@ -39,392 +42,102 @@ const fmt = (n: number): string => {
 };
 
 const MAX_SIZE_MB = 5;
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-const EditProfile: React.FC = () => {
-  const { t, i18n } = useTranslation();
-  usePageTitle(t('profile.pageTitle'));
-  const {
-    user, setUser, darkMode, toggleDarkMode,
-    notifToggles, setNotifToggles, reduceMotion, setReduceMotion, language, setLanguage,
-    openTour,
-  } = useStore();
-  const [isEditing, setIsEditing] = useState(false);
-  const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const navigate = useNavigate();
+type ProfileSectionKey = 'cosmetics' | 'info' | 'defis' | 'history' | 'settings';
+type OpenProfileSections = Record<ProfileSectionKey, boolean>;
+type TFunc = (key: string, opts?: Record<string, unknown>) => string;
 
-  const showNotif = (msg: string, type: 'success' | 'error') => {
-    setNotification({ msg, type });
-    setTimeout(() => setNotification(null), 3500);
-  };
+// /uploads/... est proxifié vers le backend (vite en dev, vercel.json en prod) —
+// pas besoin de préfixer une origine en dur.
+const getFullImageUrl = (url: string | undefined | null) => url ?? '';
 
-  const [formData, setFormData] = useState({
-    username: user?.username || '',
-    bio: user?.bio || '',
-    avatar: user?.avatar || '',
-    banner: user?.banner || ''
-  });
+const validateEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
 
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [newEmailInput, setNewEmailInput] = useState('');
-  const [emailChangeSending, setEmailChangeSending] = useState(false);
-  const [emailChangeSent, setEmailChangeSent] = useState(false);
-  const [emailChangeError, setEmailChangeError] = useState('');
+// Au sein d'une même série, on affiche les jours en ordre croissant (1, 2, 3…) —
+// le tri par date de création n'est pas fiable car les défis IA sont créés en lot.
+const seriesDayNumber = (title: string) => {
+  const m = /^Jour\s+(\d+)/i.exec(title);
+  return m ? parseInt(m[1], 10) : null;
+};
 
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
-
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-  const bannerInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (user) {
-      setFormData({
-        username: user.username || '',
-        bio: user.bio || '',
-        avatar: user.avatar || '',
-        banner: user.banner || ''
-      });
-      setAvatarPreview(null);
-      setBannerPreview(null);
-      setAvatarFile(null);
-      setBannerFile(null);
-    }
-  }, [user]);
-
-  const profileStats = {
-    memberSince: user ? new Date(user.createdAt).toLocaleDateString(i18n.language, { month: 'long', year: 'numeric' }) : ''
-  };
-
-  const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
-  const [challengesTotal, setChallengesTotal] = useState(0);
-  const [totalCompleted, setTotalCompleted] = useState(0);
-  const [totalInProgress, setTotalInProgress] = useState(0);
-  const [challengesHasMore, setChallengesHasMore] = useState(false);
-  const [loadingMoreChallenges, setLoadingMoreChallenges] = useState(false);
-  const [ownedCosmetics, setOwnedCosmetics] = useState<OwnedCosmetic[]>([]);
-  const [cosmeticLoading, setCosmeticLoading] = useState<number | null>(null);
-  const [pageLoading, setPageLoading] = useState(true);
-
-  const [openSection, setOpenSection] = useState<string | null>('appearance');
-  const [openProfileSections, setOpenProfileSections] = useState({
-    cosmetics: true, info: true, defis: true, history: true, settings: true,
-  });
-  const toggleProfileSection = (key: keyof typeof openProfileSections) =>
-    setOpenProfileSections(prev => ({ ...prev, [key]: !prev[key] }));
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token || !user) { setPageLoading(false); return; }
-    setPageLoading(true);
-    const langParam = i18n.language !== 'fr' ? '?lang=' + i18n.language : '';
-    fetch(`/api/users/me/profile-data${langParam}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(data => {
-        setUserChallenges(data.challenges ?? []);
-        setChallengesTotal(data.total ?? 0);
-        setTotalCompleted(data.totalCompleted ?? 0);
-        setTotalInProgress(data.totalInProgress ?? 0);
-        setChallengesHasMore(data.hasMore ?? false);
-        setOwnedCosmetics(data.cosmetics ?? []);
-      })
-      .catch(() => {})
-      .finally(() => setPageLoading(false));
-  }, [user, i18n.language]);
-
-  const loadMoreChallenges = async () => {
-    const token = localStorage.getItem('token');
-    if (!token || loadingMoreChallenges) return;
-    setLoadingMoreChallenges(true);
-    try {
-      const langParam = i18n.language !== 'fr' ? `&lang=${i18n.language}` : '';
-      const res = await fetch(`/api/users/me/challenges?limit=10&skip=${userChallenges.length}${langParam}`, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      const more: UserChallenge[] = Array.isArray(data) ? data : (data.challenges ?? []);
-      setUserChallenges(prev => [...prev, ...more]);
-      if (!Array.isArray(data)) setChallengesHasMore(data.hasMore ?? false);
-    } catch { /* silent */ }
-    finally { setLoadingMoreChallenges(false); }
-  };
-
-  const handleEquip = (cosmeticId: number) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    const cosmetic = ownedCosmetics.find(uc => uc.cosmeticId === cosmeticId);
-    if (!cosmetic) return;
-    if (cosmetic.cosmetic.type === 'BADGE') {
-      const equippedBadges = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped).length;
-      if (equippedBadges >= 3) {
-        showNotif(t('profile.badgeCapMessage'), 'error');
-        return;
-      }
-    }
-    // Optimistic update — UI réagit immédiatement
-    const rollback = ownedCosmetics;
-    setOwnedCosmetics(prev => prev.map(uc => {
-      if (cosmetic.cosmetic.type === 'BADGE') {
-        return uc.cosmeticId === cosmeticId ? { ...uc, equipped: true } : uc;
-      }
-      if (uc.cosmetic.type === cosmetic.cosmetic.type) {
-        return { ...uc, equipped: uc.cosmeticId === cosmeticId };
-      }
-      return uc;
-    }));
-    setCosmeticLoading(cosmeticId);
-    fetch(`/api/users/me/cosmetics/${cosmeticId}/equip`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
-      .then(async res => {
-        if (!res.ok) {
-          setOwnedCosmetics(rollback);
-          const err = await res.json().catch(() => ({}));
-          showNotif((err as { error?: string }).error ?? t('profile.equipError'), 'error');
-        } else {
-          globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
-        }
-      })
-      .catch(() => setOwnedCosmetics(rollback))
-      .finally(() => setCosmeticLoading(null));
-  };
-
-  const handleUnequip = (cosmeticId: number) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    const rollback = ownedCosmetics;
-    // Optimistic update
-    setOwnedCosmetics(prev => prev.map(uc => uc.cosmeticId === cosmeticId ? { ...uc, equipped: false } : uc));
-    setCosmeticLoading(cosmeticId);
-    fetch(`/api/users/me/cosmetics/${cosmeticId}/unequip`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
-      .then(async res => {
-        if (!res.ok) {
-          setOwnedCosmetics(rollback);
-          const err = await res.json().catch(() => ({}));
-          showNotif((err as { error?: string }).error ?? t('profile.unequipError'), 'error');
-        } else {
-          globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
-        }
-      })
-      .catch(() => setOwnedCosmetics(rollback))
-      .finally(() => setCosmeticLoading(null));
-  };
-
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setPasswordData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handlePasswordSave = async () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      showNotif(t('profile.passwordMismatch'), 'error');
-      return;
-    }
-    if (!passwordData.currentPassword || !passwordData.newPassword) {
-      showNotif(t('profile.fillAllFields'), 'error');
-      return;
-    }
-    if (!isStrongPassword(passwordData.newPassword)) {
-      showNotif(`${t('auth.weakPassword')} ${PASSWORD_REQUIREMENTS_TEXT}`, 'error');
-      return;
-    }
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/users/me/password', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showNotif(data.error || t('profile.passwordChangeError'), 'error');
-        return;
-      }
-      showNotif(t('profile.passwordUpdated'), 'success');
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setIsEditing(false);
-    } catch (err) {
-      showNotif(t('profile.passwordNetworkError'), 'error');
-    }
-  };
-
-  const handleRequestEmailChange = async () => {
-    setEmailChangeError('');
-    if (!validateEmail(newEmailInput)) {
-      setEmailChangeError(t('profile.invalidEmail'));
-      return;
-    }
-    setEmailChangeSending(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/users/me/email/request-change', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ newEmail: newEmailInput }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setEmailChangeError(data.error || t('profile.emailChangeRequestError'));
-        return;
-      }
-      setEmailChangeSent(true);
-    } catch {
-      setEmailChangeError(t('profile.emailChangeNetworkError'));
-    } finally {
-      setEmailChangeSending(false);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      showNotif(t('profile.unsupportedFormat'), 'error');
-      return;
-    }
-    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      showNotif(t('profile.imageTooLarge'), 'error');
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    if (type === 'avatar') {
-      setAvatarPreview(url);
-      setAvatarFile(file);
-    } else {
-      setBannerPreview(url);
-      setBannerFile(file);
-    }
-  };
-
-  const uploadToBackend = async (file: File, type: 'avatar' | 'banner'): Promise<string> => {
-    const form = new FormData();
-    form.append('file', file);
-    form.append('type', type);
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      body: form,
-    });
-    if (!res.ok) throw new Error('Erreur upload');
-    const data = await res.json();
-    return data.url;
-  };
-
-  const handleSave = async () => {
-    try {
-      let avatarUrl = formData.avatar;
-      let bannerUrl = formData.banner;
-      if (avatarFile) avatarUrl = await uploadToBackend(avatarFile, 'avatar');
-      if (bannerFile) bannerUrl = await uploadToBackend(bannerFile, 'banner');
-
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/users/me', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          avatar: avatarUrl,
-          banner: bannerUrl
-        })
-      });
-      if (!res.ok) throw new Error('Erreur lors de la sauvegarde');
-      const data = await res.json();
-      setUser(data.user);
-      setIsEditing(false);
-      setAvatarPreview(null);
-      setBannerPreview(null);
-      setAvatarFile(null);
-      setBannerFile(null);
-    } catch (err) {
-      showNotif(t('profile.saveError'), 'error');
-    }
-  };
-
-  // /uploads/... est proxifié vers le backend (vite en dev, vercel.json en prod) —
-  // pas besoin de préfixer une origine en dur.
-  const getFullImageUrl = (url: string | undefined | null) => url ?? '';
-
-  const equippedFrame  = getEquipped(ownedCosmetics, 'AVATAR_FRAME');
-  const equippedTitle  = getEquipped(ownedCosmetics, 'TITLE');
-  const equippedBadge  = getEquipped(ownedCosmetics, 'BADGE');
-  const equippedBanner = getEquipped(ownedCosmetics, 'BANNER');
-  const frameClass  = equippedFrame  ? (FRAME_CLASSES[equippedFrame.cosmetic.rarity]   ?? '') : '';
-  const titleClass  = equippedTitle  ? (TITLE_CLASSES[equippedTitle.cosmetic.rarity]   ?? '') : '';
-  const bannerClass = equippedBanner ? (BANNER_CLASSES[equippedBanner.cosmetic.rarity] ?? '') : '';
-  const hasBannerImage = !!(bannerPreview || formData.banner || user?.banner);
-
-  if (pageLoading) return <PageLoader message={t('profile.loadingProfile')} />;
-
-  if (!user) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: '60vh', textAlign: 'center', padding: '40px 24px', fontFamily: 'var(--q-font)' }}>
-        <div style={{ width: 64, height: 64, borderRadius: 20, marginBottom: 20,
-          background: 'var(--q-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Mail size={28} style={{ color: 'var(--q-accent-deep)' }} />
-        </div>
-        <h1 style={{ margin: '0 0 8px', fontSize: 22, fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
-          {t('profile.notAvailableTitle')}
-        </h1>
-        <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--q-text2)', maxWidth: 280 }}>
-          {t('profile.notAvailableDesc')}
-        </p>
-        <Link to="/login" className="q-press"
-          style={{ display: 'inline-flex', alignItems: 'center', height: 44, padding: '0 24px',
-            borderRadius: 14, border: 'none', cursor: 'pointer', textDecoration: 'none',
-            background: 'linear-gradient(135deg, #00DDFF 0%, #067DBA 35%, #2B1FD0 65%, #B71AEB 100%)',
-            color: '#fff', fontSize: 14, fontWeight: 700,
-            boxShadow: '0 4px 16px rgba(167,139,250,0.40)' }}>
-          {t('auth.login')}
-        </Link>
+const NotLoggedInView: React.FC = () => {
+  const { t } = useTranslation();
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      minHeight: '60vh', textAlign: 'center', padding: '40px 24px', fontFamily: 'var(--q-font)' }}>
+      <div style={{ width: 64, height: 64, borderRadius: 20, marginBottom: 20,
+        background: 'var(--q-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Mail size={28} style={{ color: 'var(--q-accent-deep)' }} />
       </div>
-    );
-  }
+      <h1 style={{ margin: '0 0 8px', fontSize: 22, fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
+        {t('profile.notAvailableTitle')}
+      </h1>
+      <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--q-text2)', maxWidth: 280 }}>
+        {t('profile.notAvailableDesc')}
+      </p>
+      <Link to="/login" className="q-press"
+        style={{ display: 'inline-flex', alignItems: 'center', height: 44, padding: '0 24px',
+          borderRadius: 14, border: 'none', cursor: 'pointer', textDecoration: 'none',
+          background: 'linear-gradient(135deg, #00DDFF 0%, #067DBA 35%, #2B1FD0 65%, #B71AEB 100%)',
+          color: '#fff', fontSize: 14, fontWeight: 700,
+          boxShadow: '0 4px 16px rgba(167,139,250,0.40)' }}>
+        {t('auth.login')}
+      </Link>
+    </div>
+  );
+};
 
-  const cosmeticsLabel = ownedCosmetics.length === 0
-    ? t('profile.noCosmeticsOwned')
-    : t('profile.cosmeticsOwned', { count: ownedCosmetics.length });
+type ProfileHeaderSectionProps = {
+  t: TFunc;
+  user: User;
+  isEditing: boolean;
+  formData: { username: string; bio: string; avatar: string; banner: string };
+  bannerPreview: string | null;
+  avatarPreview: string | null;
+  bannerClass: string;
+  frameClass: string;
+  titleClass: string;
+  hasBannerImage: boolean;
+  equippedFrame: EquippedCosmetic | null;
+  equippedTitle: EquippedCosmetic | null;
+  equippedBadge: EquippedCosmetic | null;
+  profileStats: { memberSince: string };
+  handleFileChange: (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => void;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  avatarInputRef: React.RefObject<HTMLInputElement>;
+  bannerInputRef: React.RefObject<HTMLInputElement>;
+  navigate: NavigateFunction;
+  onStartEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+};
 
-  const seriesDayNumber = (title: string) => {
-    const m = /^Jour\s+(\d+)/i.exec(title);
-    return m ? parseInt(m[1], 10) : null;
-  };
-  // Au sein d'une même série, on affiche les jours en ordre croissant (1, 2, 3…) —
-  // le tri par date de création n'est pas fiable car les défis IA sont créés en lot.
-  const sortedUserChallenges = [...userChallenges].sort((a, b) => {
-    if (a.challenge.seriesName && a.challenge.seriesName === b.challenge.seriesName) {
-      const da = seriesDayNumber(a.challenge.title);
-      const db = seriesDayNumber(b.challenge.title);
-      if (da !== null && db !== null) return da - db;
-    }
-    return 0;
-  });
+const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
+  t, user, isEditing, formData, bannerPreview, avatarPreview, bannerClass, frameClass, titleClass,
+  hasBannerImage, equippedFrame, equippedTitle, equippedBadge, profileStats,
+  handleFileChange, handleInputChange, avatarInputRef, bannerInputRef, navigate,
+  onStartEdit, onSave, onCancel,
+}) => {
+  // Ternaire imbriqué extrait : le contenu affiché hors édition dépend uniquement
+  // de la présence d'une bio, calculé une fois avant le rendu.
+  const bioDisplay = user.bio ? (
+    <p style={{
+      marginTop: 12, fontSize: 15, fontWeight: 400,
+      color: 'var(--q-text)',
+      lineHeight: 1.65, letterSpacing: 0.01,
+      maxWidth: 320, margin: '12px auto 0',
+      textAlign: 'center',
+    }}>
+      {user.bio}
+    </p>
+  ) : null;
 
   return (
-    <div style={{ paddingBottom: 100, color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
-
+    <>
       {/* ── Banner ── */}
       <div
         className={`-mx-4 md:-mx-6 -mt-4 md:-mt-6 ${!hasBannerImage ? bannerClass : ''}`}
@@ -558,17 +271,7 @@ const EditProfile: React.FC = () => {
                 {t('profile.bioCounter', { count: formData.bio.length })}
               </p>
             </>
-          ) : user.bio ? (
-            <p style={{
-              marginTop: 12, fontSize: 15, fontWeight: 400,
-              color: 'var(--q-text)',
-              lineHeight: 1.65, letterSpacing: 0.01,
-              maxWidth: 320, margin: '12px auto 0',
-              textAlign: 'center',
-            }}>
-              {user.bio}
-            </p>
-          ) : null}
+          ) : bioDisplay}
         </div>
       </div>
 
@@ -576,22 +279,943 @@ const EditProfile: React.FC = () => {
       <div style={{ textAlign: 'center', padding: '16px 18px 0' }}>
         {isEditing ? (
           <div style={{ display: 'inline-flex', gap: 8 }}>
-            <button onClick={handleSave} className="q-press"
+            <button onClick={onSave} className="q-press"
               style={{ height: 36, padding: '0 18px', borderRadius: 18, border: 'none', background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Save size={14} /> {t('common.save')}
             </button>
-            <button onClick={() => { setIsEditing(false); setAvatarPreview(null); setBannerPreview(null); setAvatarFile(null); setBannerFile(null); }} className="q-press"
+            <button onClick={onCancel} className="q-press"
               style={{ height: 36, padding: '0 18px', borderRadius: 18, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#EF4444', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <X size={14} /> {t('common.cancel')}
             </button>
           </div>
         ) : (
-          <button data-tour="profile-edit" onClick={() => setIsEditing(true)} className="q-press"
+          <button data-tour="profile-edit" onClick={onStartEdit} className="q-press"
             style={{ height: 36, padding: '0 20px', borderRadius: 18, border: 'none', background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
             {t('profile.editProfile')}
           </button>
         )}
       </div>
+    </>
+  );
+};
+
+type InfoSectionProps = {
+  t: TFunc;
+  user: User;
+  profileStats: { memberSince: string };
+  isEditing: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  emailChangeSent: boolean;
+  newEmailInput: string;
+  setNewEmailInput: (v: string) => void;
+  emailChangeError: string;
+  setEmailChangeError: (v: string) => void;
+  emailChangeSending: boolean;
+  handleRequestEmailChange: () => void;
+  passwordData: { currentPassword: string; newPassword: string; confirmPassword: string };
+  handlePasswordChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handlePasswordSave: () => void;
+};
+
+const InfoSection: React.FC<InfoSectionProps> = ({
+  t, user, profileStats, isEditing, isOpen, onToggle,
+  emailChangeSent, newEmailInput, setNewEmailInput, emailChangeError, setEmailChangeError, emailChangeSending,
+  handleRequestEmailChange, passwordData, handlePasswordChange, handlePasswordSave,
+}) => (
+  <div style={{ padding: '0 18px', marginTop: 16 }}>
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+      <button onClick={onToggle}
+        className="q-press w-full flex items-center gap-3 p-4 text-left"
+        style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)' }}>
+          <Mail size={18} color="#fff" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.myInfo')}</p>
+          <p className="text-xs truncate" style={{ color: 'var(--q-text2)' }}>{user.email}</p>
+        </div>
+        <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease' }} />
+      </button>
+      {isOpen && (
+        <div className="px-4 pb-4 space-y-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
+          {user.isAdmin && (
+            <div className="px-3 py-2 rounded-xl text-xs font-bold w-fit flex items-center gap-1.5"
+              style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
+              <Star size={12} /> {t('profile.administrator')}
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="flex items-center gap-2">
+              <Mail size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+              <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{user.email}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+              <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{t('userProfile.memberSince', { date: profileStats.memberSince })}</span>
+            </div>
+          </div>
+          {isEditing && (
+            <div>
+              <p className="text-sm font-semibold mb-2" style={{ color: 'var(--q-text)' }}>{t('profile.changeEmail')}</p>
+              <div className="rounded-2xl p-4 space-y-3" style={{ background: 'var(--q-accent-soft)', border: '1px solid var(--q-line)' }}>
+                {emailChangeSent ? (
+                  <p className="text-sm" style={{ color: 'var(--q-text)' }}>
+                    <Trans i18nKey="profile.emailChangeSentMessage" values={{ email: newEmailInput }} components={{ strong: <strong /> }} />
+                  </p>
+                ) : (
+                  <>
+                    <div>
+                      <label htmlFor="new-email" className="block text-xs font-semibold mb-1" style={{ color: 'var(--q-text2)' }}>
+                        {t('profile.newEmailLabel')}
+                      </label>
+                      <input id="new-email" type="email" value={newEmailInput}
+                        onChange={e => { setNewEmailInput(e.target.value); setEmailChangeError(''); }}
+                        placeholder={user.email} autoComplete="email"
+                        className="w-full px-3 py-2 rounded-xl bg-transparent focus:outline-none text-sm"
+                        style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} />
+                      {emailChangeError && <p className="text-red-500 text-xs mt-1">{emailChangeError}</p>}
+                    </div>
+                    <button onClick={handleRequestEmailChange} disabled={emailChangeSending}
+                      className="q-press px-4 py-2 rounded-xl text-sm font-bold text-white"
+                      style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', opacity: emailChangeSending ? 0.7 : 1 }}>
+                      {emailChangeSending ? t('profile.sending') : t('profile.sendConfirmationLink')}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          {isEditing && (
+            <div>
+              <p className="text-sm font-semibold mb-2" style={{ color: 'var(--q-text)' }}>{t('profile.changePassword')}</p>
+              <div className="rounded-2xl p-4 space-y-3" style={{ background: 'var(--q-accent-soft)', border: '1px solid var(--q-line)' }}>
+                {(['currentPassword', 'newPassword', 'confirmPassword'] as const).map((field, i) => (
+                  <div key={field}>
+                    <label htmlFor={field} className="block text-xs font-semibold mb-1" style={{ color: 'var(--q-text2)' }}>
+                      {[t('profile.currentPassword'), t('profile.newPassword'), t('profile.confirmNewPassword')][i]}
+                    </label>
+                    <input id={field} type="password" name={field} value={passwordData[field]} onChange={handlePasswordChange}
+                      autoComplete={field === 'currentPassword' ? 'current-password' : 'new-password'}
+                      className="w-full px-3 py-2 rounded-xl bg-transparent focus:outline-none text-sm"
+                      style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} />
+                    {field === 'newPassword' && (
+                      <p className="text-xs mt-1" style={{ color: 'var(--q-text2)' }}>{PASSWORD_REQUIREMENTS_TEXT}</p>
+                    )}
+                  </div>
+                ))}
+                <button onClick={handlePasswordSave}
+                  className="q-press px-4 py-2 rounded-xl text-sm font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)' }}>
+                  {t('profile.savePasswordButton')}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+type CosmeticsSectionProps = {
+  t: TFunc;
+  ownedCosmetics: OwnedCosmetic[];
+  cosmeticsLabel: string;
+  cosmeticLoading: number | null;
+  isOpen: boolean;
+  onToggle: () => void;
+  handleEquip: (cosmeticId: number) => void;
+  handleUnequip: (cosmeticId: number) => void;
+};
+
+const CosmeticsSection: React.FC<CosmeticsSectionProps> = ({
+  t, ownedCosmetics, cosmeticsLabel, cosmeticLoading, isOpen, onToggle, handleEquip, handleUnequip,
+}) => {
+  const equippedBadgeCount = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped).length;
+  return (
+    <div style={{ padding: '0 18px', marginTop: 8 }}>
+      <div data-tour="profile-cosmetics" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+        <button onClick={onToggle}
+          className="q-press w-full flex items-center gap-3 p-4 text-left"
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#EC4899,#A78BFA)' }}>
+            <ShoppingBag size={18} color="#fff" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.myCosmetics')}</p>
+            <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{cosmeticsLabel}</p>
+          </div>
+          <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease' }} />
+        </button>
+        {isOpen && (
+          <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
+            {ownedCosmetics.length === 0 ? (
+              <p className="text-sm" style={{ color: 'var(--q-text3)' }}>
+                {t('profile.noCosmeticsBody')}{' '}
+                <Link to="/shop" style={{ color: 'var(--q-accent)' }} className="hover:underline">{t('profile.visitShop')}</Link>
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {ownedCosmetics.map(uc => {
+                  const rarityColor = TITLE_CLASSES[uc.cosmetic.rarity] ?? '';
+                  const isLoading = cosmeticLoading === uc.cosmeticId;
+                  const TypeIcon = TYPE_ICONS[uc.cosmetic.type] ?? Package;
+                  const badgeCapped = !uc.equipped && uc.cosmetic.type === 'BADGE' && equippedBadgeCount >= 3;
+                  // Ternaire imbriqué extrait : le libellé du bouton "équiper" est calculé
+                  // séparément de l'état de chargement.
+                  const equipLabel = badgeCapped ? t('profile.max3') : t('profile.equip');
+                  return (
+                    <div key={uc.id} className="rounded-2xl p-3 flex flex-col gap-2"
+                      style={{ background: 'var(--q-chrome)',
+                        border: uc.equipped ? '2px solid var(--q-accent)' : '1px solid var(--q-line)',
+                        boxShadow: uc.equipped ? '0 0 0 3px var(--q-accent-soft), var(--q-shadow)' : 'var(--q-shadow)' }}>
+                      <div className="text-center">
+                        <div className="flex justify-center mb-1" style={{ color: 'var(--q-accent)' }}><TypeIcon size={22} /></div>
+                        <p className="font-bold text-xs mt-1 truncate" style={{ color: 'var(--q-text)' }}>{uc.cosmetic.name}</p>
+                        <p className={`text-xs font-semibold ${rarityColor}`}>{t(`common.rarity.${uc.cosmetic.rarity}`)}</p>
+                        <p className="text-xs" style={{ color: 'var(--q-text3)' }}>{t(`shop.type.${uc.cosmetic.type}`)}</p>
+                      </div>
+                      {uc.equipped ? (
+                        <button onClick={() => handleUnequip(uc.cosmeticId)} disabled={isLoading}
+                          className="q-press w-full py-1 rounded-xl text-xs font-bold text-white disabled:opacity-60"
+                          style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)' }}>
+                          {isLoading ? '...' : t('profile.unequip')}
+                        </button>
+                      ) : (
+                        <button onClick={() => handleEquip(uc.cosmeticId)} disabled={isLoading || badgeCapped}
+                          className="q-press w-full py-1 rounded-xl text-xs font-bold disabled:opacity-40"
+                          style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', cursor: badgeCapped ? 'not-allowed' : 'pointer' }}
+                          title={badgeCapped ? t('profile.badgeCapTooltip') : undefined}>
+                          {isLoading ? '...' : equipLabel}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+type ChallengesSectionProps = {
+  t: TFunc;
+  sortedUserChallenges: UserChallenge[];
+  totalCompleted: number;
+  totalInProgress: number;
+  userChallenges: UserChallenge[];
+  isOpen: boolean;
+  onToggle: () => void;
+};
+
+const ChallengesSection: React.FC<ChallengesSectionProps> = ({
+  t, sortedUserChallenges, totalCompleted, totalInProgress, userChallenges, isOpen, onToggle,
+}) => (
+  <div style={{ padding: '0 18px', marginTop: 8 }}>
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+      <button onClick={onToggle}
+        className="q-press w-full flex items-center gap-3 p-4 text-left"
+        style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)' }}>
+          <Trophy size={18} color="#fff" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('navbar.myChallenges')}</p>
+          <p className="text-xs" style={{ color: 'var(--q-text2)' }}>
+            {t('profile.challengesSummary', {
+              completed: totalCompleted || userChallenges.filter(c => c.status === 'COMPLETED').length,
+              inProgress: totalInProgress || userChallenges.filter(c => c.status === 'IN_PROGRESS').length,
+            })}
+          </p>
+        </div>
+        <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease' }} />
+      </button>
+      {isOpen && (
+        <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
+          {sortedUserChallenges.slice(0, 5).map((uc, i) => (
+            <div key={uc.id} className="px-4 py-3 flex items-center justify-between gap-3"
+              style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none' }}>
+              <div className="min-w-0">
+                <p className="font-semibold text-sm truncate" style={{ color: 'var(--q-text)' }}>{uc.challenge.title}</p>
+                {uc.challenge.description && (
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--q-text2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {uc.challenge.description}
+                  </p>
+                )}
+                <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--q-text3)' }}><CircleDollarSign size={10} className="inline flex-shrink-0" /> {uc.challenge.coinReward} · <Zap size={10} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP</p>
+              </div>
+              {uc.status === 'COMPLETED' ? (
+                <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded-full"
+                  style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff' }}>
+                  <CheckCircle size={12} /> {t('profile.completed')}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded-full"
+                  style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)', color: '#fff' }}>
+                  <Clock size={12} /> {t('profile.inProgress')}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+type HistorySectionProps = {
+  t: TFunc;
+  userChallenges: UserChallenge[];
+  challengesHasMore: boolean;
+  loadingMoreChallenges: boolean;
+  loadMoreChallenges: () => void;
+  challengesTotal: number;
+  isOpen: boolean;
+  onToggle: () => void;
+};
+
+const HistorySection: React.FC<HistorySectionProps> = ({
+  t, userChallenges, challengesHasMore, loadingMoreChallenges, loadMoreChallenges, challengesTotal, isOpen, onToggle,
+}) => (
+  <div style={{ padding: '0 18px', marginTop: 8 }}>
+    <div data-tour="profile-history" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+      <button onClick={onToggle}
+        className="q-press w-full flex items-center gap-3 p-4 text-left"
+        style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#818CF8,#38BDF8)' }}>
+          <History size={18} color="#fff" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.history')}</p>
+        </div>
+        <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease' }} />
+      </button>
+      {isOpen && (
+        <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
+        {userChallenges.map((uc, i, a) => {
+          const ok = uc.status === 'COMPLETED';
+          return (
+            <div key={uc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: i < a.length - 1 ? '1px solid var(--q-line)' : 'none' }}>
+              <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, background: ok ? 'rgba(52,211,153,0.18)' : 'rgba(251,146,60,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {ok ? <CheckCircle size={16} style={{ color: '#34D399' }} /> : <Clock size={16} style={{ color: '#FB923C' }} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--q-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{uc.challenge.title}</div>
+                {uc.challenge.description && (
+                  <div style={{ fontSize: 12, color: 'var(--q-text2)', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {uc.challenge.description}
+                  </div>
+                )}
+                <div style={{ fontSize: 12, color: 'var(--q-text3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {ok ? (
+                    <>
+                      <span>{t('profile.doneInline')} ·</span>
+                      <CircleDollarSign size={11} className="inline flex-shrink-0" /> {uc.challenge.coinReward}
+                      <span>·</span>
+                      <Zap size={11} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP
+                    </>
+                  ) : t('profile.inProgressLower')}
+                </div>
+              </div>
+              <ChevronRight size={14} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+            </div>
+          );
+        })}
+        {challengesHasMore && (
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--q-line)' }}>
+            <button onClick={loadMoreChallenges} disabled={loadingMoreChallenges}
+              className="q-press w-full py-2.5 rounded-xl text-sm font-bold disabled:opacity-60"
+              style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+              {loadingMoreChallenges ? t('common.loading') : t('profile.loadMore', { count: challengesTotal - userChallenges.length })}
+            </button>
+          </div>
+        )}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+type SettingsSectionProps = {
+  t: TFunc;
+  navigate: NavigateFunction;
+  openTour: () => void;
+  darkMode: boolean;
+  toggleDarkMode: () => void;
+  openSection: string | null;
+  setOpenSection: (v: string | null) => void;
+  notifToggles: NotifToggles;
+  setNotifToggles: (updater: NotifToggles | ((prev: NotifToggles) => NotifToggles)) => void;
+  language: string;
+  setLanguage: (lang: string) => void;
+  reduceMotion: boolean;
+  setReduceMotion: (updater: boolean | ((prev: boolean) => boolean)) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+};
+
+const SettingsSection: React.FC<SettingsSectionProps> = ({
+  t, navigate, openTour, darkMode, toggleDarkMode, openSection, setOpenSection,
+  notifToggles, setNotifToggles, language, setLanguage, reduceMotion, setReduceMotion,
+  isOpen, onToggle,
+}) => (
+  <div data-tour="profile-settings" style={{ padding: '0 18px', marginTop: 8 }}>
+  <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+    <button onClick={onToggle}
+      className="q-press w-full flex items-center gap-3 p-4 text-left"
+      style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+      <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+        style={{ background: 'linear-gradient(135deg,#64748B,#334155)' }}>
+        <Settings size={18} color="#fff" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.settings')}</p>
+      </div>
+      <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+        transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+        transition: 'transform 0.2s ease' }} />
+    </button>
+    {isOpen && (
+  <div className="border-t" style={{ padding: '12px', borderColor: 'var(--q-line)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+    {/* Aide */}
+    {/* Le tuto commence sur l'accueil (cloche de notifs, XP, streak...) — le relancer
+        depuis une autre page le laisserait bloqué à chercher des éléments qui n'existent
+        pas ici, donc on ramène d'abord sur "/" avant de l'ouvrir. */}
+    <button onClick={() => { navigate('/'); openTour(); }} className="q-press rounded-2xl overflow-hidden w-full flex items-center gap-3 p-4 text-left"
+      style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)', cursor: 'pointer' }}>
+      <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+        style={{ background: 'linear-gradient(135deg,#00DDFF,#2B1FD0)' }}>
+        <HelpCircle size={18} color="#fff" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.reviewTutorial')}</p>
+        <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{t('profile.reviewTutorialDesc')}</p>
+      </div>
+      <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+    </button>
+
+    {/* Apparence */}
+    <div data-tour="settings-appearance" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+      <button onClick={() => setOpenSection(openSection === 'appearance' ? null : 'appearance')}
+        className="q-press w-full flex items-center gap-3 p-4 text-left"
+        style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'var(--q-accent-soft)' }}>
+          <Palette size={18} style={{ color: 'var(--q-accent-deep)' }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.appearance')}</p>
+          <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{t('profile.appearanceDesc')}</p>
+        </div>
+        <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+          transform: openSection === 'appearance' ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease' }} />
+      </button>
+      {openSection === 'appearance' && (
+        <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {darkMode ? <Moon size={16} style={{ color: 'var(--q-accent)' }} /> : <Sun size={16} style={{ color: 'var(--q-text2)' }} />}
+              <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{t('profile.darkMode')}</span>
+            </div>
+            <button onClick={toggleDarkMode} role="switch" aria-checked={darkMode} aria-label={t('profile.darkMode')}
+              className="q-press relative flex-shrink-0"
+              style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
+                background: darkMode ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
+              <span style={{ position: 'absolute', top: 3, left: darkMode ? 21 : 3, width: 20, height: 20,
+                borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* Notifications */}
+    <div data-tour="settings-notifications" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+      <button onClick={() => setOpenSection(openSection === 'notifications' ? null : 'notifications')}
+        className="q-press w-full flex items-center gap-3 p-4 text-left"
+        style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)' }}>
+          <Bell size={18} color="#fff" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('common.notifications')}</p>
+          <p className="text-xs" style={{ color: 'var(--q-text2)' }}>
+            {t('profile.activeCount', { count: Object.values(notifToggles).filter(Boolean).length })}
+          </p>
+        </div>
+        <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+          transform: openSection === 'notifications' ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease' }} />
+      </button>
+      {openSection === 'notifications' && (
+        <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
+          {([
+            { key: 'defis', label: t('profile.notifChallengeReminders') },
+            { key: 'messages', label: t('profile.notifNewMessages') },
+            { key: 'updates', label: t('profile.notifUpdates') },
+          ] as { key: keyof typeof notifToggles; label: string }[]).map(({ key, label }) => (
+            <div key={key} className="flex items-center justify-between">
+              <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{label}</span>
+              <button onClick={() => setNotifToggles(prev => ({ ...prev, [key]: !prev[key] }))}
+                role="switch" aria-checked={notifToggles[key]} aria-label={label}
+                className="q-press relative flex-shrink-0"
+                style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
+                  background: notifToggles[key] ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
+                <span style={{ position: 'absolute', top: 3, left: notifToggles[key] ? 21 : 3, width: 20, height: 20,
+                  borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* Accessibilité */}
+    <div data-tour="settings-accessibility" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+      <button onClick={() => setOpenSection(openSection === 'accessibility' ? null : 'accessibility')}
+        className="q-press w-full flex items-center gap-3 p-4 text-left"
+        style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#34D399,#FACC15)' }}>
+          <SlidersHorizontal size={18} color="#fff" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.accessibility')}</p>
+          <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{t('profile.accessibilityDesc')}</p>
+        </div>
+        <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+          transform: openSection === 'accessibility' ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease' }} />
+      </button>
+      {openSection === 'accessibility' && (
+        <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{t('profile.language')}</span>
+            <select value={language} onChange={e => setLanguage(e.target.value)}
+              className="text-sm rounded-xl px-3 py-1.5 focus:outline-none"
+              style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)', border: '1px solid var(--q-line)', fontFamily: 'inherit' }}>
+              {['Français', 'English'].map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{t('profile.reduceMotion')}</span>
+            <button onClick={() => setReduceMotion(r => !r)} role="switch" aria-checked={reduceMotion} aria-label={t('profile.reduceMotion')}
+              className="q-press relative flex-shrink-0"
+              style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
+                background: reduceMotion ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
+              <span style={{ position: 'absolute', top: 3, left: reduceMotion ? 21 : 3, width: 20, height: 20,
+                borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+
+  </div>
+    )}
+  </div>
+  </div>
+);
+
+const EditProfile: React.FC = () => {
+  const { t, i18n } = useTranslation();
+  usePageTitle(t('profile.pageTitle'));
+  const {
+    user, setUser, darkMode, toggleDarkMode,
+    notifToggles, setNotifToggles, reduceMotion, setReduceMotion, language, setLanguage,
+    openTour,
+  } = useStore();
+  const [isEditing, setIsEditing] = useState(false);
+  const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const navigate = useNavigate();
+
+  const showNotif = (msg: string, type: 'success' | 'error') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3500);
+  };
+
+  const [formData, setFormData] = useState({
+    username: user?.username || '',
+    bio: user?.bio || '',
+    avatar: user?.avatar || '',
+    banner: user?.banner || ''
+  });
+
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [newEmailInput, setNewEmailInput] = useState('');
+  const [emailChangeSending, setEmailChangeSending] = useState(false);
+  const [emailChangeSent, setEmailChangeSent] = useState(false);
+  const [emailChangeError, setEmailChangeError] = useState('');
+
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        username: user.username || '',
+        bio: user.bio || '',
+        avatar: user.avatar || '',
+        banner: user.banner || ''
+      });
+      setAvatarPreview(null);
+      setBannerPreview(null);
+      setAvatarFile(null);
+      setBannerFile(null);
+    }
+  }, [user]);
+
+  const profileStats = {
+    memberSince: user ? new Date(user.createdAt).toLocaleDateString(i18n.language, { month: 'long', year: 'numeric' }) : ''
+  };
+
+  const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
+  const [challengesTotal, setChallengesTotal] = useState(0);
+  const [totalCompleted, setTotalCompleted] = useState(0);
+  const [totalInProgress, setTotalInProgress] = useState(0);
+  const [challengesHasMore, setChallengesHasMore] = useState(false);
+  const [loadingMoreChallenges, setLoadingMoreChallenges] = useState(false);
+  const [ownedCosmetics, setOwnedCosmetics] = useState<OwnedCosmetic[]>([]);
+  const [cosmeticLoading, setCosmeticLoading] = useState<number | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+
+  const [openSection, setOpenSection] = useState<string | null>('appearance');
+  const [openProfileSections, setOpenProfileSections] = useState<OpenProfileSections>({
+    cosmetics: true, info: true, defis: true, history: true, settings: true,
+  });
+  const toggleProfileSection = (key: ProfileSectionKey) =>
+    setOpenProfileSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || !user) { setPageLoading(false); return; }
+    setPageLoading(true);
+    const langParam = i18n.language !== 'fr' ? '?lang=' + i18n.language : '';
+    fetch(`/api/users/me/profile-data${langParam}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => {
+        setUserChallenges(data.challenges ?? []);
+        setChallengesTotal(data.total ?? 0);
+        setTotalCompleted(data.totalCompleted ?? 0);
+        setTotalInProgress(data.totalInProgress ?? 0);
+        setChallengesHasMore(data.hasMore ?? false);
+        setOwnedCosmetics(data.cosmetics ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setPageLoading(false));
+  }, [user, i18n.language]);
+
+  const loadMoreChallenges = async () => {
+    const token = localStorage.getItem('token');
+    if (!token || loadingMoreChallenges) return;
+    setLoadingMoreChallenges(true);
+    try {
+      const langParam = i18n.language !== 'fr' ? `&lang=${i18n.language}` : '';
+      const res = await fetch(`/api/users/me/challenges?limit=10&skip=${userChallenges.length}${langParam}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const more: UserChallenge[] = Array.isArray(data) ? data : (data.challenges ?? []);
+      setUserChallenges(prev => [...prev, ...more]);
+      if (!Array.isArray(data)) setChallengesHasMore(data.hasMore ?? false);
+    } catch { /* silent */ }
+    finally { setLoadingMoreChallenges(false); }
+  };
+
+  const handleEquip = (cosmeticId: number) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const cosmetic = ownedCosmetics.find(uc => uc.cosmeticId === cosmeticId);
+    if (!cosmetic) return;
+    if (cosmetic.cosmetic.type === 'BADGE') {
+      const equippedBadges = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped).length;
+      if (equippedBadges >= 3) {
+        showNotif(t('profile.badgeCapMessage'), 'error');
+        return;
+      }
+    }
+    // Optimistic update — UI réagit immédiatement
+    const rollback = ownedCosmetics;
+    setOwnedCosmetics(prev => prev.map(uc => {
+      if (cosmetic.cosmetic.type === 'BADGE') {
+        return uc.cosmeticId === cosmeticId ? { ...uc, equipped: true } : uc;
+      }
+      if (uc.cosmetic.type === cosmetic.cosmetic.type) {
+        return { ...uc, equipped: uc.cosmeticId === cosmeticId };
+      }
+      return uc;
+    }));
+    setCosmeticLoading(cosmeticId);
+    fetch(`/api/users/me/cosmetics/${cosmeticId}/equip`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      .then(async res => {
+        if (!res.ok) {
+          setOwnedCosmetics(rollback);
+          const err = await res.json().catch(() => ({}));
+          showNotif((err as { error?: string }).error ?? t('profile.equipError'), 'error');
+        } else {
+          globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
+        }
+      })
+      .catch(() => setOwnedCosmetics(rollback))
+      .finally(() => setCosmeticLoading(null));
+  };
+
+  const handleUnequip = (cosmeticId: number) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const rollback = ownedCosmetics;
+    // Optimistic update
+    setOwnedCosmetics(prev => prev.map(uc => uc.cosmeticId === cosmeticId ? { ...uc, equipped: false } : uc));
+    setCosmeticLoading(cosmeticId);
+    fetch(`/api/users/me/cosmetics/${cosmeticId}/unequip`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      .then(async res => {
+        if (!res.ok) {
+          setOwnedCosmetics(rollback);
+          const err = await res.json().catch(() => ({}));
+          showNotif((err as { error?: string }).error ?? t('profile.unequipError'), 'error');
+        } else {
+          globalThis.dispatchEvent(new CustomEvent('cosmetics-updated'));
+        }
+      })
+      .catch(() => setOwnedCosmetics(rollback))
+      .finally(() => setCosmeticLoading(null));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePasswordSave = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      showNotif(t('profile.passwordMismatch'), 'error');
+      return;
+    }
+    if (!passwordData.currentPassword || !passwordData.newPassword) {
+      showNotif(t('profile.fillAllFields'), 'error');
+      return;
+    }
+    if (!isStrongPassword(passwordData.newPassword)) {
+      showNotif(`${t('auth.weakPassword')} ${PASSWORD_REQUIREMENTS_TEXT}`, 'error');
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/users/me/password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showNotif(data.error || t('profile.passwordChangeError'), 'error');
+        return;
+      }
+      showNotif(t('profile.passwordUpdated'), 'success');
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setIsEditing(false);
+    } catch (err) {
+      showNotif(t('profile.passwordNetworkError'), 'error');
+    }
+  };
+
+  const handleRequestEmailChange = async () => {
+    setEmailChangeError('');
+    if (!validateEmail(newEmailInput)) {
+      setEmailChangeError(t('profile.invalidEmail'));
+      return;
+    }
+    setEmailChangeSending(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/users/me/email/request-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ newEmail: newEmailInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmailChangeError(data.error || t('profile.emailChangeRequestError'));
+        return;
+      }
+      setEmailChangeSent(true);
+    } catch {
+      setEmailChangeError(t('profile.emailChangeNetworkError'));
+    } finally {
+      setEmailChangeSending(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_TYPES.has(file.type)) {
+      showNotif(t('profile.unsupportedFormat'), 'error');
+      return;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      showNotif(t('profile.imageTooLarge'), 'error');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    if (type === 'avatar') {
+      setAvatarPreview(url);
+      setAvatarFile(file);
+    } else {
+      setBannerPreview(url);
+      setBannerFile(file);
+    }
+  };
+
+  const uploadToBackend = async (file: File, type: 'avatar' | 'banner'): Promise<string> => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('type', type);
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      body: form,
+    });
+    if (!res.ok) throw new Error('Erreur upload');
+    const data = await res.json();
+    return data.url;
+  };
+
+  const handleSave = async () => {
+    try {
+      let avatarUrl = formData.avatar;
+      let bannerUrl = formData.banner;
+      if (avatarFile) avatarUrl = await uploadToBackend(avatarFile, 'avatar');
+      if (bannerFile) bannerUrl = await uploadToBackend(bannerFile, 'banner');
+
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/users/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...formData,
+          avatar: avatarUrl,
+          banner: bannerUrl
+        })
+      });
+      if (!res.ok) throw new Error('Erreur lors de la sauvegarde');
+      const data = await res.json();
+      setUser(data.user);
+      setIsEditing(false);
+      setAvatarPreview(null);
+      setBannerPreview(null);
+      setAvatarFile(null);
+      setBannerFile(null);
+    } catch (err) {
+      showNotif(t('profile.saveError'), 'error');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setAvatarPreview(null);
+    setBannerPreview(null);
+    setAvatarFile(null);
+    setBannerFile(null);
+  };
+
+  const equippedFrame  = getEquipped(ownedCosmetics, 'AVATAR_FRAME');
+  const equippedTitle  = getEquipped(ownedCosmetics, 'TITLE');
+  const equippedBadge  = getEquipped(ownedCosmetics, 'BADGE');
+  const equippedBanner = getEquipped(ownedCosmetics, 'BANNER');
+  const frameClass  = equippedFrame  ? (FRAME_CLASSES[equippedFrame.cosmetic.rarity]   ?? '') : '';
+  const titleClass  = equippedTitle  ? (TITLE_CLASSES[equippedTitle.cosmetic.rarity]   ?? '') : '';
+  const bannerClass = equippedBanner ? (BANNER_CLASSES[equippedBanner.cosmetic.rarity] ?? '') : '';
+  const hasBannerImage = !!(bannerPreview || formData.banner || user?.banner);
+
+  if (pageLoading) return <PageLoader message={t('profile.loadingProfile')} />;
+
+  if (!user) return <NotLoggedInView />;
+
+  const cosmeticsLabel = ownedCosmetics.length === 0
+    ? t('profile.noCosmeticsOwned')
+    : t('profile.cosmeticsOwned', { count: ownedCosmetics.length });
+
+  const sortedUserChallenges = [...userChallenges].sort((a, b) => {
+    if (a.challenge.seriesName && a.challenge.seriesName === b.challenge.seriesName) {
+      const da = seriesDayNumber(a.challenge.title);
+      const db = seriesDayNumber(b.challenge.title);
+      if (da !== null && db !== null) return da - db;
+    }
+    return 0;
+  });
+
+  return (
+    <div style={{ paddingBottom: 100, color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
+
+      <ProfileHeaderSection
+        t={t}
+        user={user}
+        isEditing={isEditing}
+        formData={formData}
+        bannerPreview={bannerPreview}
+        avatarPreview={avatarPreview}
+        bannerClass={bannerClass}
+        frameClass={frameClass}
+        titleClass={titleClass}
+        hasBannerImage={hasBannerImage}
+        equippedFrame={equippedFrame}
+        equippedTitle={equippedTitle}
+        equippedBadge={equippedBadge}
+        profileStats={profileStats}
+        handleFileChange={handleFileChange}
+        handleInputChange={handleInputChange}
+        avatarInputRef={avatarInputRef}
+        bannerInputRef={bannerInputRef}
+        navigate={navigate}
+        onStartEdit={() => setIsEditing(true)}
+        onSave={handleSave}
+        onCancel={handleCancelEdit}
+      />
 
       {/* ── Stats 3-col (mockup style) ── */}
       <div style={{ padding: '20px 18px 0', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
@@ -709,457 +1333,82 @@ const EditProfile: React.FC = () => {
       })()}
 
       {/* ── Informations ── */}
-      <div style={{ padding: '0 18px', marginTop: 16 }}>
-          <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-            <button onClick={() => toggleProfileSection('info')}
-              className="q-press w-full flex items-center gap-3 p-4 text-left"
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)' }}>
-                <Mail size={18} color="#fff" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.myInfo')}</p>
-                <p className="text-xs truncate" style={{ color: 'var(--q-text2)' }}>{user.email}</p>
-              </div>
-              <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
-                transform: openProfileSections.info ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease' }} />
-            </button>
-            {openProfileSections.info && (
-              <div className="px-4 pb-4 space-y-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
-                {user.isAdmin && (
-                  <div className="px-3 py-2 rounded-xl text-xs font-bold w-fit flex items-center gap-1.5"
-                    style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
-                    <Star size={12} /> {t('profile.administrator')}
-                  </div>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2">
-                    <Mail size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
-                    <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{user.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
-                    <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{t('userProfile.memberSince', { date: profileStats.memberSince })}</span>
-                  </div>
-                </div>
-                {isEditing && (
-                  <div>
-                    <p className="text-sm font-semibold mb-2" style={{ color: 'var(--q-text)' }}>{t('profile.changeEmail')}</p>
-                    <div className="rounded-2xl p-4 space-y-3" style={{ background: 'var(--q-accent-soft)', border: '1px solid var(--q-line)' }}>
-                      {emailChangeSent ? (
-                        <p className="text-sm" style={{ color: 'var(--q-text)' }}>
-                          <Trans i18nKey="profile.emailChangeSentMessage" values={{ email: newEmailInput }} components={{ strong: <strong /> }} />
-                        </p>
-                      ) : (
-                        <>
-                          <div>
-                            <label htmlFor="new-email" className="block text-xs font-semibold mb-1" style={{ color: 'var(--q-text2)' }}>
-                              {t('profile.newEmailLabel')}
-                            </label>
-                            <input id="new-email" type="email" value={newEmailInput}
-                              onChange={e => { setNewEmailInput(e.target.value); setEmailChangeError(''); }}
-                              placeholder={user.email} autoComplete="email"
-                              className="w-full px-3 py-2 rounded-xl bg-transparent focus:outline-none text-sm"
-                              style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} />
-                            {emailChangeError && <p className="text-red-500 text-xs mt-1">{emailChangeError}</p>}
-                          </div>
-                          <button onClick={handleRequestEmailChange} disabled={emailChangeSending}
-                            className="q-press px-4 py-2 rounded-xl text-sm font-bold text-white"
-                            style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', opacity: emailChangeSending ? 0.7 : 1 }}>
-                            {emailChangeSending ? t('profile.sending') : t('profile.sendConfirmationLink')}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {isEditing && (
-                  <div>
-                    <p className="text-sm font-semibold mb-2" style={{ color: 'var(--q-text)' }}>{t('profile.changePassword')}</p>
-                    <div className="rounded-2xl p-4 space-y-3" style={{ background: 'var(--q-accent-soft)', border: '1px solid var(--q-line)' }}>
-                      {(['currentPassword', 'newPassword', 'confirmPassword'] as const).map((field, i) => (
-                        <div key={field}>
-                          <label htmlFor={field} className="block text-xs font-semibold mb-1" style={{ color: 'var(--q-text2)' }}>
-                            {[t('profile.currentPassword'), t('profile.newPassword'), t('profile.confirmNewPassword')][i]}
-                          </label>
-                          <input id={field} type="password" name={field} value={passwordData[field]} onChange={handlePasswordChange}
-                            autoComplete={field === 'currentPassword' ? 'current-password' : 'new-password'}
-                            className="w-full px-3 py-2 rounded-xl bg-transparent focus:outline-none text-sm"
-                            style={{ border: '1px solid var(--q-accent)', color: 'var(--q-text)' }} />
-                          {field === 'newPassword' && (
-                            <p className="text-xs mt-1" style={{ color: 'var(--q-text2)' }}>{PASSWORD_REQUIREMENTS_TEXT}</p>
-                          )}
-                        </div>
-                      ))}
-                      <button onClick={handlePasswordSave}
-                        className="q-press px-4 py-2 rounded-xl text-sm font-bold text-white"
-                        style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)' }}>
-                        {t('profile.savePasswordButton')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+      <InfoSection
+        t={t}
+        user={user}
+        profileStats={profileStats}
+        isEditing={isEditing}
+        isOpen={openProfileSections.info}
+        onToggle={() => toggleProfileSection('info')}
+        emailChangeSent={emailChangeSent}
+        newEmailInput={newEmailInput}
+        setNewEmailInput={setNewEmailInput}
+        emailChangeError={emailChangeError}
+        setEmailChangeError={setEmailChangeError}
+        emailChangeSending={emailChangeSending}
+        handleRequestEmailChange={handleRequestEmailChange}
+        passwordData={passwordData}
+        handlePasswordChange={handlePasswordChange}
+        handlePasswordSave={handlePasswordSave}
+      />
 
       {/* ── Cosmétiques ── */}
-      <div style={{ padding: '0 18px', marginTop: 8 }}>
-          <div data-tour="profile-cosmetics" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-            <button onClick={() => toggleProfileSection('cosmetics')}
-              className="q-press w-full flex items-center gap-3 p-4 text-left"
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#EC4899,#A78BFA)' }}>
-                <ShoppingBag size={18} color="#fff" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.myCosmetics')}</p>
-                <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{cosmeticsLabel}</p>
-              </div>
-              <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
-                transform: openProfileSections.cosmetics ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease' }} />
-            </button>
-            {openProfileSections.cosmetics && (
-              <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
-                {ownedCosmetics.length === 0 ? (
-                  <p className="text-sm" style={{ color: 'var(--q-text3)' }}>
-                    {t('profile.noCosmeticsBody')}{' '}
-                    <Link to="/shop" style={{ color: 'var(--q-accent)' }} className="hover:underline">{t('profile.visitShop')}</Link>
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {(() => {
-                      const equippedBadgeCount = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped).length;
-                      return ownedCosmetics.map(uc => {
-                        const rarityColor = TITLE_CLASSES[uc.cosmetic.rarity] ?? '';
-                        const isLoading = cosmeticLoading === uc.cosmeticId;
-                        const TypeIcon = TYPE_ICONS[uc.cosmetic.type] ?? Package;
-                        const badgeCapped = !uc.equipped && uc.cosmetic.type === 'BADGE' && equippedBadgeCount >= 3;
-                        return (
-                          <div key={uc.id} className="rounded-2xl p-3 flex flex-col gap-2"
-                            style={{ background: 'var(--q-chrome)',
-                              border: uc.equipped ? '2px solid var(--q-accent)' : '1px solid var(--q-line)',
-                              boxShadow: uc.equipped ? '0 0 0 3px var(--q-accent-soft), var(--q-shadow)' : 'var(--q-shadow)' }}>
-                            <div className="text-center">
-                              <div className="flex justify-center mb-1" style={{ color: 'var(--q-accent)' }}><TypeIcon size={22} /></div>
-                              <p className="font-bold text-xs mt-1 truncate" style={{ color: 'var(--q-text)' }}>{uc.cosmetic.name}</p>
-                              <p className={`text-xs font-semibold ${rarityColor}`}>{t(`common.rarity.${uc.cosmetic.rarity}`)}</p>
-                              <p className="text-xs" style={{ color: 'var(--q-text3)' }}>{t(`shop.type.${uc.cosmetic.type}`)}</p>
-                            </div>
-                            {uc.equipped ? (
-                              <button onClick={() => handleUnequip(uc.cosmeticId)} disabled={isLoading}
-                                className="q-press w-full py-1 rounded-xl text-xs font-bold text-white disabled:opacity-60"
-                                style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)' }}>
-                                {isLoading ? '...' : t('profile.unequip')}
-                              </button>
-                            ) : (
-                              <button onClick={() => handleEquip(uc.cosmeticId)} disabled={isLoading || badgeCapped}
-                                className="q-press w-full py-1 rounded-xl text-xs font-bold disabled:opacity-40"
-                                style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', cursor: badgeCapped ? 'not-allowed' : 'pointer' }}
-                                title={badgeCapped ? t('profile.badgeCapTooltip') : undefined}>
-                                {isLoading ? '...' : badgeCapped ? t('profile.max3') : t('profile.equip')}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+      <CosmeticsSection
+        t={t}
+        ownedCosmetics={ownedCosmetics}
+        cosmeticsLabel={cosmeticsLabel}
+        cosmeticLoading={cosmeticLoading}
+        isOpen={openProfileSections.cosmetics}
+        onToggle={() => toggleProfileSection('cosmetics')}
+        handleEquip={handleEquip}
+        handleUnequip={handleUnequip}
+      />
 
       {/* ── Défis ── */}
       {userChallenges.length > 0 && (
-        <div style={{ padding: '0 18px', marginTop: 8 }}>
-            <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-              <button onClick={() => toggleProfileSection('defis')}
-                className="q-press w-full flex items-center gap-3 p-4 text-left"
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)' }}>
-                  <Trophy size={18} color="#fff" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('navbar.myChallenges')}</p>
-                  <p className="text-xs" style={{ color: 'var(--q-text2)' }}>
-                    {t('profile.challengesSummary', {
-                      completed: totalCompleted || userChallenges.filter(c => c.status === 'COMPLETED').length,
-                      inProgress: totalInProgress || userChallenges.filter(c => c.status === 'IN_PROGRESS').length,
-                    })}
-                  </p>
-                </div>
-                <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
-                  transform: openProfileSections.defis ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease' }} />
-              </button>
-              {openProfileSections.defis && (
-                <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
-                  {sortedUserChallenges.slice(0, 5).map((uc, i) => (
-                    <div key={uc.id} className="px-4 py-3 flex items-center justify-between gap-3"
-                      style={{ borderTop: i > 0 ? '1px solid var(--q-line)' : 'none' }}>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate" style={{ color: 'var(--q-text)' }}>{uc.challenge.title}</p>
-                        {uc.challenge.description && (
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--q-text2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                            {uc.challenge.description}
-                          </p>
-                        )}
-                        <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--q-text3)' }}><CircleDollarSign size={10} className="inline flex-shrink-0" /> {uc.challenge.coinReward} · <Zap size={10} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP</p>
-                      </div>
-                      {uc.status === 'COMPLETED' ? (
-                        <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded-full"
-                          style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff' }}>
-                          <CheckCircle size={12} /> {t('profile.completed')}
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded-full"
-                          style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)', color: '#fff' }}>
-                          <Clock size={12} /> {t('profile.inProgress')}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <ChallengesSection
+          t={t}
+          sortedUserChallenges={sortedUserChallenges}
+          totalCompleted={totalCompleted}
+          totalInProgress={totalInProgress}
+          userChallenges={userChallenges}
+          isOpen={openProfileSections.defis}
+          onToggle={() => toggleProfileSection('defis')}
+        />
+      )}
 
       {/* ── Historique ── */}
       {userChallenges.length > 0 && (
-        <div style={{ padding: '0 18px', marginTop: 8 }}>
-          <div data-tour="profile-history" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-            <button onClick={() => toggleProfileSection('history')}
-              className="q-press w-full flex items-center gap-3 p-4 text-left"
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#818CF8,#38BDF8)' }}>
-                <History size={18} color="#fff" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.history')}</p>
-              </div>
-              <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
-                transform: openProfileSections.history ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease' }} />
-            </button>
-            {openProfileSections.history && (
-              <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
-              {userChallenges.map((uc, i, a) => {
-                const ok = uc.status === 'COMPLETED';
-                return (
-                  <div key={uc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: i < a.length - 1 ? '1px solid var(--q-line)' : 'none' }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, background: ok ? 'rgba(52,211,153,0.18)' : 'rgba(251,146,60,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {ok ? <CheckCircle size={16} style={{ color: '#34D399' }} /> : <Clock size={16} style={{ color: '#FB923C' }} />}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--q-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{uc.challenge.title}</div>
-                      {uc.challenge.description && (
-                        <div style={{ fontSize: 12, color: 'var(--q-text2)', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {uc.challenge.description}
-                        </div>
-                      )}
-                      <div style={{ fontSize: 12, color: 'var(--q-text3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {ok ? (
-                          <>
-                            <span>{t('profile.doneInline')} ·</span>
-                            <CircleDollarSign size={11} className="inline flex-shrink-0" /> {uc.challenge.coinReward}
-                            <span>·</span>
-                            <Zap size={11} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP
-                          </>
-                        ) : t('profile.inProgressLower')}
-                      </div>
-                    </div>
-                    <ChevronRight size={14} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
-                  </div>
-                );
-              })}
-              {challengesHasMore && (
-                <div style={{ padding: '12px 16px', borderTop: '1px solid var(--q-line)' }}>
-                  <button onClick={loadMoreChallenges} disabled={loadingMoreChallenges}
-                    className="q-press w-full py-2.5 rounded-xl text-sm font-bold disabled:opacity-60"
-                    style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                    {loadingMoreChallenges ? t('common.loading') : t('profile.loadMore', { count: challengesTotal - userChallenges.length })}
-                  </button>
-                </div>
-              )}
-              </div>
-            )}
-          </div>
-        </div>
+        <HistorySection
+          t={t}
+          userChallenges={userChallenges}
+          challengesHasMore={challengesHasMore}
+          loadingMoreChallenges={loadingMoreChallenges}
+          loadMoreChallenges={loadMoreChallenges}
+          challengesTotal={challengesTotal}
+          isOpen={openProfileSections.history}
+          onToggle={() => toggleProfileSection('history')}
+        />
       )}
 
       {/* ── Paramètres ── */}
-      <div data-tour="profile-settings" style={{ padding: '0 18px', marginTop: 8 }}>
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-        <button onClick={() => toggleProfileSection('settings')}
-          className="q-press w-full flex items-center gap-3 p-4 text-left"
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg,#64748B,#334155)' }}>
-            <Settings size={18} color="#fff" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.settings')}</p>
-          </div>
-          <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
-            transform: openProfileSections.settings ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s ease' }} />
-        </button>
-        {openProfileSections.settings && (
-      <div className="border-t" style={{ padding: '12px', borderColor: 'var(--q-line)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-
-        {/* Aide */}
-        {/* Le tuto commence sur l'accueil (cloche de notifs, XP, streak...) — le relancer
-            depuis une autre page le laisserait bloqué à chercher des éléments qui n'existent
-            pas ici, donc on ramène d'abord sur "/" avant de l'ouvrir. */}
-        <button onClick={() => { navigate('/'); openTour(); }} className="q-press rounded-2xl overflow-hidden w-full flex items-center gap-3 p-4 text-left"
-          style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)', cursor: 'pointer' }}>
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg,#00DDFF,#2B1FD0)' }}>
-            <HelpCircle size={18} color="#fff" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.reviewTutorial')}</p>
-            <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{t('profile.reviewTutorialDesc')}</p>
-          </div>
-          <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
-        </button>
-
-        {/* Apparence */}
-        <div data-tour="settings-appearance" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-          <button onClick={() => setOpenSection(openSection === 'appearance' ? null : 'appearance')}
-            className="q-press w-full flex items-center gap-3 p-4 text-left"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'var(--q-accent-soft)' }}>
-              <Palette size={18} style={{ color: 'var(--q-accent-deep)' }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.appearance')}</p>
-              <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{t('profile.appearanceDesc')}</p>
-            </div>
-            <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
-              transform: openSection === 'appearance' ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease' }} />
-          </button>
-          {openSection === 'appearance' && (
-            <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {darkMode ? <Moon size={16} style={{ color: 'var(--q-accent)' }} /> : <Sun size={16} style={{ color: 'var(--q-text2)' }} />}
-                  <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{t('profile.darkMode')}</span>
-                </div>
-                <button onClick={toggleDarkMode} role="switch" aria-checked={darkMode} aria-label={t('profile.darkMode')}
-                  className="q-press relative flex-shrink-0"
-                  style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
-                    background: darkMode ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
-                  <span style={{ position: 'absolute', top: 3, left: darkMode ? 21 : 3, width: 20, height: 20,
-                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Notifications */}
-        <div data-tour="settings-notifications" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-          <button onClick={() => setOpenSection(openSection === 'notifications' ? null : 'notifications')}
-            className="q-press w-full flex items-center gap-3 p-4 text-left"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)' }}>
-              <Bell size={18} color="#fff" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('common.notifications')}</p>
-              <p className="text-xs" style={{ color: 'var(--q-text2)' }}>
-                {t('profile.activeCount', { count: Object.values(notifToggles).filter(Boolean).length })}
-              </p>
-            </div>
-            <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
-              transform: openSection === 'notifications' ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease' }} />
-          </button>
-          {openSection === 'notifications' && (
-            <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
-              {([
-                { key: 'defis', label: t('profile.notifChallengeReminders') },
-                { key: 'messages', label: t('profile.notifNewMessages') },
-                { key: 'updates', label: t('profile.notifUpdates') },
-              ] as { key: keyof typeof notifToggles; label: string }[]).map(({ key, label }) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{label}</span>
-                  <button onClick={() => setNotifToggles(prev => ({ ...prev, [key]: !prev[key] }))}
-                    role="switch" aria-checked={notifToggles[key]} aria-label={label}
-                    className="q-press relative flex-shrink-0"
-                    style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
-                      background: notifToggles[key] ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
-                    <span style={{ position: 'absolute', top: 3, left: notifToggles[key] ? 21 : 3, width: 20, height: 20,
-                      borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-                      boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Accessibilité */}
-        <div data-tour="settings-accessibility" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
-          <button onClick={() => setOpenSection(openSection === 'accessibility' ? null : 'accessibility')}
-            className="q-press w-full flex items-center gap-3 p-4 text-left"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#34D399,#FACC15)' }}>
-              <SlidersHorizontal size={18} color="#fff" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.accessibility')}</p>
-              <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{t('profile.accessibilityDesc')}</p>
-            </div>
-            <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
-              transform: openSection === 'accessibility' ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease' }} />
-          </button>
-          {openSection === 'accessibility' && (
-            <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{t('profile.language')}</span>
-                <select value={language} onChange={e => setLanguage(e.target.value)}
-                  className="text-sm rounded-xl px-3 py-1.5 focus:outline-none"
-                  style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)', border: '1px solid var(--q-line)', fontFamily: 'inherit' }}>
-                  {['Français', 'English'].map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{t('profile.reduceMotion')}</span>
-                <button onClick={() => setReduceMotion(r => !r)} role="switch" aria-checked={reduceMotion} aria-label={t('profile.reduceMotion')}
-                  className="q-press relative flex-shrink-0"
-                  style={{ width: 44, height: 26, borderRadius: 13, border: 'none', padding: 0, cursor: 'pointer',
-                    background: reduceMotion ? 'var(--q-accent)' : 'var(--q-line)', transition: 'background 0.2s ease' }}>
-                  <span style={{ position: 'absolute', top: 3, left: reduceMotion ? 21 : 3, width: 20, height: 20,
-                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-      </div>
-        )}
-      </div>
-      </div>
+      <SettingsSection
+        t={t}
+        navigate={navigate}
+        openTour={openTour}
+        darkMode={darkMode}
+        toggleDarkMode={toggleDarkMode}
+        openSection={openSection}
+        setOpenSection={setOpenSection}
+        notifToggles={notifToggles}
+        setNotifToggles={setNotifToggles}
+        language={language}
+        setLanguage={setLanguage}
+        reduceMotion={reduceMotion}
+        setReduceMotion={setReduceMotion}
+        isOpen={openProfileSections.settings}
+        onToggle={() => toggleProfileSection('settings')}
+      />
 
       {/* ── Dashboard admin (visible uniquement pour les admins) ── */}
       {user?.isAdmin && (
