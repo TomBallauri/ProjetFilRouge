@@ -1,6 +1,12 @@
 import { prisma } from './prisma.js';
 import { translateTexts } from './translate.js';
 
+// DeepL ajoute parfois des guillemets décoratifs autour de noms courts
+// (ex. "Cadre Foudre Ardente" → `"Blazing Lightning" Frame`) — indésirable pour
+// des noms d'objets/titres/séries courts. On ne l'applique volontairement PAS
+// aux descriptions (phrases complètes où des guillemets peuvent être légitimes).
+const stripDecorativeQuotes = (text) => text.replace(/["'“”‘’]/g, '').trim();
+
 // Traduit et met en cache (colonnes titleEn/descriptionEn) un défi à la volée.
 // Ne fait un appel DeepL que si la traduction n'a jamais été calculée — sinon
 // on relit simplement le cache déjà en base.
@@ -23,7 +29,8 @@ export async function withTranslatedChallenge(challenge, lang, seriesNameEn) {
   }
   const translated = await translateTexts([challenge.title, challenge.description]);
   if (!translated) return { ...challenge, seriesNameEn: resolvedSeriesNameEn }; // repli silencieux vers le FR
-  const [titleEn, descriptionEn] = translated;
+  const titleEn = stripDecorativeQuotes(translated[0]);
+  const descriptionEn = translated[1];
   await prisma.challenge.update({ where: { id: challenge.id }, data: { titleEn, descriptionEn } }).catch(() => {});
   return { ...challenge, title: titleEn, description: descriptionEn, seriesNameEn: resolvedSeriesNameEn };
 }
@@ -35,7 +42,8 @@ export async function withTranslatedCosmetic(cosmetic, lang) {
   }
   const translated = await translateTexts([cosmetic.name, cosmetic.description]);
   if (!translated) return cosmetic;
-  const [nameEn, descriptionEn] = translated;
+  const nameEn = stripDecorativeQuotes(translated[0]);
+  const descriptionEn = translated[1];
   await prisma.cosmetic.update({ where: { id: cosmetic.id }, data: { nameEn, descriptionEn } }).catch(() => {});
   return { ...cosmetic, name: nameEn, description: descriptionEn };
 }
@@ -52,8 +60,9 @@ async function ensureSeriesNamesTranslated(challenges) {
   await Promise.allSettled(toTranslate.map(async (name) => {
     const translated = await translateTexts([name]);
     if (!translated) return;
-    map.set(name, translated[0]);
-    await prisma.challenge.updateMany({ where: { seriesName: name, seriesNameEn: null }, data: { seriesNameEn: translated[0] } }).catch(() => {});
+    const seriesNameEn = stripDecorativeQuotes(translated[0]);
+    map.set(name, seriesNameEn);
+    await prisma.challenge.updateMany({ where: { seriesName: name, seriesNameEn: null }, data: { seriesNameEn } }).catch(() => {});
   }));
   return map;
 }
@@ -78,10 +87,18 @@ export async function withTranslatedChallenges(challenges, lang) {
 export const withTranslatedCosmetics = (cosmetics, lang) => withTranslatedList(cosmetics, withTranslatedCosmetic, lang);
 
 // Variante pour les listes de UserChallenge (le défi est imbriqué sous `.challenge`,
-// utilisée par GET /api/users/me/challenges).
+// utilisée par GET /api/users/me/challenges et /api/users/me/profile-data).
 export async function withTranslatedUserChallenges(userChallenges, lang) {
   if (lang !== 'en') return userChallenges;
   const rawChallenges = userChallenges.map(uc => uc.challenge);
   const translatedChallenges = await withTranslatedChallenges(rawChallenges, lang);
   return userChallenges.map((uc, i) => ({ ...uc, challenge: translatedChallenges[i] }));
+}
+
+// Idem pour les listes de UserCosmetic (le cosmétique est imbriqué sous `.cosmetic`).
+export async function withTranslatedUserCosmetics(userCosmetics, lang) {
+  if (lang !== 'en') return userCosmetics;
+  const rawCosmetics = userCosmetics.map(uc => uc.cosmetic);
+  const translatedCosmetics = await withTranslatedCosmetics(rawCosmetics, lang);
+  return userCosmetics.map((uc, i) => ({ ...uc, cosmetic: translatedCosmetics[i] }));
 }

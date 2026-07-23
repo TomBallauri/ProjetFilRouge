@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../lib/auth.js';
+import { StreakService } from '../../services/StreakService.js';
 
 const LEADERBOARD_SELECT = {
   id: true, username: true, avatar: true, coins: true, xp: true, level: true,
-  currentStreak: true, longestStreak: true,
+  currentStreak: true, longestStreak: true, lastStreakDate: true,
   _count: { select: { challenges: true } },
   cosmetics: {
     where: { equipped: true },
@@ -12,16 +13,22 @@ const LEADERBOARD_SELECT = {
   }
 };
 
+// `currentStreak` en base peut être périmé (voir StreakService.effectiveStreak) — on
+// recalcule donc la vraie valeur avant de classer, sinon un utilisateur inactif depuis
+// des jours resterait affiché (et classé) avec une streak qu'il n'a plus.
+const withEffectiveStreak = (users) => users
+  .map((u) => {
+    const { lastStreakDate, ...rest } = u;
+    return { ...rest, currentStreak: StreakService.effectiveStreak(u) };
+  })
+  .sort((a, b) => b.currentStreak - a.currentStreak);
+
 const router = Router();
 
 router.get('/api/leaderboard', async (req, res) => {
   try {
-    const users = await prisma.user.findMany({
-      select: LEADERBOARD_SELECT,
-      orderBy: { currentStreak: 'desc' },
-      take: 50
-    });
-    res.json(users);
+    const users = await prisma.user.findMany({ select: LEADERBOARD_SELECT });
+    res.json(withEffectiveStreak(users).slice(0, 50));
   } catch (error) {
     res.status(500).json({ error: "Erreur lors de la récupération du classement" });
   }
@@ -39,9 +46,8 @@ router.get('/api/leaderboard/friends', authMiddleware, async (req, res) => {
         ]
       },
       select: LEADERBOARD_SELECT,
-      orderBy: { currentStreak: 'desc' }
     });
-    res.json(users);
+    res.json(withEffectiveStreak(users));
   } catch (error) {
     res.status(500).json({ error: 'Erreur lors de la récupération du classement amis' });
   }

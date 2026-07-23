@@ -33,6 +33,22 @@ export class StreakService {
     return null;
   }
 
+  // `currentStreak` n'est mis à jour qu'au moment où l'utilisateur complète un défi
+  // (voir updateForUser) — tant qu'il ne complète rien, la valeur stockée en base reste
+  // celle de sa dernière activité, même si trop de jours se sont écoulés entre-temps et
+  // que la streak est en réalité perdue. On calcule donc ici la valeur réellement à jour
+  // pour l'affichage (login, /me, classement...), sans dépendre d'une reconnexion ou
+  // d'une nouvelle completion pour que ça se répercute.
+  static effectiveStreak(user) {
+    if (!user.currentStreak || !user.lastStreakDate) return user.currentStreak ?? 0;
+    const todayUTC = new Date();
+    todayUTC.setUTCHours(0, 0, 0, 0);
+    const last = new Date(user.lastStreakDate);
+    last.setUTCHours(0, 0, 0, 0);
+    const diffDays = Math.round((todayUTC - last) / 86_400_000);
+    return diffDays > 1 ? 0 : user.currentStreak;
+  }
+
   async updateForUser(userId) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) return null;

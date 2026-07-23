@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
 import { SECRET, authMiddleware, isAdmin } from '../lib/auth.js';
 import { sanitizeUser } from '../lib/userUtils.js';
-import { withTranslatedCosmetics } from '../lib/translateContent.js';
+import { withTranslatedCosmetics, withTranslatedUserChallenges, withTranslatedUserCosmetics } from '../lib/translateContent.js';
 
 const router = Router();
 
@@ -102,7 +102,7 @@ router.get('/api/users/me/cosmetics', async (req, res) => {
 router.get('/api/users/me/profile-data', authMiddleware, async (req, res) => {
   const userId = req.userId;
   try {
-    const [challenges, total, totalCompleted, totalInProgress, cosmetics] = await Promise.all([
+    const [challengeRows, total, totalCompleted, totalInProgress, cosmeticRows] = await Promise.all([
       prisma.userChallenge.findMany({
         where: { userId },
         include: { challenge: true },
@@ -113,6 +113,10 @@ router.get('/api/users/me/profile-data', authMiddleware, async (req, res) => {
       prisma.userChallenge.count({ where: { userId, status: 'COMPLETED' } }),
       prisma.userChallenge.count({ where: { userId, status: 'IN_PROGRESS' } }),
       prisma.userCosmetic.findMany({ where: { userId }, include: { cosmetic: true } }),
+    ]);
+    const [challenges, cosmetics] = await Promise.all([
+      withTranslatedUserChallenges(challengeRows, req.query.lang),
+      withTranslatedUserCosmetics(cosmeticRows, req.query.lang),
     ]);
     res.json({
       challenges, total, totalCompleted, totalInProgress,
@@ -139,6 +143,7 @@ router.get('/api/users/:id/profile', async (req, res) => {
       }
     });
     if (!user) return res.status(404).json({ error: "Utilisateur non trouvé" });
+    user.cosmetics = await withTranslatedUserCosmetics(user.cosmetics, req.query.lang);
     res.json(user);
   } catch (error) {
     res.status(500).json({ error: "Erreur serveur" });

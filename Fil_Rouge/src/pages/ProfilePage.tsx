@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut, ChevronLeft, Lock, HelpCircle } from 'lucide-react';
+import { Mail, Calendar, Edit, Save, X, Trophy, Zap, CheckCircle, Clock, ShoppingBag, Settings, Moon, Sun, Bell, ChevronDown, Palette, SlidersHorizontal, Award, Star, CircleDollarSign, Frame, PanelTop, Tag, Package, Flame, BookOpen, Brain, Activity, ChevronRight, LogOut, ChevronLeft, Lock, HelpCircle, History } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
@@ -115,7 +115,7 @@ const EditProfile: React.FC = () => {
 
   const [openSection, setOpenSection] = useState<string | null>('appearance');
   const [openProfileSections, setOpenProfileSections] = useState({
-    cosmetics: true, info: true, defis: true,
+    cosmetics: true, info: true, defis: true, history: true, settings: true,
   });
   const toggleProfileSection = (key: keyof typeof openProfileSections) =>
     setOpenProfileSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -124,7 +124,8 @@ const EditProfile: React.FC = () => {
     const token = localStorage.getItem('token');
     if (!token || !user) { setPageLoading(false); return; }
     setPageLoading(true);
-    fetch('/api/users/me/profile-data', { headers: { Authorization: `Bearer ${token}` } })
+    const langParam = i18n.language !== 'fr' ? '?lang=' + i18n.language : '';
+    fetch(`/api/users/me/profile-data${langParam}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(data => {
         setUserChallenges(data.challenges ?? []);
@@ -136,14 +137,15 @@ const EditProfile: React.FC = () => {
       })
       .catch(() => {})
       .finally(() => setPageLoading(false));
-  }, [user]);
+  }, [user, i18n.language]);
 
   const loadMoreChallenges = async () => {
     const token = localStorage.getItem('token');
     if (!token || loadingMoreChallenges) return;
     setLoadingMoreChallenges(true);
     try {
-      const res = await fetch(`/api/users/me/challenges?limit=10&skip=${userChallenges.length}`, { headers: { Authorization: `Bearer ${token}` } });
+      const langParam = i18n.language !== 'fr' ? `&lang=${i18n.language}` : '';
+      const res = await fetch(`/api/users/me/challenges?limit=10&skip=${userChallenges.length}${langParam}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       const more: UserChallenge[] = Array.isArray(data) ? data : (data.challenges ?? []);
       setUserChallenges(prev => [...prev, ...more]);
@@ -933,12 +935,24 @@ const EditProfile: React.FC = () => {
 
       {/* ── Historique ── */}
       {userChallenges.length > 0 && (
-        <>
-          <div style={{ padding: '22px 22px 10px' }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--q-display)', letterSpacing: -0.2, color: 'var(--q-text)' }}>{t('profile.history')}</h2>
-          </div>
-          <div data-tour="profile-history" style={{ padding: '0 18px' }}>
-            <div style={{ borderRadius: 22, overflow: 'hidden', background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+        <div style={{ padding: '0 18px', marginTop: 8 }}>
+          <div data-tour="profile-history" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+            <button onClick={() => toggleProfileSection('history')}
+              className="q-press w-full flex items-center gap-3 p-4 text-left"
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#818CF8,#38BDF8)' }}>
+                <History size={18} color="#fff" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.history')}</p>
+              </div>
+              <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+                transform: openProfileSections.history ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease' }} />
+            </button>
+            {openProfileSections.history && (
+              <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
               {userChallenges.map((uc, i, a) => {
                 const ok = uc.status === 'COMPLETED';
                 return (
@@ -977,18 +991,31 @@ const EditProfile: React.FC = () => {
                   </button>
                 </div>
               )}
-            </div>
+              </div>
+            )}
           </div>
-        </>
+        </div>
       )}
 
       {/* ── Paramètres ── */}
-      <div data-tour="profile-settings" style={{ padding: '22px 22px 10px' }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--q-display)', letterSpacing: -0.2, color: 'var(--q-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Settings size={20} style={{ color: 'var(--q-accent)' }} /> {t('profile.settings')}
-        </h2>
-      </div>
-      <div style={{ padding: '0 18px 40px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div data-tour="profile-settings" style={{ padding: '0 18px', marginTop: 8 }}>
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+        <button onClick={() => toggleProfileSection('settings')}
+          className="q-press w-full flex items-center gap-3 p-4 text-left"
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#64748B,#334155)' }}>
+            <Settings size={18} color="#fff" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.settings')}</p>
+          </div>
+          <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
+            transform: openProfileSections.settings ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease' }} />
+        </button>
+        {openProfileSections.settings && (
+      <div className="border-t" style={{ padding: '12px', borderColor: 'var(--q-line)', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
         {/* Aide */}
         {/* Le tuto commence sur l'accueil (cloche de notifs, XP, streak...) — le relancer
@@ -1129,6 +1156,9 @@ const EditProfile: React.FC = () => {
           )}
         </div>
 
+      </div>
+        )}
+      </div>
       </div>
 
       {/* ── Dashboard admin (visible uniquement pour les admins) ── */}

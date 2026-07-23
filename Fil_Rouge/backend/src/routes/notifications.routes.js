@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../lib/auth.js';
 import { seriesGroupReady, expireStaleInvites } from '../lib/groupHelpers.js';
+import { StreakService } from '../../services/StreakService.js';
 
 const router = Router();
 
@@ -28,15 +29,19 @@ router.get('/api/notifications', authMiddleware, async (req, res) => {
       : Promise.resolve([]),
   ]);
 
+  // `currentStreak` en base peut être périmé (voir StreakService.effectiveStreak) si
+  // l'utilisateur n'a rien complété depuis plusieurs jours — sans ça, la bannière
+  // "streak en danger" continuerait d'afficher une streak déjà perdue.
+  const effectiveStreak = StreakService.effectiveStreak(userInfo ?? { currentStreak: 0, lastStreakDate: null });
   const streakAtRisk =
-    (userInfo?.currentStreak ?? 0) > 0 &&
+    effectiveStreak > 0 &&
     (!userInfo?.lastStreakDate || new Date(userInfo.lastStreakDate) < today);
 
   res.json({
     pendingFriendRequests: friendRequests,
     pendingSeriesInvites: seriesInvites,
     streakAtRisk: !!streakAtRisk,
-    streakDays: userInfo?.currentStreak ?? 0,
+    streakDays: effectiveStreak,
     groups: seriesGroups.map(g => ({
       groupId: g.id,
       seriesName: g.seriesName,

@@ -96,9 +96,9 @@ const CosmeticPreview: React.FC<{ cosmetic: Cosmetic }> = ({ cosmetic }) => {
     const titleClass = TITLE_CLASSES[cosmetic.rarity] ?? 'text-gray-400';
     const titleText = cosmetic.name.replace(/^Titre\s*:\s*/i, '');
     return (
-      <div className={`w-full h-14 rounded-lg my-2 flex flex-col items-center justify-center gap-1 ${r.bg}`}>
-        <div className="w-7 h-7 rounded-full bg-gray-400/60 flex items-center justify-center text-white text-xs font-bold">A</div>
-        <span className={`text-xs font-bold ${titleClass}`}>{titleText}</span>
+      <div className={`w-full min-h-14 rounded-lg my-2 py-2 flex flex-col items-center justify-center gap-1 ${r.bg}`}>
+        <div className="w-7 h-7 rounded-full bg-gray-400/60 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">A</div>
+        <span className={`text-xs font-bold text-center leading-tight px-2 ${titleClass}`}>{titleText}</span>
       </div>
     );
   }

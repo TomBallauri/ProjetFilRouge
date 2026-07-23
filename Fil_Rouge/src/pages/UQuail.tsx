@@ -174,7 +174,8 @@ const UQuail: React.FC = () => {
     if (!user) return;
     const token = localStorage.getItem('token');
     if (token) {
-      fetch('/api/users/me/challenges?limit=20', { headers: { Authorization: `Bearer ${token}` } })
+      const listLangParam = i18n.language !== 'fr' ? `&lang=${i18n.language}` : '';
+      fetch(`/api/users/me/challenges?limit=20${listLangParam}`, { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json())
         .then((data: { challenges: UserChallenge[] } | UserChallenge[]) => {
           const list = Array.isArray(data) ? data : (data.challenges ?? []);

@@ -10,6 +10,7 @@ import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/password.js
 import { hashToken } from '../lib/tokens.js';
 import { FRONTEND_URL } from '../lib/config.js';
 import { emailChangeLimiter } from '../lib/rateLimiters.js';
+import { StreakService } from '../../services/StreakService.js';
 
 const EMAIL_CHANGE_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -20,11 +21,14 @@ router.get('/api/users', isAdmin, async (req, res) => {
   const users = await prisma.user.findMany({
     select: {
       id: true, username: true, email: true, isAdmin: true,
-      coins: true, xp: true, level: true, currentStreak: true, createdAt: true,
+      coins: true, xp: true, level: true, currentStreak: true, lastStreakDate: true, createdAt: true,
     },
     orderBy: { id: 'asc' },
   });
-  res.json(users);
+  res.json(users.map((u) => {
+    const { lastStreakDate, ...rest } = u;
+    return { ...rest, currentStreak: StreakService.effectiveStreak(u) };
+  }));
 });
 
 router.get('/api/users/me', async (req, res) => {

@@ -58,7 +58,8 @@ const UserProfilePage: React.FC = () => {
 
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/users/${id}/profile`)
+    const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
+    fetch(`/api/users/${id}/profile${langParam}`)
       .then(r => { if (r.status === 404) { setNotFound(true); return null; } return r.json(); })
       .then(data => { if (data) setProfile(data); })
       .finally(() => setLoading(false));
