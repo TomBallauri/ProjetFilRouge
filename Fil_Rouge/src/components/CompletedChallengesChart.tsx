@@ -4,27 +4,13 @@ import { useStore } from '../lib/store';
 import { BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
 import { computeView, type CompletedEntry, type RangeMode } from '../lib/completedChallengesStats';
 
-const PAGE_SIZE = 100;
-const MAX_FETCH = 500; // pas d'endpoint d'agrégat côté backend — on plafonne le nombre de
-                        // pages récupérées plutôt que de paginer indéfiniment pour un historique
-                        // potentiellement long.
-
-async function fetchAllCompleted(token: string): Promise<{ items: CompletedEntry[]; truncated: boolean }> {
-  const results: CompletedEntry[] = [];
-  let skip = 0;
-  for (;;) {
-    const res = await fetch(`/api/users/me/challenges?status=COMPLETED&limit=${PAGE_SIZE}&skip=${skip}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return { items: results, truncated: true };
-    const data = await res.json();
-    const items: { completedAt?: string }[] = Array.isArray(data) ? data : (data.challenges ?? []);
-    for (const it of items) if (it.completedAt) results.push({ completedAt: it.completedAt });
-    const hasMore = Array.isArray(data) ? items.length === PAGE_SIZE : (data.hasMore ?? false);
-    if (!hasMore || items.length === 0) return { items: results, truncated: false };
-    if (results.length >= MAX_FETCH) return { items: results, truncated: true };
-    skip += items.length;
-  }
+async function fetchAllCompleted(token: string): Promise<CompletedEntry[]> {
+  const res = await fetch('/api/users/me/challenges/completed-dates', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  const data: { dates: string[] } = await res.json();
+  return data.dates.map(completedAt => ({ completedAt }));
 }
 
 const TABS: { mode: RangeMode; labelKey: string }[] = [
@@ -37,7 +23,6 @@ const CompletedChallengesChart: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { user } = useStore();
   const [items, setItems] = useState<CompletedEntry[] | null>(null);
-  const [truncated, setTruncated] = useState(false);
   const [mode, setMode] = useState<RangeMode>('week');
   const [offset, setOffset] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
@@ -46,7 +31,7 @@ const CompletedChallengesChart: React.FC = () => {
     const token = localStorage.getItem('token');
     if (!token || !user) return;
     let cancelled = false;
-    fetchAllCompleted(token).then(res => { if (!cancelled) { setItems(res.items); setTruncated(res.truncated); } });
+    fetchAllCompleted(token).then(res => { if (!cancelled) setItems(res); });
     return () => { cancelled = true; };
   }, [user]);
 
@@ -60,10 +45,10 @@ const CompletedChallengesChart: React.FC = () => {
     if (!items || items.length === 0) return null;
     return new Date(Math.min(...items.map(it => new Date(it.completedAt).getTime())));
   }, [items]);
-  // On n'a pas la garantie d'avoir tout l'historique (voir MAX_FETCH) — si on a dû s'arrêter en
-  // route, on bloque la navigation avant d'afficher une période qui a l'air vide mais dont on ne
-  // sait en réalité rien, plutôt que de mentir par un graphique à zéro.
-  const prevDisabled = truncated && oldestDate !== null && periodStart <= oldestDate;
+  // On a tout l'historique (voir /api/users/me/challenges/completed-dates) — pas la peine de
+  // laisser naviguer vers une période antérieure au tout premier défi complété, qui sera
+  // toujours vide.
+  const prevDisabled = oldestDate !== null && periodStart <= oldestDate;
 
   const switchMode = (next: RangeMode) => { setMode(next); setOffset(0); setActiveIdx(null); };
 

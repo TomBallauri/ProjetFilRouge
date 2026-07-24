@@ -409,6 +409,19 @@ router.get('/api/users/me/challenges', async (req, res) => {
   }
 });
 
+// Dates de complétion, sans pagination — alimente le graphique d'activité de la page d'accueil,
+// qui a besoin de tout l'historique pour regrouper par jour/semaine/mois côté client. Pas de
+// `include: { challenge: true }` comme GET /api/users/me/challenges ci-dessus : une seule colonne
+// de dates reste légère même pour un très gros historique, donc pas besoin d'y plafonner le
+// nombre de lignes récupérées (voir CompletedChallengesChart.tsx côté frontend).
+router.get('/api/users/me/challenges/completed-dates', authMiddleware, async (req, res) => {
+  const rows = await prisma.userChallenge.findMany({
+    where: { userId: req.userId, status: 'COMPLETED', completedAt: { not: null } },
+    select: { completedAt: true },
+  });
+  res.json({ dates: rows.map(r => r.completedAt) });
+});
+
 // Dashboard: toutes les données utilisateur en un seul appel
 router.get('/api/users/me/dashboard', authMiddleware, async (req, res) => {
   const userId = req.userId;
