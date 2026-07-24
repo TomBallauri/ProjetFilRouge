@@ -65,6 +65,11 @@ interface StoreState {
   setNotifData:   (data: NotifData | null) => void;
   setNotifCount:  (count: number) => void;
 
+  /* Group chat popup (opened from the notification bell — see GroupChatModal), not persisted */
+  activeGroupChatId: number | null;
+  openGroupChat:     (groupId: number) => void;
+  closeGroupChat:    () => void;
+
   /* Tutoriel de bienvenue (not persisted — ré-ouvrable depuis le profil) */
   tourOpen: boolean;
   openTour: () => void;
@@ -135,6 +140,10 @@ export const useStore = create<StoreState>()(
       notifCount:    0,
       setNotifData:  (data) => set({ notifData: data }),
       setNotifCount: (count) => set({ notifCount: count }),
+
+      activeGroupChatId: null,
+      openGroupChat:      (groupId) => set({ activeGroupChatId: groupId }),
+      closeGroupChat:     () => set({ activeGroupChatId: null }),
 
       tourOpen: false,
       openTour: () => set({ tourOpen: true }),

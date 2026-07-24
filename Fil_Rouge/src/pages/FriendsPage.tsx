@@ -52,6 +52,10 @@ const FriendsPage: React.FC = () => {
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
   const [searchError, setSearchError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Remplace window.confirm() : ce dialogue natif ne peut pas être stylé (chrome du navigateur
+  // visible, boutons OK/Annuler non traduits par l'app — traduits par le navigateur lui-même
+  // selon sa propre langue, d'où le mélange anglais/français observé).
+  const [confirmRemove, setConfirmRemove] = useState<{ id: number; username: string } | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -70,7 +74,7 @@ const FriendsPage: React.FC = () => {
       const requestsData = await requestsRes.json();
       setFriends(Array.isArray(friendsData) ? friendsData : []);
       setRequests(Array.isArray(requestsData) ? requestsData : []);
-    } catch {}
+    } catch { /* silent */ }
     finally { setLoading(false); }
   };
 
@@ -97,8 +101,14 @@ const FriendsPage: React.FC = () => {
     fetchAll();
   };
 
-  const removeFriend = async (id: number, username: string) => {
-    if (!globalThis.confirm(t('friends.confirmRemove', { username }))) return;
+  const removeFriend = (id: number, username: string) => {
+    setConfirmRemove({ id, username });
+  };
+
+  const confirmRemoveFriend = async () => {
+    if (!confirmRemove) return;
+    const { id } = confirmRemove;
+    setConfirmRemove(null);
     await declineOrRemove(id);
   };
 
@@ -445,6 +455,48 @@ const FriendsPage: React.FC = () => {
       {/* ── DEMANDES REÇUES ── */}
       {tab === 'requests' && (
         loading ? <PageLoader /> : requestsListContent
+      )}
+
+      {/* ── Confirmation de suppression d'ami ── */}
+      {confirmRemove && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onClick={() => setConfirmRemove(null)}
+          onKeyDown={e => { if (e.key === 'Escape') setConfirmRemove(null); }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            role="alertdialog" aria-modal="true" aria-label={t('friends.confirmRemove', { username: confirmRemove.username })}
+            style={{
+              width: '100%', maxWidth: 340, borderRadius: 24, padding: 22, textAlign: 'center',
+              background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
+            }}
+          >
+            <div style={{ width: 48, height: 48, borderRadius: '50%', margin: '0 auto 14px',
+              background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertTriangle size={22} color="#EF4444" aria-hidden="true" />
+            </div>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--q-text)', marginBottom: 20 }}>
+              {t('friends.confirmRemove', { username: confirmRemove.username })}
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setConfirmRemove(null)} autoFocus
+                style={{ flex: 1, padding: '11px', borderRadius: 14, border: '1.5px solid var(--q-line)',
+                  background: 'transparent', color: 'var(--q-text2)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                {t('common.cancel')}
+              </button>
+              <button onClick={confirmRemoveFriend}
+                style={{ flex: 1, padding: '11px', borderRadius: 14, border: 'none',
+                  background: '#EF4444', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                {t('friends.confirmRemoveButton')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

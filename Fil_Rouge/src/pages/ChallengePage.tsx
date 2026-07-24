@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useVisibilityPausedInterval } from '../hooks/useVisibilityPausedInterval';
+import { isGroupUnread } from '../hooks/useNotificationPolling';
 import { useStore } from '../lib/store';
 import type { User } from '../types/User';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -507,30 +508,68 @@ const SeriesDropdown: React.FC<{
   user: User | null;
   onJoined?: () => void;
   onGroupChange?: () => void;
-}> = ({ name, displayName, challenges, actionLoading, getUserStatus, onStart, onComplete, user, onJoined, onGroupChange }) => {
-  const { t, i18n } = useTranslation();
+  showNotif: (msg: string, type: 'success' | 'error') => void;
+  // Ouverture + scroll automatiques quand on arrive depuis une carte de la page d'accueil
+  // ("Ta journée") — voir focusChallengeId dans ChallengePage.
+  forceOpenSeries?: string | null;
+  focusChallengeId?: number | null;
+}> = ({ name, displayName, challenges, actionLoading, getUserStatus, onStart, onComplete, user, onJoined, onGroupChange, showNotif, forceOpenSeries, focusChallengeId }) => {
+  const { t } = useTranslation();
   // `name` reste la clé stable (FR) utilisée pour les endpoints by-series/series-groups
   // (join/invite/kick/chat...) ; `label` est uniquement pour l'affichage traduit.
   const label = displayName ?? name;
+  const { notifData, openGroupChat } = useStore();
+  // Badge "nouveau message" sur l'en-tête repliée — sans ça, un message reçu dans un groupe
+  // n'est visible qu'après avoir déjà ouvert la série (le compteur du panneau membre est à
+  // l'intérieur), donc impossible de savoir quelle série a du nouveau depuis la liste.
+  const seriesNotif = notifData?.groups.find(g => g.seriesName === name);
+  const hasUnreadMessage = !!(seriesNotif && user && isGroupUnread(seriesNotif, user.id));
+  // Marque la série comme lue dans le même store que la cloche de notifs (voir UQuail.tsx) —
+  // sans ça, ouvrir le tchat ici ne fait disparaître le badge que de ce composant, pas de la
+  // notif globale, qui resterait affichée jusqu'à l'ouverture du panneau d'accueil.
+  const markSeriesSeen = () => {
+    if (!user || !seriesNotif?.latestMessageId) return;
+    const seenKey = `notif_seen_${user.id}`;
+    const currentSeen = JSON.parse(localStorage.getItem(seenKey) ?? '{}');
+    const seenGroups = { ...currentSeen.groups, [String(seriesNotif.groupId)]: seriesNotif.latestMessageId };
+    localStorage.setItem(seenKey, JSON.stringify({ ...currentSeen, groups: seenGroups }));
+  };
+  const [unreadHeaderCount, setUnreadHeaderCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [group, setGroup] = useState<SeriesGroupData | null | undefined>(undefined); // undefined=loading, null=none
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
-  const [showChat, setShowChat] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Remplace window.confirm() — dialogue natif du navigateur, ni stylable ni traduit par l'app
+  // (voir FriendsPage.tsx pour le même correctif).
+  const [confirmKick, setConfirmKick] = useState<{ userId: number; username: string } | null>(null);
   const [selectedFriends, setSelectedFriends] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [startingAll, setStartingAll] = useState(false);
   const [kickLoading, setKickLoading] = useState<number | null>(null);
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [messages, setMessages] = useState<SeriesGroupMsg[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatSending, setChatSending] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const lastMsgIdRef = useRef(0);
 
   const token = () => localStorage.getItem('token') ?? '';
+
+  // Récupère un compte précis de messages non lus pour le badge de l'en-tête repliée — seulement
+  // quand `hasUnreadMessage` est vrai (donc peu coûteux : la plupart des séries n'ont rien de
+  // neuf et ne déclenchent aucun appel), en comparant aux mêmes IDs "vus" que le badge lui-même
+  // pour rester cohérent avec lui.
+  useEffect(() => {
+    if (!hasUnreadMessage || !user || !seriesNotif) { setUnreadHeaderCount(0); return; }
+    let cancelled = false;
+    fetch(`/api/series-groups/${seriesNotif.groupId}/messages`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: SeriesGroupMsg[] | null) => {
+        if (cancelled || !Array.isArray(data)) return;
+        const seen = JSON.parse(localStorage.getItem(`notif_seen_${user.id}`) ?? '{}');
+        const seenId = seen.groups?.[String(seriesNotif.groupId)] ?? 0;
+        setUnreadHeaderCount(data.filter(m => m.id > seenId && m.userId !== user.id).length);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasUnreadMessage, seriesNotif?.groupId, seriesNotif?.latestMessageId, user?.id]);
 
   // Le dropdown se re-rend souvent sans changement de `challenges` (frappe dans le tchat,
   // ticks de polling...) : useMemo évite de re-trier à chaque fois pour rien.
@@ -569,6 +608,23 @@ const SeriesDropdown: React.FC<{
       .catch(() => {});
   };
 
+  // Ouvre automatiquement la série visée en arrivant depuis une carte de la page d'accueil.
+  useEffect(() => {
+    if (forceOpenSeries === name) setOpen(true);
+  }, [forceOpenSeries, name]);
+
+  // Une fois ouvert (et une fois la série ciblée), fait défiler jusqu'au défi précis — la liste
+  // des défis est déjà en mémoire (prop `challenges`), donc pas besoin d'attendre un fetch : un
+  // seul frame suffit pour que le DOM soit à jour après le changement de `open`.
+  useEffect(() => {
+    if (!open || forceOpenSeries !== name || focusChallengeId == null) return;
+    const raf = requestAnimationFrame(() => {
+      document.querySelector(`[data-challenge-id="${focusChallengeId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, forceOpenSeries, name, focusChallengeId]);
+
   // Refetch à chaque ouverture
   useEffect(() => {
     if (!open || !user) return;
@@ -592,94 +648,6 @@ const SeriesDropdown: React.FC<{
       .then(data => setFriends(Array.isArray(data) ? data.filter((f: FriendEntry) => f.user) : []));
   }, [showCreate, showInvite, friends.length]);
 
-  // Restaure lastMsgId depuis localStorage quand le groupe est chargé
-  useEffect(() => {
-    if (!group?.id) return;
-    const stored = localStorage.getItem(`sg_lm_${group.id}`);
-    if (stored) lastMsgIdRef.current = Number(stored) || 0;
-  }, [group?.id]);
-
-  // Chargement initial des messages + reset non-lus quand le chat s'ouvre
-  useEffect(() => {
-    if (!showChat || !group || myMembership?.status !== 'JOINED') return;
-    setUnreadMessages(0);
-    fetch(`/api/series-groups/${group.id}/messages`, { headers: { Authorization: `Bearer ${token()}` } })
-      .then(r => r.json())
-      .then(data => {
-        if (!Array.isArray(data)) return;
-        setMessages(data);
-        if (data.length > 0) {
-          lastMsgIdRef.current = data[data.length - 1].id;
-          localStorage.setItem(`sg_lm_${group.id}`, String(data[data.length - 1].id));
-        }
-      })
-      .catch(() => {});
-  }, [showChat, group?.id, myMembership?.status]);
-
-  // Polling messages toutes les 4s quand le dropdown est ouvert
-  useVisibilityPausedInterval(() => {
-    const groupId = group?.id;
-    if (!groupId) return;
-    fetch(`/api/series-groups/${groupId}/messages`, { headers: { Authorization: `Bearer ${token()}` } })
-      .then(r => r.json())
-      .then((data: SeriesGroupMsg[]) => {
-        if (!Array.isArray(data) || data.length === 0) return;
-        const latestId = data[data.length - 1].id;
-        if (latestId > lastMsgIdRef.current) {
-          const isBaseline = lastMsgIdRef.current === 0;
-          const newCount = isBaseline ? 0 : data.filter(m => m.id > lastMsgIdRef.current).length;
-          setMessages(data);
-          lastMsgIdRef.current = latestId;
-          localStorage.setItem(`sg_lm_${groupId}`, String(latestId));
-          if (!showChat && newCount > 0) {
-            setUnreadMessages(u => u + newCount);
-          }
-        }
-      })
-      .catch(() => {});
-  }, 4000, open && !!group && myMembership?.status === 'JOINED');
-
-  // Auto-scroll vers le bas quand de nouveaux messages arrivent (seulement si le chat est ouvert)
-  useEffect(() => {
-    if (showChat) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, showChat]);
-
-  const handleSendMessage = async () => {
-    if (!group || !chatInput.trim() || chatSending) return;
-    const content = chatInput.trim();
-    // Optimistic update — message visible immédiatement
-    const tempId = -Date.now();
-    const optimistic: SeriesGroupMsg = {
-      id: tempId, groupId: group.id, userId: user?.id ?? 0, content,
-      createdAt: new Date().toISOString(),
-      user: { id: user?.id ?? 0, username: user?.username ?? '', avatar: user?.avatar },
-    };
-    setMessages(prev => [...prev, optimistic]);
-    setChatInput('');
-    setChatSending(true);
-    try {
-      const res = await fetch(`/api/series-groups/${group.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-        body: JSON.stringify({ content }),
-      });
-      const msg = await res.json();
-      if (res.ok) {
-        // Remplacer le message temporaire par le vrai
-        setMessages(prev => prev.map(m => m.id === tempId ? msg : m));
-        lastMsgIdRef.current = msg.id;
-        if (group) localStorage.setItem(`sg_lm_${group.id}`, String(msg.id));
-      } else {
-        // Rollback si erreur serveur
-        setMessages(prev => prev.filter(m => m.id !== tempId));
-        setChatInput(content);
-      }
-    } catch {
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      setChatInput(content);
-    } finally { setChatSending(false); }
-  };
-
   const handleCreate = async () => {
     setSaving(true);
     try {
@@ -694,7 +662,7 @@ const SeriesDropdown: React.FC<{
       setShowCreate(false);
       setSelectedFriends([]);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : t('challengePage.notif.genericError'));
+      showNotif(e instanceof Error ? e.message : t('challengePage.notif.genericError'), 'error');
     } finally {
       setSaving(false);
     }
@@ -711,7 +679,7 @@ const SeriesDropdown: React.FC<{
         onJoined?.();
         onGroupChange?.();
       } else {
-        alert(data.error ?? t('challengePage.notif.genericError'));
+        showNotif(data.error ?? t('challengePage.notif.genericError'), 'error');
         if (res.status === 410) setGroup(null); // invitation supprimée côté serveur (expirée ou groupe déjà terminé)
       }
     } finally { setSaving(false); }
@@ -745,7 +713,7 @@ const SeriesDropdown: React.FC<{
       const res = await fetch(`/api/series-groups/${group.id}/complete`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
       const data = await res.json();
       if (res.ok) { setGroup(data); onGroupChange?.(); }
-      else alert(data.error ?? t('challengePage.notif.genericError'));
+      else showNotif(data.error ?? t('challengePage.notif.genericError'), 'error');
     } finally { setSaving(false); }
   };
 
@@ -759,7 +727,7 @@ const SeriesDropdown: React.FC<{
       });
       const data = await res.json();
       if (res.ok) setGroup(data);
-      else alert(data.error ?? t('challengePage.notif.genericError'));
+      else showNotif(data.error ?? t('challengePage.notif.genericError'), 'error');
     } finally { setKickLoading(null); }
   };
 
@@ -778,7 +746,7 @@ const SeriesDropdown: React.FC<{
       setShowInvite(false);
       setSelectedFriends([]);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : t('challengePage.notif.genericError'));
+      showNotif(e instanceof Error ? e.message : t('challengePage.notif.genericError'), 'error');
     } finally {
       setSaving(false);
     }
@@ -867,106 +835,40 @@ const SeriesDropdown: React.FC<{
     );
   };
 
-  // ── Modale tchat plein écran (hors du bloc JOINED pour ne pas disparaître au refetch) ──
-  const renderChatDialog = (): React.ReactNode => {
-    if (!showChat || !group) return null;
-    const emptyState = messages.length === 0 ? (
-      <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--q-text3)', fontSize: 13 }}>
-        <MessageCircle size={32} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.3 }} />
-        {t('challengePage.series.noMessagesYet')}
-      </div>
-    ) : null;
+  const renderKickDialog = (): React.ReactNode => {
+    if (!confirmKick) return null;
     return (
       <div style={{
         position: 'fixed', inset: 0, zIndex: 100,
         background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end',
-        padding: '0',
-      }} onClick={() => setShowChat(false)}>
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      }} onClick={() => setConfirmKick(null)}>
         <div onClick={e => e.stopPropagation()} style={{
-          width: '100%', maxWidth: 520,
-          background: 'var(--q-chrome)',
-          borderRadius: '24px 24px 0 0',
+          background: 'var(--q-chrome)', borderRadius: 24,
           border: '1px solid var(--q-line)',
-          borderBottom: 'none',
-          display: 'flex', flexDirection: 'column',
-          maxHeight: '80vh',
-          boxShadow: '0 -8px 48px rgba(0,0,0,0.4)',
+          padding: '28px 24px', maxWidth: 320, width: '100%', textAlign: 'center',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
         }}>
-          {/* Header modale */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '16px 18px', borderBottom: '1px solid var(--q-line)', flexShrink: 0,
-          }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--q-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <MessageCircle size={17} color="#fff" aria-hidden="true" />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
-              <div style={{ fontSize: 11, color: 'var(--q-text3)' }}>{t('challengePage.seriesInvites.membersJoined', { count: group?.members.filter(m => m.status === 'JOINED').length ?? 0 })}</div>
-            </div>
-            <button type="button" onClick={() => setShowChat(false)} style={{
-              width: 32, height: 32, borderRadius: '50%', border: 'none',
-              background: 'var(--q-line)', color: 'var(--q-text2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
-            }}>
-              <X size={16} aria-hidden="true" />
-            </button>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(239,68,68,0.12)', border: '1.5px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <Users size={22} color="#EF4444" aria-hidden="true" />
           </div>
-
-          {/* Messages */}
-          <div className="q-hidescroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {emptyState}
-            {messages.map(msg => {
-              const isMe = msg.user.id === user?.id;
-              return (
-                <div key={msg.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexDirection: isMe ? 'row-reverse' : 'row' }}>
-                  {!isMe && <UserAvatar avatar={msg.user.avatar} username={msg.user.username} cosmetics={[]} size="sm" />}
-                  <div style={{ maxWidth: '72%' }}>
-                    {!isMe && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-text3)', marginBottom: 3 }}>{msg.user.username}</div>}
-                    <div style={{
-                      padding: '9px 13px', borderRadius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                      background: isMe ? 'var(--q-accent)' : 'var(--q-bg-flat)',
-                      border: isMe ? 'none' : '1px solid var(--q-line)',
-                      color: isMe ? '#fff' : 'var(--q-text)',
-                      fontSize: 13, lineHeight: 1.5, wordBreak: 'break-word',
-                    }}>
-                      {msg.content}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--q-text3)', marginTop: 3, textAlign: isMe ? 'right' : 'left' }}>
-                      {new Date(msg.createdAt).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={chatEndRef} />
+          <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--q-text)', marginBottom: 8 }}>
+            {t('challengePage.series.excludeTitle', { username: confirmKick.username })}
           </div>
-
-          {/* Input */}
-          <div style={{ padding: '12px 18px', borderTop: '1px solid var(--q-line)', display: 'flex', gap: 8, flexShrink: 0 }}>
-            <input
-              type="text"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-              placeholder={t('challengePage.series.writeMessagePlaceholder')}
-              autoFocus
-              style={{
-                flex: 1, padding: '11px 14px', borderRadius: 14,
-                border: '1px solid var(--q-line)', background: 'var(--q-bg-flat)',
-                color: 'var(--q-text)', fontSize: 14, outline: 'none',
-              }}
-            />
-            <button type="button" onClick={handleSendMessage} disabled={chatSending || !chatInput.trim()} style={{
-              width: 44, height: 44, borderRadius: 14, border: 'none', flexShrink: 0,
-              background: chatInput.trim() ? 'var(--q-accent)' : 'var(--q-line)',
-              color: '#fff', cursor: chatInput.trim() ? 'pointer' : 'default',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: chatSending ? 0.6 : 1, transition: 'background 0.2s',
-            }}>
-              <Send size={16} aria-hidden="true" />
-            </button>
+          <div style={{ fontSize: 13, color: 'var(--q-text2)', marginBottom: 24, lineHeight: 1.5 }}>
+            {t('challengePage.series.excludeConfirm', { username: confirmKick.username })}
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button type="button" onClick={() => setConfirmKick(null)} style={{
+              flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
+              background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+            }}>{t('common.cancel')}</button>
+            <button type="button" onClick={() => { const userId = confirmKick.userId; setConfirmKick(null); handleKick(userId); }} disabled={kickLoading === confirmKick.userId} style={{
+              flex: 1, padding: '12px', borderRadius: 12, border: 'none',
+              background: 'linear-gradient(135deg,#EF4444,#DC2626)',
+              color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              opacity: kickLoading === confirmKick.userId ? 0.6 : 1,
+            }}>{kickLoading === confirmKick.userId ? '…' : t('challengePage.series.exclude')}</button>
           </div>
         </div>
       </div>
@@ -1065,7 +967,7 @@ const SeriesDropdown: React.FC<{
                 {isCreator && !isMe && !group.completedAt && (
                   <button
                     type="button"
-                    onClick={() => { if (globalThis.confirm(t('challengePage.series.excludeConfirm', { username: m.user.username }))) handleKick(m.userId); }}
+                    onClick={() => setConfirmKick({ userId: m.userId, username: m.user.username })}
                     disabled={kickLoading === m.userId}
                     title={t('challengePage.series.excludeTitle', { username: m.user.username })}
                     style={{
@@ -1091,21 +993,21 @@ const SeriesDropdown: React.FC<{
         {/* ── Boutons d'action (masqués une fois la série terminée en groupe) ── */}
         {!group.completedAt && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button type="button" onClick={() => { setShowChat(true); setUnreadMessages(0); }} style={{
+            <button type="button" onClick={() => { openGroupChat(group.id); markSeriesSeen(); }} style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '10px', borderRadius: 12, border: 'none',
               background: 'var(--q-accent)', color: '#fff',
               fontSize: 13, fontWeight: 700, cursor: 'pointer', position: 'relative',
             }}>
               <MessageCircle size={14} aria-hidden="true" /> {t('challengePage.series.chat')}
-              {unreadMessages > 0 && (
-                <span style={{
+              {hasUnreadMessage && (
+                <span aria-label={t('challengePage.series.newMessageAriaLabel', { count: unreadHeaderCount })} style={{
                   background: '#EF4444', color: '#fff', borderRadius: 999,
-                  fontSize: 10, fontWeight: 800, padding: '1px 5px',
+                  fontSize: 10, fontWeight: 800, padding: unreadHeaderCount > 9 ? '1px 5px' : '1px 0',
                   minWidth: 16, textAlign: 'center', flexShrink: 0,
                   boxShadow: '0 0 0 2px var(--q-accent)',
                 }}>
-                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                  {unreadHeaderCount > 0 ? (unreadHeaderCount > 99 ? '99+' : unreadHeaderCount) : ''}
                 </span>
               )}
             </button>
@@ -1189,7 +1091,7 @@ const SeriesDropdown: React.FC<{
 
         {renderLeaveDialog()}
 
-        {renderChatDialog()}
+        {renderKickDialog()}
       </div>
     );
   };
@@ -1202,8 +1104,18 @@ const SeriesDropdown: React.FC<{
         padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
       }}>
         <Sparkles size={15} color="var(--q-accent)" aria-hidden="true" style={{ flexShrink: 0 }} />
-        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {label}
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ minWidth: 0, fontSize: 13, fontWeight: 700, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {label}
+          </span>
+          {hasUnreadMessage && (
+            <span aria-label={t('challengePage.series.newMessageAriaLabel', { count: unreadHeaderCount })} style={{
+              background: '#EF4444', color: '#fff', borderRadius: 999,
+              height: 16, minWidth: 16, padding: unreadHeaderCount > 9 ? '0 4px' : 0,
+              fontSize: 10, fontWeight: 800,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>{unreadHeaderCount > 0 ? (unreadHeaderCount > 99 ? '99+' : unreadHeaderCount) : ''}</span>
+          )}
         </span>
         <span style={{ fontSize: 11, color: 'var(--q-text3)', fontFamily: 'var(--q-mono)', flexShrink: 0, marginRight: 4 }}>
           {doneCount}/{challenges.length}
@@ -1239,11 +1151,13 @@ const SeriesDropdown: React.FC<{
             const cat = CATEGORY_GRAD[c.category];
             const actionLabel = inProgress ? t('challengePage.card.markCompleted') : t('challengePage.series.start');
             return (
-              <div key={c.id} style={{
-                padding: '14px 14px',
-                borderTop: i > 0 || user ? '1px solid var(--q-line)' : 'none',
-                opacity: done ? 0.55 : 1,
-              }}>
+              <div key={c.id} data-challenge-id={c.id}
+                className={c.id === focusChallengeId ? 'q-focus-flash' : undefined}
+                style={{
+                  padding: '14px 14px',
+                  borderTop: i > 0 || user ? '1px solid var(--q-line)' : 'none',
+                  opacity: done ? 0.55 : 1,
+                }}>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                   {diff && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: diff.grad }}>{diff.icon} {t(`common.difficulty.${c.difficulty.toLowerCase()}`)}</span>}
                   {cat && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: cat.grad }}><cat.Icon size={11} aria-hidden="true" /> {t(`common.category.${c.category}`)}</span>}
@@ -1322,6 +1236,12 @@ const ChallengePage: React.FC = () => {
   const [inviteModal, setInviteModal] = useState<Challenge | null>(null);
   const [selectedFriends, setSelectedFriends] = useState<number[]>([]);
   const [groupActionLoading, setGroupActionLoading] = useState<number | null>(null);
+  // Défi ciblé en arrivant depuis une carte de la page d'accueil ("Ta journée", voir UQuail.tsx
+  // qui passe focusChallengeId/focusSeriesName via navigate(..., { state })). Nettoyé de l'état
+  // de navigation tout de suite (même schéma que showOnboarding dans Layout.tsx) pour ne pas
+  // redéclencher le scroll/surbrillance sur un retour en arrière ou un rafraîchissement.
+  const [focusChallengeId, setFocusChallengeId] = useState<number | null>(null);
+  const [focusSeriesName, setFocusSeriesName] = useState<string | null>(null);
   const [groupCreating, setGroupCreating] = useState(false);
   const [chatGroupId, setChatGroupId] = useState<number | null>(null);
   const [chatMessages, setChatMessages] = useState<GroupMessageType[]>([]);
@@ -1343,16 +1263,15 @@ const ChallengePage: React.FC = () => {
 
   // ── Sections indépendantes (En cours / Terminés) ──────────────────────────
   const [inProgressItems, setInProgressItems] = useState<UserChallengeWithData[]>([]);
-  const [inProgressTotal, setInProgressTotal] = useState(0);
   const [inProgressHasMore, setInProgressHasMore] = useState(false);
   const [loadingMoreInProgress, setLoadingMoreInProgress] = useState(false);
   const [completedItems, setCompletedItems] = useState<UserChallengeWithData[]>([]);
-  const [completedTotal, setCompletedTotal] = useState(0);
   const [completedHasMore, setCompletedHasMore] = useState(false);
   const [loadingMoreCompleted, setLoadingMoreCompleted] = useState(false);
 
   const token = localStorage.getItem('token');
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchChallenges(0); }, [search, selectedCategory, selectedDifficulty, location.key, i18n.language]);
   useEffect(() => {
     if (!user || !token) return;
@@ -1363,10 +1282,8 @@ const ChallengePage: React.FC = () => {
       .then(data => {
         setUserChallenges(Array.isArray(data.challenges) ? data.challenges : []);
         setInProgressItems(data.inProgress?.challenges ?? []);
-        setInProgressTotal(data.inProgress?.total ?? 0);
         setInProgressHasMore(data.inProgress?.hasMore ?? false);
         setCompletedItems(data.completed?.challenges ?? []);
-        setCompletedTotal(data.completed?.total ?? 0);
         setCompletedHasMore(data.completed?.hasMore ?? false);
         setGroups(data.groups ?? []);
         setPendingSeriesInvites(data.pendingSeriesInvites ?? []);
@@ -1374,7 +1291,33 @@ const ChallengePage: React.FC = () => {
       .catch(() => {})
       .finally(() => setGroupsLoading(false));
     fetchMySeriesGroups();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, location.key, i18n.language]);
+
+  // Lit la cible passée par la page d'accueil (voir focusChallengeId ci-dessus) et nettoie
+  // l'état de navigation tout de suite pour ne pas la rejouer sur un retour en arrière.
+  useEffect(() => {
+    const navState = location.state as { focusChallengeId?: number; focusSeriesName?: string | null } | null;
+    if (!navState?.focusChallengeId) return;
+    setFocusChallengeId(navState.focusChallengeId);
+    setFocusSeriesName(navState.focusSeriesName ?? null);
+    navigate(location.pathname, { replace: true, state: {} });
+    const timeout = setTimeout(() => { setFocusChallengeId(null); setFocusSeriesName(null); }, 4000);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
+
+  // Défi solo ciblé (pas de série à ouvrir) : défile jusqu'à sa carte une fois les données
+  // chargées — `groupsLoading` bascule à false juste après que /dashboard (qui alimente
+  // inProgressItems) ait répondu, donc c'est un signal fiable pour retenter une fois le DOM prêt.
+  useEffect(() => {
+    if (!focusChallengeId || focusSeriesName || groupsLoading) return;
+    const raf = requestAnimationFrame(() => {
+      document.querySelector(`[data-challenge-id="${focusChallengeId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [focusChallengeId, focusSeriesName, groupsLoading]);
 
   // Groupes de série de l'utilisateur — sert uniquement à savoir si une série a un groupe
   // encore non validé (completedAt null), pour la garder dans "En cours" tant que
@@ -1485,10 +1428,7 @@ const ChallengePage: React.FC = () => {
       const items: UserChallengeWithData[] = Array.isArray(data) ? data : (data.challenges ?? []);
       if (skip > 0) setInProgressItems(prev => [...prev, ...items]);
       else setInProgressItems(items);
-      if (!Array.isArray(data)) {
-        setInProgressTotal(data.total ?? items.length);
-        setInProgressHasMore(data.hasMore ?? false);
-      }
+      if (!Array.isArray(data)) setInProgressHasMore(data.hasMore ?? false);
     } catch { if (skip === 0) setInProgressItems([]); }
     finally { if (skip > 0) setLoadingMoreInProgress(false); }
   };
@@ -1503,10 +1443,7 @@ const ChallengePage: React.FC = () => {
       const items: UserChallengeWithData[] = Array.isArray(data) ? data : (data.challenges ?? []);
       if (skip > 0) setCompletedItems(prev => [...prev, ...items]);
       else setCompletedItems(items);
-      if (!Array.isArray(data)) {
-        setCompletedTotal(data.total ?? items.length);
-        setCompletedHasMore(data.hasMore ?? false);
-      }
+      if (!Array.isArray(data)) setCompletedHasMore(data.hasMore ?? false);
     } catch { if (skip === 0) setCompletedItems([]); }
     finally { if (skip > 0) setLoadingMoreCompleted(false); }
   };
@@ -1603,7 +1540,7 @@ const ChallengePage: React.FC = () => {
       const res = await fetch(`/api/groups/${groupId}/messages`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (Array.isArray(data)) setChatMessages(data);
-    } catch {}
+    } catch { /* silent */ }
     finally { setChatLoading(false); }
   };
 
@@ -1620,7 +1557,7 @@ const ChallengePage: React.FC = () => {
           const d = await r.json();
           if (d?.user?.id) { setChatMyId(Number(d.user.id)); setUser(d.user); }
         }
-      } catch {}
+      } catch { /* silent */ }
     } else {
       setChatMyId(user?.id ?? null);
     }
@@ -1638,7 +1575,7 @@ const ChallengePage: React.FC = () => {
     const optimistic: GroupMessageType = {
       id: tempId, groupId: chatGroupId, userId: user.id, content,
       createdAt: new Date().toISOString(),
-      user: { id: user.id, username: user.username, avatar: user.avatar, cosmetics: (user as any).cosmetics ?? [] },
+      user: { id: user.id, username: user.username, avatar: user.avatar, cosmetics: user.cosmetics ?? [] },
     };
     setChatMessages(prev => [...prev, optimistic]);
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 30);
@@ -2538,20 +2475,24 @@ const ChallengePage: React.FC = () => {
             {inProgressSeriesEntries.length > 0 && (
               <div className="flex flex-col gap-2 mb-3">
                 {inProgressSeriesEntries.map(([name, seriesChallenges]) => (
-                  <SeriesDropdown key={name} name={name} displayName={seriesChallenges[0]?.seriesNameEn ?? undefined} challenges={seriesChallenges}
+                  <SeriesDropdown key={name} name={name} displayName={i18n.language !== 'fr' ? (seriesChallenges[0]?.seriesNameEn ?? undefined) : undefined} challenges={seriesChallenges}
                     actionLoading={actionLoading} getUserStatus={getUserStatus}
                     onStart={handleStart} onComplete={handleComplete} user={user}
                     onJoined={async () => { await fetchUserChallenges(); await fetchInProgressItems(0); }}
-                    onGroupChange={fetchMySeriesGroups} />
+                    onGroupChange={fetchMySeriesGroups} showNotif={showNotif}
+                    forceOpenSeries={focusSeriesName} focusChallengeId={focusChallengeId} />
                 ))}
               </div>
             )}
             {soloInProgress.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {soloInProgress.map(uc => (
-                  <ChallengeCard key={uc.id} challenge={uc.challenge} status="IN_PROGRESS" isLoading={actionLoading === uc.challenge.id}
-                    user={user} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')}
-                    onInvite={handleOpenInvite} isDaily={uc.challenge.id === dailyChallengeId} />
+                  <div key={uc.id} data-challenge-id={uc.challenge.id}
+                    className={uc.challenge.id === focusChallengeId ? 'q-focus-flash' : undefined}>
+                    <ChallengeCard challenge={uc.challenge} status="IN_PROGRESS" isLoading={actionLoading === uc.challenge.id}
+                      user={user} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')}
+                      onInvite={handleOpenInvite} isDaily={uc.challenge.id === dailyChallengeId} />
+                  </div>
                 ))}
               </div>
             )}
@@ -2581,11 +2522,11 @@ const ChallengePage: React.FC = () => {
             {seriesEntries.length > 0 && (
               <div className="flex flex-col gap-2 mb-3">
                 {seriesEntries.map(([name, seriesChallenges]) => (
-                  <SeriesDropdown key={name} name={name} displayName={seriesChallenges[0]?.seriesNameEn ?? undefined} challenges={seriesChallenges}
+                  <SeriesDropdown key={name} name={name} displayName={i18n.language !== 'fr' ? (seriesChallenges[0]?.seriesNameEn ?? undefined) : undefined} challenges={seriesChallenges}
                     actionLoading={actionLoading} getUserStatus={getUserStatus}
                     onStart={handleStart} onComplete={handleComplete} user={user}
                     onJoined={async () => { await fetchUserChallenges(); await fetchInProgressItems(0); }}
-                    onGroupChange={fetchMySeriesGroups} />
+                    onGroupChange={fetchMySeriesGroups} showNotif={showNotif} />
                 ))}
               </div>
             )}
@@ -2629,11 +2570,11 @@ const ChallengePage: React.FC = () => {
             {completedSeriesEntries.length > 0 && (
               <div className="flex flex-col gap-2 mb-3">
                 {completedSeriesEntries.map(([name, seriesChallenges]) => (
-                  <SeriesDropdown key={name} name={name} displayName={seriesChallenges[0]?.seriesNameEn ?? undefined} challenges={seriesChallenges}
+                  <SeriesDropdown key={name} name={name} displayName={i18n.language !== 'fr' ? (seriesChallenges[0]?.seriesNameEn ?? undefined) : undefined} challenges={seriesChallenges}
                     actionLoading={actionLoading} getUserStatus={getUserStatus}
                     onStart={handleStart} onComplete={handleComplete} user={user}
                     onJoined={async () => { await fetchUserChallenges(); await fetchInProgressItems(0); }}
-                    onGroupChange={fetchMySeriesGroups} />
+                    onGroupChange={fetchMySeriesGroups} showNotif={showNotif} />
                 ))}
               </div>
             )}

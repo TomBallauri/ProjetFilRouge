@@ -9,12 +9,6 @@ const FRAME_RINGS: Record<string, string> = {
   LEGENDARY: 'ring-2 ring-yellow-400 shadow-md shadow-yellow-400/50',
 };
 
-export const RANK_FRAME_CLASSES: Record<number, string> = {
-  1: 'ring-2 ring-yellow-400 shadow-md shadow-yellow-400/40',
-  2: 'ring-2 ring-gray-300',
-  3: 'ring-2 ring-orange-400',
-};
-
 function resolveUrl(url?: string): string {
   // /uploads/... est proxifié vers le backend (vite en dev, vercel.json en prod) —
   // pas besoin de préfixer une origine en dur.

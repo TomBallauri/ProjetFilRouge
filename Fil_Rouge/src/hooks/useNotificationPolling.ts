@@ -17,11 +17,17 @@ function fireToast(message: string, type: string, link?: string) {
 
 // ── per-poll diff helpers ───────────────────────────────────────────────────
 
-function detectNewMessages(prev: NotifData, curr: NotifData, myUserId?: number) {
+export function detectNewMessages(prev: NotifData, curr: NotifData, myUserId: number, activeGroupChatId: number | null) {
   const prevMap = new Map(prev.groups.map(g => [g.groupId, g.latestMessageId]));
   for (const g of curr.groups) {
     const prevId = prevMap.get(g.groupId);
-    if (g.latestMessageId && prevId !== undefined && g.latestMessageId !== prevId && g.latestMessageUserId !== myUserId)
+    // Pas de toast pour le groupe dont le tchat est déjà ouvert (voir GroupChatModal) — le
+    // message y apparaît déjà en direct. Et pas de toast non plus si le message est déjà
+    // marqué "vu" (même vérif que les badges) : le tchat a pu être fermé juste avant ce poll,
+    // entre le moment où GroupChatModal a marqué le message lu et celui où ce poll (toutes les
+    // 20s) s'exécute — sans ce check, on se reprend une notif pour un message déjà lu.
+    if (g.latestMessageId && prevId !== undefined && g.latestMessageId !== prevId &&
+      g.groupId !== activeGroupChatId && isGroupUnread(g, myUserId))
       fireToast(`Nouveau message dans "${g.seriesName}"`, 'message', `/groups/${g.groupId}`);
   }
 }
@@ -75,24 +81,53 @@ function warnStreakIfNeeded(data: NotifData, prevAtRisk: boolean | null, userId:
 
 // ── badge count ─────────────────────────────────────────────────────────────
 
-function computeBadge(data: NotifData, myUserId: number): number {
+// Shared with ChallengePage's per-series "new message" badge, so the little red dot on a
+// given series and the count on the sidebar bell are always based on the same "seen" state.
+export function isGroupUnread(g: NotifData['groups'][number], myUserId: number): boolean {
+  const seen = JSON.parse(localStorage.getItem(lsSeenKey(myUserId)) ?? '{}');
+  return !!g.latestMessageId && g.latestMessageUserId !== myUserId &&
+    g.latestMessageId > ((seen.groups?.[String(g.groupId)]) ?? 0);
+}
+
+export function computeBadge(data: NotifData, myUserId: number): number {
   // Friend requests and invites: always actionable — count until user acts.
   // Streak: shown in panel + toast, not in badge (amber bell is the visual cue).
   // Group messages: use "seen" tracking — but never count your own message as unread.
-  const seen = JSON.parse(localStorage.getItem(lsSeenKey(myUserId)) ?? '{}');
-  const unreadGroups = data.groups.filter(g =>
-    g.latestMessageId && g.latestMessageUserId !== myUserId &&
-    g.latestMessageId > ((seen.groups?.[String(g.groupId)]) ?? 0)
-  ).length;
+  const unreadGroups = data.groups.filter(g => isGroupUnread(g, myUserId)).length;
   return data.pendingFriendRequests + data.pendingSeriesInvites + unreadGroups;
+}
+
+// Fusionne les groupes connus entre polls plutôt que de tout remplacer par le contenu du
+// dernier poll : /api/notifications ne renvoie pas forcément tous les groupes à chaque appel,
+// et un groupe simplement absent d'UN poll ne doit pas repasser "lu" pour autant — sinon le
+// badge (cloche + par-série sur ChallengePage) disparaît sans que rien n'ait été lu. Mute `known`
+// en place (comme l'appelant s'y attend avec le ref) et retourne aussi la liste à jour.
+export function mergeKnownGroups(
+  known: Map<number, NotifData['groups'][number]>,
+  incoming: NotifData['groups'][number][]
+): NotifData['groups'][number][] {
+  for (const g of incoming) known.set(g.groupId, g);
+  return [...known.values()];
 }
 
 // ── main hook ───────────────────────────────────────────────────────────────
 
 export function useNotificationPolling() {
-  const { user, setNotifData, setNotifCount } = useStore();
-  const prevRef   = useRef<NotifData | null>(null);
-  const firstLoad = useRef(true);
+  const { user, setNotifData, setNotifCount, activeGroupChatId } = useStore();
+  const prevRef      = useRef<NotifData | null>(null);
+  const firstLoad    = useRef(true);
+  // `load` ci-dessous est capturé une seule fois par le setInterval (tant que user.id ne change
+  // pas) — un ref est nécessaire pour que le polling voie la valeur à jour de activeGroupChatId
+  // à chaque tick, plutôt que celle figée au moment où l'effet a démarré.
+  const activeGroupChatIdRef = useRef<number | null>(null);
+  activeGroupChatIdRef.current = activeGroupChatId;
+  // Accumule les groupes connus entre polls, par groupId : /api/notifications ne renvoie pas
+  // forcément TOUS les groupes à chaque appel (ex: portée limitée aux groupes récemment actifs),
+  // et un groupe simplement absent d'un poll ne doit pas repasser "lu" pour autant — sinon le
+  // badge (cloche + par-série sur ChallengePage) disparaît sans que rien n'ait été lu. La
+  // détection d'exclusion de groupe, elle, continue d'utiliser les données brutes du poll
+  // (prev/curr ci-dessous), pas cet accumulateur qui ne rétrécit jamais.
+  const knownGroupsRef = useRef<Map<number, NotifData['groups'][number]>>(new Map());
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -103,6 +138,7 @@ export function useNotificationPolling() {
     // et déclenche de faux toasts ("retiré du groupe", "nouvelle demande d'ami"...).
     prevRef.current   = null;
     firstLoad.current = true;
+    knownGroupsRef.current = new Map();
     const userId = user.id;
 
     const load = () => {
@@ -120,7 +156,7 @@ export function useNotificationPolling() {
             if (data.pendingSeriesInvites > prev.pendingSeriesInvites)
               fireToast("Tu as été invité dans un groupe série !", 'invite', '/challenges');
             detectRemovedGroups(prev.groups, currIds);
-            detectNewMessages(prev, data, userId);
+            detectNewMessages(prev, data, userId, activeGroupChatIdRef.current);
             warnStreakIfNeeded(data, prev.streakAtRisk, userId);
           }
 
@@ -129,8 +165,10 @@ export function useNotificationPolling() {
 
           firstLoad.current = false;
           prevRef.current   = data;
-          setNotifData(data);
-          setNotifCount(computeBadge(data, userId));
+
+          const merged: NotifData = { ...data, groups: mergeKnownGroups(knownGroupsRef.current, data.groups) };
+          setNotifData(merged);
+          setNotifCount(computeBadge(merged, userId));
         })
         .catch(() => {});
     };
@@ -155,5 +193,8 @@ export function useNotificationPolling() {
       stop();
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
+    // user?.id (pas l'objet user entier) est volontaire : ne relancer le polling que si le
+    // compte connecté change, pas à chaque mise à jour d'un autre champ (coins, xp...).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, setNotifData, setNotifCount]);
 }

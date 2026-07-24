@@ -68,8 +68,8 @@ const ForgotPasswordPage: React.FC = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t('auth.genericError'));
       setSent(true);
-    } catch (err: any) {
-      setError(err.message || t('auth.genericError'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('auth.genericError'));
     } finally {
       setLoading(false);
     }

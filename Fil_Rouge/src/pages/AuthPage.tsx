@@ -91,8 +91,8 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
       setUser(data.user);
       applyServerSettings(data.user?.settings);
       navigate('/', mode === 'register' ? { state: { showOnboarding: true } } : undefined);
-    } catch (err: any) {
-      setError(err.message || t('auth.genericError'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('auth.genericError'));
     } finally {
       setLoading(false);
     }

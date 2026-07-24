@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, Award, ChevronLeft, UserPlus, UserCheck, UserX, Clock } from 'lucide-react';
+import { CheckCircle, Award, ChevronLeft, UserPlus, UserCheck, UserX, Clock, Flame, Moon } from 'lucide-react';
 import { BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../lib/cosmetics';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 import UserAvatar from '../components/UserAvatar';
@@ -19,6 +19,10 @@ type PublicUser = {
   createdAt: string;
   cosmetics: EquippedCosmetic[];
   _count: { challenges: number };
+  // Optionnel : déjà exposé publiquement sur le classement (voir TopUser dans UQuail.tsx), donc
+  // très probablement déjà renvoyé ici aussi — mais on le traite comme absent tant que ce n'est
+  // pas confirmé côté backend, plutôt que d'afficher un 0 trompeur.
+  currentStreak?: number;
 };
 
 function resolveUrl(url?: string): string {
@@ -52,6 +56,10 @@ const UserProfilePage: React.FC = () => {
   const [notFound, setNotFound] = useState(false);
   const [friendStatus, setFriendStatus] = useState<FriendStatus>({ status: 'NONE' });
   const [friendLoading, setFriendLoading] = useState(false);
+  // /api/users/:id/profile ne renvoie pas currentStreak — mais /api/leaderboard, lui, l'expose
+  // déjà publiquement pour chaque joueur (voir LeaderboardPage.tsx). On le réutilise plutôt que
+  // de demander un changement backend juste pour ce champ.
+  const [streakFallback, setStreakFallback] = useState<number | undefined>(undefined);
 
   const token = localStorage.getItem('token');
   const isOwnProfile = currentUser?.id === Number(id);
@@ -63,6 +71,14 @@ const UserProfilePage: React.FC = () => {
       .then(r => { if (r.status === 404) { setNotFound(true); return null; } return r.json(); })
       .then(data => { if (data) setProfile(data); })
       .finally(() => setLoading(false));
+
+    fetch('/api/leaderboard')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { id: number; currentStreak: number }[] | null) => {
+        const entry = Array.isArray(data) ? data.find(u => u.id === Number(id)) : undefined;
+        if (entry) setStreakFallback(entry.currentStreak);
+      })
+      .catch(() => {});
 
     if (token && !isOwnProfile) {
       fetch(`/api/friends/status/${id}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -114,6 +130,8 @@ const UserProfilePage: React.FC = () => {
   const bannerClass = equippedBanner ? (BANNER_CLASSES[equippedBanner.cosmetic.rarity] ?? '') : '';
   const xpInLevel   = profile.xp % 1000;
   const memberSince = new Date(profile.createdAt).toLocaleDateString(i18n.language, { month: 'long', year: 'numeric' });
+  const streak      = profile.currentStreak ?? streakFallback;
+  const hasStreak   = typeof streak === 'number';
 
   return (
     <div style={{ paddingBottom: 100, color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
@@ -129,12 +147,12 @@ const UserProfilePage: React.FC = () => {
         }}
       >
 {/* Back button */}
-        <button onClick={() => navigate(-1)} className="q-press"
+        <button onClick={() => navigate(-1)} aria-label={t('common.back')} className="q-press"
           style={{ position: 'absolute', top: 54, left: 18, width: 40, height: 40, borderRadius: 20,
             background: 'rgba(255,255,255,0.85)', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             backdropFilter: 'blur(10px)' }}>
-          <ChevronLeft size={18} color="#1F2030" />
+          <ChevronLeft size={18} color="#1F2030" aria-hidden="true" />
         </button>
       </div>
 
@@ -146,14 +164,18 @@ const UserProfilePage: React.FC = () => {
           <UserAvatar avatar={profile.avatar} username={profile.username} cosmetics={profile.cosmetics} size="lg" />
         </div>
         <div style={{ marginTop: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 24, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.3 }}>
-              {profile.username}
-            </span>
-            {equippedBadges.length > 0 && (
-              <Award size={18} style={{ color: '#FACC15', flexShrink: 0 }} />
-            )}
+          <div style={{ fontSize: 24, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.3 }}>
+            {profile.username}
           </div>
+          {equippedBadges.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 }}>
+              {equippedBadges.map(b => (
+                <span key={b.cosmeticId} title={b.cosmetic.name} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  <Award size={16} className={TITLE_CLASSES[b.cosmetic.rarity] ?? ''} aria-hidden="true" />
+                </span>
+              ))}
+            </div>
+          )}
           {equippedTitle && (
             <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2 }} className={titleClass}>
               {equippedTitle.cosmetic.name.replace(/^Titre\s*:\s*/i, '')}
@@ -185,7 +207,7 @@ const UserProfilePage: React.FC = () => {
                     background: 'linear-gradient(135deg,#A78BFA,#3B82F6)', color: '#fff',
                     boxShadow: '0 6px 18px -4px rgba(167,139,250,0.55)',
                     opacity: friendLoading ? 0.6 : 1 }}>
-                  <UserPlus size={16} /> {t('userProfile.addFriend')}
+                  <UserPlus size={16} aria-hidden="true" /> {t('userProfile.addFriend')}
                 </button>
               )}
               {friendStatus.status === 'PENDING' && friendStatus.isSender && (
@@ -194,7 +216,7 @@ const UserProfilePage: React.FC = () => {
                     borderRadius: 999, border: '2px solid rgba(148,163,184,0.4)', cursor: 'pointer',
                     fontWeight: 700, fontSize: 13, background: 'transparent',
                     color: 'var(--q-text2)', opacity: friendLoading ? 0.6 : 1 }}>
-                  <Clock size={16} /> {t('userProfile.requestSent')}
+                  <Clock size={16} aria-hidden="true" /> {t('userProfile.requestSent')}
                 </button>
               )}
               {friendStatus.status === 'PENDING' && !friendStatus.isSender && (
@@ -204,14 +226,14 @@ const UserProfilePage: React.FC = () => {
                       borderRadius: 999, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
                       background: 'linear-gradient(135deg,#34D399,#3B82F6)', color: '#fff',
                       opacity: friendLoading ? 0.6 : 1 }}>
-                    <UserCheck size={16} /> {t('userProfile.accept')}
+                    <UserCheck size={16} aria-hidden="true" /> {t('userProfile.accept')}
                   </button>
                   <button onClick={removeFriend} disabled={friendLoading}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px',
                       borderRadius: 999, border: '2px solid rgba(239,68,68,0.4)', cursor: 'pointer',
                       fontWeight: 700, fontSize: 13, background: 'transparent',
                       color: '#EF4444', opacity: friendLoading ? 0.6 : 1 }}>
-                    <UserX size={16} /> {t('userProfile.decline')}
+                    <UserX size={16} aria-hidden="true" /> {t('userProfile.decline')}
                   </button>
                 </div>
               )}
@@ -221,7 +243,7 @@ const UserProfilePage: React.FC = () => {
                     borderRadius: 999, border: '2px solid rgba(52,211,153,0.5)', cursor: 'pointer',
                     fontWeight: 700, fontSize: 13, background: 'rgba(52,211,153,0.1)',
                     color: '#34D399', opacity: friendLoading ? 0.6 : 1 }}>
-                  <UserCheck size={16} /> {t('userProfile.friendsRemove')}
+                  <UserCheck size={16} aria-hidden="true" /> {t('userProfile.friendsRemove')}
                 </button>
               )}
             </div>
@@ -229,7 +251,7 @@ const UserProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Stats 3-col ── */}
+      {/* ── Stats ── */}
       <div style={{ padding: '20px 18px 0', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
         {[
           { value: profile.level,            label: t('userProfile.statLevel') },
@@ -244,6 +266,32 @@ const UserProfilePage: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* ── Série en cours (même format que la carte "Défis réussis" plus bas ; mêmes couleurs
+          que la carte streak de la page d'accueil, voir UQuail.tsx, pour rester cohérent) ── */}
+      {hasStreak && (
+        <div style={{ padding: '10px 18px 0' }}>
+          <div style={{ borderRadius: 22, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
+            background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 14, flexShrink: 0,
+              background: streak > 0 ? 'linear-gradient(135deg,#FB923C,#FACC15)' : 'rgba(148,163,184,0.15)',
+              boxShadow: streak > 0 ? '0 6px 18px -4px rgba(251,146,60,0.6)' : 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {streak > 0
+                ? <Flame size={20} color="#fff" aria-hidden="true" />
+                : <Moon size={18} color="rgba(148,163,184,0.7)" aria-hidden="true" />}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: streak > 0 ? 'var(--q-text)' : 'var(--q-text3)' }}>
+                {streak > 0 ? t('uquail.streakDaysInARow', { count: streak }) : t('uquail.noStreakYet')}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 1 }}>
+                {t('userProfile.statStreak')}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── XP bar ── */}
       <div style={{ padding: '12px 18px 0' }}>
@@ -278,7 +326,7 @@ const UserProfilePage: React.FC = () => {
                   <div style={{ position: 'relative', width: 44, height: 44, borderRadius: 22, margin: '0 auto',
                     background: 'rgba(255,255,255,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}>
-                    <Award size={22} style={{ color: '#A78BFA' }} />
+                    <Award size={22} style={{ color: '#A78BFA' }} aria-hidden="true" />
                   </div>
                   <div style={{ position: 'relative', fontSize: 10, fontWeight: 700, color: '#fff', marginTop: 8, lineHeight: 1.2 }}>
                     {uc.cosmetic.name}
@@ -297,7 +345,7 @@ const UserProfilePage: React.FC = () => {
           <div style={{ width: 40, height: 40, borderRadius: 14, flexShrink: 0,
             background: 'linear-gradient(135deg,#FACC15,#FB923C)',
             display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CheckCircle size={20} color="#fff" />
+            <CheckCircle size={20} color="#fff" aria-hidden="true" />
           </div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--q-text)' }}>

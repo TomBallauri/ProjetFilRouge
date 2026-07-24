@@ -2,6 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Bell, Users, Trophy, MessageSquare, UserX, Flame } from 'lucide-react';
+import { useStore } from '../lib/store';
+
+// Les toasts "nouveau message" pointent vers /groups/:id (voir useNotificationPolling.ts) —
+// mais depuis qu'on a une popup de tchat (voir GroupChatModal), cliquer dessus doit l'ouvrir
+// plutôt que de naviguer vers l'ancienne page dédiée.
+const GROUP_LINK_RE = /^\/groups\/(\d+)$/;
 
 type Toast = { id: number; message: string; type: string; link?: string };
 
@@ -25,6 +31,7 @@ const NotifToastContainer: React.FC = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { openGroupChat } = useStore();
 
   const dismiss = useCallback((id: number) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
@@ -49,7 +56,12 @@ const NotifToastContainer: React.FC = () => {
         <button
           key={toast.id}
           type="button"
-          onClick={() => { dismiss(toast.id); if (toast.link) navigate(toast.link); }}
+          onClick={() => {
+            dismiss(toast.id);
+            const groupMatch = toast.link?.match(GROUP_LINK_RE);
+            if (groupMatch) openGroupChat(Number(groupMatch[1]));
+            else if (toast.link) navigate(toast.link);
+          }}
           style={{
             display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
             background: 'var(--q-chrome)', border: '1px solid var(--q-line)',

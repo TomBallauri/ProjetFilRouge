@@ -8,6 +8,7 @@ import BackButton from '../components/BackButton';
 import { usePageTitle } from '../hooks/usePageTitle';
 import PageLoader from '../components/PageLoader';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES } from '../lib/cosmetics';
+import type { User } from '../types/User';
 
 type Cosmetic = {
   id: number;
@@ -123,7 +124,7 @@ type CosmeticCardProps = {
   alreadyOwned: boolean;
   canAfford: boolean;
   isLoading: boolean;
-  user: any;
+  user: User | null;
   darkMode: boolean;
   card: string;
   onBuy: (c: Cosmetic) => void;
@@ -198,6 +199,7 @@ const ShopPage: React.FC = () => {
 
   const token = localStorage.getItem('token');
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchCosmetics(); if (user) fetchOwned(); }, [i18n.language]);
 
   const fetchCosmetics = async () => {

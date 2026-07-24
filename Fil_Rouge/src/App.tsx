@@ -2,6 +2,7 @@ import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import PageLoader from './components/PageLoader';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './lib/store';
 
 // Chaque page est chargée à la demande : sans ça, tout (y compris le dashboard admin,
@@ -61,29 +62,31 @@ function App() {
 
   return (
     <div className={darkMode ? 'dark' : ''}>
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/login" element={<AuthPage mode="login" />} />
-          <Route path="/register" element={<AuthPage mode="register" />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/" element={<Layout />}>
-            <Route index element={<UQuail />} />
-            <Route path="profile" element={<ProfilePage />} />
-            <Route path="settings" element={<div className="p-4">Settings (Coming Soon)</div>} />
-            <Route path="challenges" element={<ChallengePage />} />
-            <Route path="challenges/create" element={<CreateChallenge />} />
-            <Route path="challenges/ai-create" element={<AIChallengeGenerator />} />
-            <Route path="shop" element={<ShopPage />} />
-            <Route path="leaderboard" element={<LeaderboardPage />} />
-            <Route path="user/:id" element={<UserProfilePage />} />
-            <Route path="friends" element={<FriendsPage />} />
-            <Route path="groups/:groupId" element={<GroupChatPage />} />
-          </Route>
-        </Routes>
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/login" element={<AuthPage mode="login" />} />
+            <Route path="/register" element={<AuthPage mode="register" />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/" element={<Layout />}>
+              <Route index element={<UQuail />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="settings" element={<div className="p-4">Settings (Coming Soon)</div>} />
+              <Route path="challenges" element={<ChallengePage />} />
+              <Route path="challenges/create" element={<CreateChallenge />} />
+              <Route path="challenges/ai-create" element={<AIChallengeGenerator />} />
+              <Route path="shop" element={<ShopPage />} />
+              <Route path="leaderboard" element={<LeaderboardPage />} />
+              <Route path="user/:id" element={<UserProfilePage />} />
+              <Route path="friends" element={<FriendsPage />} />
+              <Route path="groups/:groupId" element={<GroupChatPage />} />
+            </Route>
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }

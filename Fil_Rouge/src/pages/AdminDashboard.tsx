@@ -171,6 +171,13 @@ function StatChip({ value, label }: Readonly<{ value: React.ReactNode; label: st
 function Modal({ title, onClose, children }: Readonly<{ title: string; onClose: () => void; children: React.ReactNode }>) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
+  // `onClose` est un arrow function inline côté appelant (nouvelle référence à chaque render du
+  // parent) — si l'effet ci-dessous en dépendait directement, il se ré-exécuterait à chaque
+  // frappe dans un champ du formulaire (le parent re-render à chaque touche), et son cleanup
+  // (`previouslyFocused?.focus()`) arracherait le focus du champ en cours d'édition. Un ref
+  // permet de garder la dernière valeur sans redéclencher l'effet.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -184,7 +191,7 @@ function Modal({ title, onClose, children }: Readonly<{ title: string; onClose: 
     focusables()[0]?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Escape') { onCloseRef.current(); return; }
       if (e.key !== 'Tab') return;
       const els = focusables();
       if (els.length === 0) return;
@@ -198,7 +205,7 @@ function Modal({ title, onClose, children }: Readonly<{ title: string; onClose: 
       document.removeEventListener('keydown', onKeyDown);
       previouslyFocused?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
@@ -249,6 +256,9 @@ const AdminDashboard: React.FC = () => {
   const [editingChallenge, setEditingChallenge] = useState<Partial<AdminChallenge> | null>(null);
   const [editingCosmetic, setEditingCosmetic] = useState<Partial<AdminCosmetic> | null>(null);
   const [editingUser, setEditingUser] = useState<Partial<AdminUser> | null>(null);
+  // Remplace window.confirm() — dialogue natif du navigateur, ni stylable ni traduit par l'app
+  // (voir FriendsPage.tsx pour le même correctif).
+  const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const showNotif = (msg: string, type: 'success' | 'error') => {
@@ -280,7 +290,7 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     if (!user?.isAdmin) return;
-    const endpoints: Record<Tab, { url: string; auth?: boolean; setter: (data: any) => void }> = {
+    const endpoints: Record<Tab, { url: string; auth?: boolean; setter: (data: unknown) => void }> = {
       users: { url: '/api/users', auth: true, setter: setUsers },
       challenges: { url: '/api/admin/challenges', auth: true, setter: setChallenges },
       cosmetics: { url: '/api/cosmetics', setter: setCosmetics },
@@ -312,11 +322,12 @@ const AdminDashboard: React.FC = () => {
   };
 
   // ── Users ──────────────────────────────────────────────────────────────
-  const handleDeleteUser = async (id: number) => {
-    if (!globalThis.confirm(t('admin.confirmDeleteUser'))) return;
-    const res = await authFetch(`/api/users/${id}`, { method: "DELETE" });
-    if (res.ok) { setUsers(prev => prev.filter(u => u.id !== id)); showNotif(t('admin.userDeleted'), 'success'); }
-    else { const d = await res.json().catch(() => ({})); showNotif(d.error || t('admin.error'), 'error'); }
+  const handleDeleteUser = (id: number) => {
+    setConfirmAction({ message: t('admin.confirmDeleteUser'), onConfirm: async () => {
+      const res = await authFetch(`/api/users/${id}`, { method: "DELETE" });
+      if (res.ok) { setUsers(prev => prev.filter(u => u.id !== id)); showNotif(t('admin.userDeleted'), 'success'); }
+      else { const d = await res.json().catch(() => ({})); showNotif(d.error || t('admin.error'), 'error'); }
+    } });
   };
   const handleToggleAdmin = async (u: AdminUser) => {
     const res = await authFetch(`/api/users/${u.id}`, { method: "PUT", body: JSON.stringify({ isAdmin: !u.isAdmin }) });
@@ -345,11 +356,12 @@ const AdminDashboard: React.FC = () => {
   };
 
   // ── Challenges ─────────────────────────────────────────────────────────
-  const handleDeleteChallenge = async (id: number) => {
-    if (!globalThis.confirm(t('admin.confirmDeleteChallenge'))) return;
-    const res = await authFetch(`/api/admin/challenges/${id}`, { method: "DELETE" });
-    if (res.ok) { setChallenges(prev => prev.filter(c => c.id !== id)); showNotif(t('admin.challengeDeleted'), 'success'); }
-    else { const d = await res.json().catch(() => ({})); showNotif(d.error || t('admin.error'), 'error'); }
+  const handleDeleteChallenge = (id: number) => {
+    setConfirmAction({ message: t('admin.confirmDeleteChallenge'), onConfirm: async () => {
+      const res = await authFetch(`/api/admin/challenges/${id}`, { method: "DELETE" });
+      if (res.ok) { setChallenges(prev => prev.filter(c => c.id !== id)); showNotif(t('admin.challengeDeleted'), 'success'); }
+      else { const d = await res.json().catch(() => ({})); showNotif(d.error || t('admin.error'), 'error'); }
+    } });
   };
   const handleSaveChallenge = async () => {
     if (!editingChallenge) return;
@@ -365,11 +377,12 @@ const AdminDashboard: React.FC = () => {
   };
 
   // ── Cosmetics ──────────────────────────────────────────────────────────
-  const handleDeleteCosmetic = async (id: number) => {
-    if (!globalThis.confirm(t('admin.confirmDeleteCosmetic'))) return;
-    const res = await authFetch(`/api/admin/cosmetics/${id}`, { method: "DELETE" });
-    if (res.ok) { setCosmetics(prev => prev.filter(c => c.id !== id)); showNotif(t('admin.cosmeticDeleted'), 'success'); }
-    else { const d = await res.json().catch(() => ({})); showNotif(d.error || t('admin.error'), 'error'); }
+  const handleDeleteCosmetic = (id: number) => {
+    setConfirmAction({ message: t('admin.confirmDeleteCosmetic'), onConfirm: async () => {
+      const res = await authFetch(`/api/admin/cosmetics/${id}`, { method: "DELETE" });
+      if (res.ok) { setCosmetics(prev => prev.filter(c => c.id !== id)); showNotif(t('admin.cosmeticDeleted'), 'success'); }
+      else { const d = await res.json().catch(() => ({})); showNotif(d.error || t('admin.error'), 'error'); }
+    } });
   };
   const handleSaveCosmetic = async () => {
     if (!editingCosmetic) return;
@@ -768,6 +781,24 @@ const AdminDashboard: React.FC = () => {
             <button className="q-press mt-2 px-4 py-2.5 rounded-2xl font-bold text-sm text-white"
               style={{ background: 'var(--q-accent)' }} onClick={handleSaveUser}>
               {t('common.save')}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {confirmAction && (
+        <Modal title={t('admin.confirmTitle')} onClose={() => setConfirmAction(null)}>
+          <p className="text-sm" style={{ color: 'var(--q-text)' }}>{confirmAction.message}</p>
+          <div className="flex gap-3 mt-5">
+            <button onClick={() => setConfirmAction(null)} autoFocus
+              className="flex-1 py-2.5 rounded-2xl font-bold text-sm"
+              style={{ border: '1.5px solid var(--q-line)', background: 'transparent', color: 'var(--q-text2)', cursor: 'pointer' }}>
+              {t('common.cancel')}
+            </button>
+            <button onClick={() => { const action = confirmAction; setConfirmAction(null); action.onConfirm(); }}
+              className="flex-1 py-2.5 rounded-2xl font-bold text-sm text-white"
+              style={{ border: 'none', background: '#EF4444', cursor: 'pointer' }}>
+              {t('admin.delete')}
             </button>
           </div>
         </Modal>

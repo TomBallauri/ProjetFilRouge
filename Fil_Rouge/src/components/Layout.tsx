@@ -6,6 +6,7 @@ import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import NotifToastContainer from './NotifToastContainer';
 import OnboardingTour from './OnboardingTour';
+import GroupChatModal from './GroupChatModal';
 
 const Footer: React.FC = () => {
   const { darkMode } = useStore();
@@ -56,6 +57,7 @@ const Layout: React.FC = () => {
       <Footer />
       <NotifToastContainer />
       <OnboardingTour />
+      <GroupChatModal />
     </div>
   );
 };

@@ -139,7 +139,7 @@ const GroupChatPage: React.FC = () => {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: 'var(--q-text3)', fontFamily: 'var(--q-font)' }}>
-        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', marginRight: 10 }} />
+        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', marginRight: 10 }} aria-hidden="true" />
         {t('common.loading')}
       </div>
     );
@@ -169,7 +169,7 @@ const GroupChatPage: React.FC = () => {
           background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 12,
           color: 'var(--q-text2)', display: 'flex', alignItems: 'center',
         }}>
-          <ArrowLeft size={20} />
+          <ArrowLeft size={20} aria-hidden="true" />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--q-text)', letterSpacing: -0.3, lineHeight: 1.2 }}>

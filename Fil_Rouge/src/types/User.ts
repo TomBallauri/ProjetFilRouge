@@ -1,3 +1,5 @@
+import type { EquippedCosmetic } from '../lib/cosmetics';
+
 export interface UserSettings {
   darkMode?: boolean;
   notifDefis?: boolean;
@@ -24,6 +26,8 @@ export interface User {
   discussionsStarted?: number;
   reputation?: number;
   currentStreak?: number;
+  longestStreak?: number;
   recentActivities?: { content: string; date: string }[];
   settings?: UserSettings;
+  cosmetics?: EquippedCosmetic[];
 }

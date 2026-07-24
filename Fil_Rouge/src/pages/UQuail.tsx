@@ -11,6 +11,9 @@ import {
   Star, Award, Crown, Moon,
 } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
+import CompletedChallengesChart from '../components/CompletedChallengesChart';
+import { compareBySeriesDayNumber } from '../lib/challengeSort';
+import { streakMultiplier, nextStreakMilestone, streakWeekProgress } from '../lib/streak';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 
 // ── types ──────────────────────────────────────────────────────────────────
@@ -23,6 +26,7 @@ type UserChallenge = {
   completedAt?: string;
   challenge: {
     title: string;
+    description?: string;
     category: string;
     difficulty: string;
     coinReward: number;
@@ -53,9 +57,6 @@ function getLevelTitleKey(level: number): string {
   return 'uquail.levelTitles.master';
 }
 
-
-const daysSince = (dateStr: string): number =>
-  Math.max(1, Math.ceil((Date.now() - new Date(dateStr).getTime()) / 86_400_000));
 
 // ── design tokens (gradients) ───────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
 const UQuail: React.FC = () => {
   const { t, i18n } = useTranslation();
   usePageTitle(t('uquail.pageTitle'));
-  const { user, notifData, notifCount, setNotifCount } = useStore();
+  const { user, notifData, notifCount, setNotifCount, openGroupChat } = useStore();
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<UserChallenge[]>([]);
   const [homeCosmetics, setHomeCosmetics] = useState<EquippedCosmetic[]>([]);
@@ -287,29 +288,18 @@ const UQuail: React.FC = () => {
 
   const xpInLevel  = (user.xp ?? 0) % 1000;
   const xpPercent  = xpInLevel / 1000;
-  const seriesDayNumber = (title: string) => {
-    const m = /^Jour\s+(\d+)/i.exec(title);
-    return m ? parseInt(m[1], 10) : null;
-  };
   // Au sein d'une même série, on affiche les jours dans l'ordre (2, 3, 4…) plutôt que par
   // date de création — la sauvegarde en masse des défis IA les crée tous "en cours" en
   // parallèle, ce qui ne garantit pas que le jour le plus ancien apparaisse en premier.
   const inProgress = challenges
     .filter(c => c.status === 'IN_PROGRESS')
-    .sort((a, b) => {
-      if (a.challenge.seriesName && a.challenge.seriesName === b.challenge.seriesName) {
-        const da = seriesDayNumber(a.challenge.title);
-        const db = seriesDayNumber(b.challenge.title);
-        if (da !== null && db !== null) return da - db;
-      }
-      return 0;
-    });
+    .sort(compareBySeriesDayNumber);
   const levelTitle = t(getLevelTitleKey(user.level ?? 1));
 
-  const streak = (user as any).currentStreak ?? 0;
-  const multiplier = Math.min(3, Math.round((1 + Math.floor(streak / 7) * 0.05) * 100) / 100);
-  const nextMilestone = [7, 14, 30, 60, 100].find(m => m > streak) ?? 100;
-  const streakProgress = (streak % 7) / 7;
+  const streak = user.currentStreak ?? 0;
+  const multiplier = streakMultiplier(streak);
+  const nextMilestone = nextStreakMilestone(streak);
+  const streakProgress = streakWeekProgress(streak);
 
   // Extracted so the loadingMain ternary below isn't a nested conditional.
   const todayFallback = inProgress.length === 0 ? (
@@ -335,11 +325,10 @@ const UQuail: React.FC = () => {
       {inProgress.slice(0, 3).map((uc, i) => {
         const meta = CAT_META[uc.challenge.category] ?? DEFAULT_CAT;
         const catLabel = t(`common.category.${uc.challenge.category}`, { defaultValue: t('uquail.defaultChallenge') });
-        const day = daysSince(uc.startedAt);
-        const total = 30;
-        const progress = Math.min(1, day / total);
         return (
-          <button key={uc.id} onClick={() => navigate('/challenges')}
+          <button key={uc.id} onClick={() => navigate('/challenges', {
+              state: { focusChallengeId: uc.challengeId, focusSeriesName: uc.challenge.seriesName ?? null },
+            })}
             aria-label={t('uquail.viewChallenge', { title: uc.challenge.title })}
             className="q-press rounded-3xl w-full text-left flex gap-3 items-center p-3.5"
             style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
@@ -353,23 +342,16 @@ const UQuail: React.FC = () => {
                     boxShadow: '0 0 4px rgba(255,255,255,0.7)', flexShrink: 0, display: 'inline-block' }} />
                   {catLabel}
                 </span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: '#FFDDC2', color: '#D46B0F', border: '1px solid #FFDDC2' }}>
-                  <Flame size={10} style={{ color: '#D46B0F' }} aria-hidden="true" /> {t('common.daysAbbrev', { count: day })}
-                </span>
               </div>
-              <div className="text-sm font-bold mb-1.5 truncate" style={{ color: 'var(--q-text)', letterSpacing: -0.1 }}>
+              <div className="text-sm font-bold truncate" style={{ color: 'var(--q-text)', letterSpacing: -0.1 }}>
                 {uc.challenge.title}
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(42,42,51,0.08)' }}>
-                  <div className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${progress * 100}%`, background: meta.grad }} />
+              {uc.challenge.description && (
+                <div className="text-xs mt-0.5" style={{ color: 'var(--q-text2)',
+                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {uc.challenge.description}
                 </div>
-                <span className="text-[11px] font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--q-text2)' }}>
-                  {t('uquail.dayOf', { day, total })}
-                </span>
-              </div>
+              )}
             </div>
             <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
           </button>
@@ -452,8 +434,11 @@ const UQuail: React.FC = () => {
                     g.latestMessageId > ((currentSeen.groups?.[String(g.groupId)]) ?? 0)
                   )
                 );
-                // Mark group messages as seen — friend/invite counts persist until acted on
-                const seenGroups: Record<string, number> = {};
+                // Mark group messages as seen — friend/invite counts persist until acted on.
+                // Merge into the existing per-group map (don't replace it wholesale): a group
+                // absent from this particular poll must keep its previously-seen id, otherwise
+                // its "seen" record gets wiped and the same old message reappears as unread later.
+                const seenGroups: Record<string, number> = { ...currentSeen.groups };
                 notifData.groups.forEach(g => { seenGroups[String(g.groupId)] = g.latestMessageId ?? 0; });
                 localStorage.setItem(seenKey, JSON.stringify({ ...currentSeen, groups: seenGroups }));
                 // Immediate badge update — next poll will reconfirm
@@ -507,7 +492,7 @@ const UQuail: React.FC = () => {
 
                 {/* Unread group messages — snapshot taken at panel open */}
                 {panelUnreadGroups.map(g => (
-                  <button key={g.groupId} onClick={() => { setNotifPanelOpen(false); navigate(`/groups/${g.groupId}`); }}
+                  <button key={g.groupId} onClick={() => { setNotifPanelOpen(false); openGroupChat(g.groupId); }}
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
                     <MessageSquare size={15} color="var(--q-accent)" aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -706,6 +691,8 @@ const UQuail: React.FC = () => {
       ) : todayFallback}
       </div>
 
+      <CompletedChallengesChart />
+
       {/* ── Quick nav cards — desktop only (mobile has bottom tab bar) ── */}
       <div className="hidden md:block">
       {inProgress.length > 0 ? (
@@ -855,10 +842,16 @@ const UQuail: React.FC = () => {
                   </span>
                 )}
               </div>
-              <p className="text-sm font-bold text-white leading-snug mb-2"
+              <p className="text-sm font-bold text-white leading-snug mb-1"
                 style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                 {dailyChallenge.title}
               </p>
+              {dailyChallenge.description && (
+                <p className="text-xs mb-2" style={{ color: 'rgba(255,255,255,0.8)',
+                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {dailyChallenge.description}
+                </p>
+              )}
               <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.85)' }}>
                 <span className="px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(255,255,255,0.2)' }}>
                   {t(`common.difficulty.${dailyChallenge.difficulty.toLowerCase()}`, { defaultValue: dailyChallenge.difficulty })}

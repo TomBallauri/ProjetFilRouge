@@ -10,6 +10,9 @@ import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES, getEquipped } from '../li
 import type { EquippedCosmetic } from '../lib/cosmetics';
 import PageLoader from '../components/PageLoader';
 import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordPolicy';
+import { compareBySeriesDayNumber } from '../lib/challengeSort';
+import { streakMultiplier } from '../lib/streak';
+import { validateEmail } from '../lib/validation';
 import type { User } from '../types/User';
 
 type OwnedCosmetic = EquippedCosmetic & { id: number; purchasedAt: string };
@@ -52,17 +55,6 @@ type TFunc = (key: string, opts?: Record<string, unknown>) => string;
 // pas besoin de préfixer une origine en dur.
 const getFullImageUrl = (url: string | undefined | null) => url ?? '';
 
-const validateEmail = (email: string) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-// Au sein d'une même série, on affiche les jours en ordre croissant (1, 2, 3…) —
-// le tri par date de création n'est pas fiable car les défis IA sont créés en lot.
-const seriesDayNumber = (title: string) => {
-  const m = /^Jour\s+(\d+)/i.exec(title);
-  return m ? parseInt(m[1], 10) : null;
-};
 
 const NotLoggedInView: React.FC = () => {
   const { t } = useTranslation();
@@ -71,7 +63,7 @@ const NotLoggedInView: React.FC = () => {
       minHeight: '60vh', textAlign: 'center', padding: '40px 24px', fontFamily: 'var(--q-font)' }}>
       <div style={{ width: 64, height: 64, borderRadius: 20, marginBottom: 20,
         background: 'var(--q-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Mail size={28} style={{ color: 'var(--q-accent-deep)' }} />
+        <Mail size={28} style={{ color: 'var(--q-accent-deep)' }} aria-hidden="true" />
       </div>
       <h1 style={{ margin: '0 0 8px', fontSize: 22, fontFamily: 'var(--q-display)', color: 'var(--q-text)' }}>
         {t('profile.notAvailableTitle')}
@@ -104,7 +96,7 @@ type ProfileHeaderSectionProps = {
   hasBannerImage: boolean;
   equippedFrame: EquippedCosmetic | null;
   equippedTitle: EquippedCosmetic | null;
-  equippedBadge: EquippedCosmetic | null;
+  equippedBadges: EquippedCosmetic[];
   profileStats: { memberSince: string };
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => void;
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
@@ -118,7 +110,7 @@ type ProfileHeaderSectionProps = {
 
 const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
   t, user, isEditing, formData, bannerPreview, avatarPreview, bannerClass, frameClass, titleClass,
-  hasBannerImage, equippedFrame, equippedTitle, equippedBadge, profileStats,
+  hasBannerImage, equippedFrame, equippedTitle, equippedBadges, profileStats,
   handleFileChange, handleInputChange, avatarInputRef, bannerInputRef, navigate,
   onStartEdit, onSave, onCancel,
 }) => {
@@ -138,9 +130,15 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
 
   return (
     <>
-      {/* ── Banner ── */}
+      {/* ── Banner ──
+          Reste un <div> (pas un <button>) car il contient le bouton "retour" ci-dessous —
+          on ne peut pas imbriquer un élément interactif dans un autre. role="button" + gestion
+          clavier seulement quand il est réellement cliquable (mode édition). */}
       <div
         className={`-mx-4 md:-mx-6 -mt-4 md:-mt-6 ${!hasBannerImage ? bannerClass : ''}`}
+        role={isEditing ? 'button' : undefined}
+        tabIndex={isEditing ? 0 : undefined}
+        aria-label={isEditing ? t('profile.changeBanner') : undefined}
         style={{
           height: 190,
           position: 'relative',
@@ -151,6 +149,9 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
             : { background: 'var(--q-vibrant-hero)' }),
         }}
         onClick={() => isEditing && bannerInputRef.current?.click()}
+        onKeyDown={e => {
+          if (isEditing && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); bannerInputRef.current?.click(); }
+        }}
       >
         {isEditing && (
           <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp"
@@ -158,26 +159,27 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
         )}
 {/* Back button */}
         {!isEditing && (
-          <button onClick={() => navigate(-1)} className="q-press"
+          <button onClick={() => navigate(-1)} className="q-press" aria-label={t('common.back')}
             style={{ position: 'absolute', top: 54, left: 18, width: 40, height: 40, borderRadius: 20,
               background: 'rgba(255,255,255,0.85)', border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               backdropFilter: 'blur(10px)', zIndex: 10 }}>
-            <ChevronLeft size={18} color="#1F2030" />
+            <ChevronLeft size={18} color="#1F2030" aria-hidden="true" />
           </button>
         )}
         {/* Edit overlay */}
         {isEditing && (
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-            <Edit size={32} color="#fff" />
+            <Edit size={32} color="#fff" aria-hidden="true" />
           </div>
         )}
       </div>
 
       {/* ── Avatar + Identity ── */}
       <div style={{ padding: '0 18px', marginTop: -54, textAlign: 'center' }}>
-        <div
-          style={{ display: 'inline-block', position: 'relative', width: 104, height: 104, cursor: isEditing ? 'pointer' : 'default' }}
+        <button type="button" disabled={!isEditing} aria-label={t('profile.changeAvatar')}
+          style={{ display: 'inline-block', position: 'relative', width: 104, height: 104,
+            cursor: isEditing ? 'pointer' : 'default', background: 'none', border: 'none', padding: 0 }}
           onClick={() => isEditing && avatarInputRef.current?.click()}
         >
           {/* Avatar shrinks inward when a frame image is equipped — no overflow needed */}
@@ -196,7 +198,7 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
             />
             {isEditing && (
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.40)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Edit size={28} color="#fff" />
+                <Edit size={28} color="#fff" aria-hidden="true" />
               </div>
             )}
           </div>
@@ -209,11 +211,12 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
               style={{ objectFit: 'fill' }}
             />
           )}
-          {isEditing && (
-            <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp"
-              style={{ display: 'none' }} onChange={e => handleFileChange(e, 'avatar')} />
-          )}
-        </div>
+        </button>
+        {/* Input séparé du bouton — un <input> ne peut pas être imbriqué dans un <button> (HTML invalide) */}
+        {isEditing && (
+          <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+            style={{ display: 'none' }} onChange={e => handleFileChange(e, 'avatar')} />
+        )}
 
         <div style={{ marginTop: 10 }}>
           {isEditing ? (
@@ -221,13 +224,17 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
               aria-label={t('auth.username')}
               style={{ fontSize: 22, fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--q-accent)', textAlign: 'center', outline: 'none', width: '100%', maxWidth: 280 }} />
           ) : (
-            <div style={{ fontSize: 24, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.3, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 24, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.3 }}>
               {user.username}
-              {equippedBadge && (
-                <span title={equippedBadge.cosmetic.name} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  <Award size={16} style={{ color: '#FACC15', flexShrink: 0 }} />
+            </div>
+          )}
+          {!isEditing && equippedBadges.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 }}>
+              {equippedBadges.map(b => (
+                <span key={b.cosmeticId} title={b.cosmetic.name} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  <Award size={16} className={TITLE_CLASSES[b.cosmetic.rarity] ?? ''} aria-hidden="true" />
                 </span>
-              )}
+              ))}
             </div>
           )}
           {equippedTitle && (
@@ -281,11 +288,11 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
           <div style={{ display: 'inline-flex', gap: 8 }}>
             <button onClick={onSave} className="q-press"
               style={{ height: 36, padding: '0 18px', borderRadius: 18, border: 'none', background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Save size={14} /> {t('common.save')}
+              <Save size={14} aria-hidden="true" /> {t('common.save')}
             </button>
             <button onClick={onCancel} className="q-press"
               style={{ height: 36, padding: '0 18px', borderRadius: 18, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#EF4444', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <X size={14} /> {t('common.cancel')}
+              <X size={14} aria-hidden="true" /> {t('common.cancel')}
             </button>
           </div>
         ) : (
@@ -330,7 +337,7 @@ const InfoSection: React.FC<InfoSectionProps> = ({
         style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)' }}>
-          <Mail size={18} color="#fff" />
+          <Mail size={18} color="#fff" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.myInfo')}</p>
@@ -338,23 +345,23 @@ const InfoSection: React.FC<InfoSectionProps> = ({
         </div>
         <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
           transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s ease' }} />
+          transition: 'transform 0.2s ease' }} aria-hidden="true" />
       </button>
       {isOpen && (
         <div className="px-4 pb-4 space-y-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
           {user.isAdmin && (
             <div className="px-3 py-2 rounded-xl text-xs font-bold w-fit flex items-center gap-1.5"
               style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)' }}>
-              <Star size={12} /> {t('profile.administrator')}
+              <Star size={12} aria-hidden="true" /> {t('profile.administrator')}
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex items-center gap-2">
-              <Mail size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+              <Mail size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
               <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{user.email}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Calendar size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+              <Calendar size={15} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
               <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{t('userProfile.memberSince', { date: profileStats.memberSince })}</span>
             </div>
           </div>
@@ -444,7 +451,7 @@ const CosmeticsSection: React.FC<CosmeticsSectionProps> = ({
           style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{ background: 'linear-gradient(135deg,#EC4899,#A78BFA)' }}>
-            <ShoppingBag size={18} color="#fff" />
+            <ShoppingBag size={18} color="#fff" aria-hidden="true" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.myCosmetics')}</p>
@@ -452,7 +459,7 @@ const CosmeticsSection: React.FC<CosmeticsSectionProps> = ({
           </div>
           <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
             transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s ease' }} />
+            transition: 'transform 0.2s ease' }} aria-hidden="true" />
         </button>
         {isOpen && (
           <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
@@ -477,7 +484,7 @@ const CosmeticsSection: React.FC<CosmeticsSectionProps> = ({
                         border: uc.equipped ? '2px solid var(--q-accent)' : '1px solid var(--q-line)',
                         boxShadow: uc.equipped ? '0 0 0 3px var(--q-accent-soft), var(--q-shadow)' : 'var(--q-shadow)' }}>
                       <div className="text-center">
-                        <div className="flex justify-center mb-1" style={{ color: 'var(--q-accent)' }}><TypeIcon size={22} /></div>
+                        <div className="flex justify-center mb-1" style={{ color: 'var(--q-accent)' }}><TypeIcon size={22} aria-hidden="true" /></div>
                         <p className="font-bold text-xs mt-1 truncate" style={{ color: 'var(--q-text)' }}>{uc.cosmetic.name}</p>
                         <p className={`text-xs font-semibold ${rarityColor}`}>{t(`common.rarity.${uc.cosmetic.rarity}`)}</p>
                         <p className="text-xs" style={{ color: 'var(--q-text3)' }}>{t(`shop.type.${uc.cosmetic.type}`)}</p>
@@ -528,7 +535,7 @@ const ChallengesSection: React.FC<ChallengesSectionProps> = ({
         style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)' }}>
-          <Trophy size={18} color="#fff" />
+          <Trophy size={18} color="#fff" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('navbar.myChallenges')}</p>
@@ -541,7 +548,7 @@ const ChallengesSection: React.FC<ChallengesSectionProps> = ({
         </div>
         <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
           transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s ease' }} />
+          transition: 'transform 0.2s ease' }} aria-hidden="true" />
       </button>
       {isOpen && (
         <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
@@ -555,17 +562,17 @@ const ChallengesSection: React.FC<ChallengesSectionProps> = ({
                     {uc.challenge.description}
                   </p>
                 )}
-                <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--q-text3)' }}><CircleDollarSign size={10} className="inline flex-shrink-0" /> {uc.challenge.coinReward} · <Zap size={10} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP</p>
+                <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--q-text3)' }}><CircleDollarSign size={10} className="inline flex-shrink-0" aria-hidden="true" /> {uc.challenge.coinReward} · <Zap size={10} className="inline flex-shrink-0" aria-hidden="true" /> {uc.challenge.xpReward} XP</p>
               </div>
               {uc.status === 'COMPLETED' ? (
                 <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded-full"
                   style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff' }}>
-                  <CheckCircle size={12} /> {t('profile.completed')}
+                  <CheckCircle size={12} aria-hidden="true" /> {t('profile.completed')}
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded-full"
                   style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)', color: '#fff' }}>
-                  <Clock size={12} /> {t('profile.inProgress')}
+                  <Clock size={12} aria-hidden="true" /> {t('profile.inProgress')}
                 </span>
               )}
             </div>
@@ -597,14 +604,14 @@ const HistorySection: React.FC<HistorySectionProps> = ({
         style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'linear-gradient(135deg,#818CF8,#38BDF8)' }}>
-          <History size={18} color="#fff" />
+          <History size={18} color="#fff" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.history')}</p>
         </div>
         <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
           transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s ease' }} />
+          transition: 'transform 0.2s ease' }} aria-hidden="true" />
       </button>
       {isOpen && (
         <div className="border-t" style={{ borderColor: 'var(--q-line)' }}>
@@ -613,7 +620,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({
           return (
             <div key={uc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: i < a.length - 1 ? '1px solid var(--q-line)' : 'none' }}>
               <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, background: ok ? 'rgba(52,211,153,0.18)' : 'rgba(251,146,60,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {ok ? <CheckCircle size={16} style={{ color: '#34D399' }} /> : <Clock size={16} style={{ color: '#FB923C' }} />}
+                {ok ? <CheckCircle size={16} style={{ color: '#34D399' }} aria-hidden="true" /> : <Clock size={16} style={{ color: '#FB923C' }} aria-hidden="true" />}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--q-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{uc.challenge.title}</div>
@@ -626,14 +633,14 @@ const HistorySection: React.FC<HistorySectionProps> = ({
                   {ok ? (
                     <>
                       <span>{t('profile.doneInline')} ·</span>
-                      <CircleDollarSign size={11} className="inline flex-shrink-0" /> {uc.challenge.coinReward}
+                      <CircleDollarSign size={11} className="inline flex-shrink-0" aria-hidden="true" /> {uc.challenge.coinReward}
                       <span>·</span>
-                      <Zap size={11} className="inline flex-shrink-0" /> {uc.challenge.xpReward} XP
+                      <Zap size={11} className="inline flex-shrink-0" aria-hidden="true" /> {uc.challenge.xpReward} XP
                     </>
                   ) : t('profile.inProgressLower')}
                 </div>
               </div>
-              <ChevronRight size={14} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+              <ChevronRight size={14} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
             </div>
           );
         })}
@@ -682,14 +689,14 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
       style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
       <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
         style={{ background: 'linear-gradient(135deg,#64748B,#334155)' }}>
-        <Settings size={18} color="#fff" />
+        <Settings size={18} color="#fff" aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.settings')}</p>
       </div>
       <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
         transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-        transition: 'transform 0.2s ease' }} />
+        transition: 'transform 0.2s ease' }} aria-hidden="true" />
     </button>
     {isOpen && (
   <div className="border-t" style={{ padding: '12px', borderColor: 'var(--q-line)', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -702,13 +709,13 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
       style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)', cursor: 'pointer' }}>
       <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
         style={{ background: 'linear-gradient(135deg,#00DDFF,#2B1FD0)' }}>
-        <HelpCircle size={18} color="#fff" />
+        <HelpCircle size={18} color="#fff" aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.reviewTutorial')}</p>
         <p className="text-xs" style={{ color: 'var(--q-text2)' }}>{t('profile.reviewTutorialDesc')}</p>
       </div>
-      <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} />
+      <ChevronRight size={16} style={{ color: 'var(--q-text3)', flexShrink: 0 }} aria-hidden="true" />
     </button>
 
     {/* Apparence */}
@@ -718,7 +725,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
         style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'var(--q-accent-soft)' }}>
-          <Palette size={18} style={{ color: 'var(--q-accent-deep)' }} />
+          <Palette size={18} style={{ color: 'var(--q-accent-deep)' }} aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.appearance')}</p>
@@ -726,13 +733,13 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
         </div>
         <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
           transform: openSection === 'appearance' ? 'rotate(180deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s ease' }} />
+          transition: 'transform 0.2s ease' }} aria-hidden="true" />
       </button>
       {openSection === 'appearance' && (
         <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {darkMode ? <Moon size={16} style={{ color: 'var(--q-accent)' }} /> : <Sun size={16} style={{ color: 'var(--q-text2)' }} />}
+              {darkMode ? <Moon size={16} style={{ color: 'var(--q-accent)' }} aria-hidden="true" /> : <Sun size={16} style={{ color: 'var(--q-text2)' }} aria-hidden="true" />}
               <span className="text-sm font-semibold" style={{ color: 'var(--q-text)' }}>{t('profile.darkMode')}</span>
             </div>
             <button onClick={toggleDarkMode} role="switch" aria-checked={darkMode} aria-label={t('profile.darkMode')}
@@ -755,7 +762,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
         style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'linear-gradient(135deg,#38BDF8,#A78BFA)' }}>
-          <Bell size={18} color="#fff" />
+          <Bell size={18} color="#fff" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('common.notifications')}</p>
@@ -765,7 +772,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
         </div>
         <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
           transform: openSection === 'notifications' ? 'rotate(180deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s ease' }} />
+          transition: 'transform 0.2s ease' }} aria-hidden="true" />
       </button>
       {openSection === 'notifications' && (
         <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
@@ -798,7 +805,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
         style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'linear-gradient(135deg,#34D399,#FACC15)' }}>
-          <SlidersHorizontal size={18} color="#fff" />
+          <SlidersHorizontal size={18} color="#fff" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{t('profile.accessibility')}</p>
@@ -806,7 +813,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
         </div>
         <ChevronDown size={16} style={{ color: 'var(--q-text3)', flexShrink: 0,
           transform: openSection === 'accessibility' ? 'rotate(180deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s ease' }} />
+          transition: 'transform 0.2s ease' }} aria-hidden="true" />
       </button>
       {openSection === 'accessibility' && (
         <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--q-line)' }}>
@@ -1055,7 +1062,7 @@ const EditProfile: React.FC = () => {
       showNotif(t('profile.passwordUpdated'), 'success');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setIsEditing(false);
-    } catch (err) {
+    } catch {
       showNotif(t('profile.passwordNetworkError'), 'error');
     }
   };
@@ -1150,7 +1157,7 @@ const EditProfile: React.FC = () => {
       setBannerPreview(null);
       setAvatarFile(null);
       setBannerFile(null);
-    } catch (err) {
+    } catch {
       showNotif(t('profile.saveError'), 'error');
     }
   };
@@ -1165,7 +1172,9 @@ const EditProfile: React.FC = () => {
 
   const equippedFrame  = getEquipped(ownedCosmetics, 'AVATAR_FRAME');
   const equippedTitle  = getEquipped(ownedCosmetics, 'TITLE');
-  const equippedBadge  = getEquipped(ownedCosmetics, 'BADGE');
+  // Jusqu'à 3 badges peuvent être équipés simultanément (voir equippedBadgeCount plus bas) —
+  // contrairement à getEquipped() qui n'en renvoie qu'un seul, il en faut la liste complète ici.
+  const equippedBadges = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped);
   const equippedBanner = getEquipped(ownedCosmetics, 'BANNER');
   const frameClass  = equippedFrame  ? (FRAME_CLASSES[equippedFrame.cosmetic.rarity]   ?? '') : '';
   const titleClass  = equippedTitle  ? (TITLE_CLASSES[equippedTitle.cosmetic.rarity]   ?? '') : '';
@@ -1180,14 +1189,7 @@ const EditProfile: React.FC = () => {
     ? t('profile.noCosmeticsOwned')
     : t('profile.cosmeticsOwned', { count: ownedCosmetics.length });
 
-  const sortedUserChallenges = [...userChallenges].sort((a, b) => {
-    if (a.challenge.seriesName && a.challenge.seriesName === b.challenge.seriesName) {
-      const da = seriesDayNumber(a.challenge.title);
-      const db = seriesDayNumber(b.challenge.title);
-      if (da !== null && db !== null) return da - db;
-    }
-    return 0;
-  });
+  const sortedUserChallenges = [...userChallenges].sort(compareBySeriesDayNumber);
 
   return (
     <div style={{ paddingBottom: 100, color: 'var(--q-text)', fontFamily: 'var(--q-font)' }}>
@@ -1205,7 +1207,7 @@ const EditProfile: React.FC = () => {
         hasBannerImage={hasBannerImage}
         equippedFrame={equippedFrame}
         equippedTitle={equippedTitle}
-        equippedBadge={equippedBadge}
+        equippedBadges={equippedBadges}
         profileStats={profileStats}
         handleFileChange={handleFileChange}
         handleInputChange={handleInputChange}
@@ -1233,9 +1235,9 @@ const EditProfile: React.FC = () => {
 
       {/* ── Streak card ── */}
       {(() => {
-        const streak = (user as any).currentStreak ?? 0;
-        const longest = (user as any).longestStreak ?? 0;
-        const multiplier = Math.min(3, Math.round((1 + Math.floor(streak / 7) * 0.05) * 100) / 100);
+        const streak = user.currentStreak ?? 0;
+        const longest = user.longestStreak ?? 0;
+        const multiplier = streakMultiplier(streak);
         return (
           <div style={{ padding: '12px 18px 0' }}>
             <div style={{ borderRadius: 22, padding: 16, background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)', display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -1321,7 +1323,7 @@ const EditProfile: React.FC = () => {
                     <div style={{ position: 'relative', width: 44, height: 44, borderRadius: 22, margin: '0 auto',
                       background: 'rgba(255,255,255,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}>
-                      <Award size={22} style={{ color: '#A78BFA' }} />
+                      <Award size={22} style={{ color: '#A78BFA' }} aria-hidden="true" />
                     </div>
                     <div style={{ position: 'relative', fontSize: 10, fontWeight: 700, color: '#fff', marginTop: 8, lineHeight: 1.2 }}>{uc.cosmetic.name}</div>
                   </div>
@@ -1419,7 +1421,7 @@ const EditProfile: React.FC = () => {
             style={{ height: 48, borderRadius: 18, border: '1px solid var(--q-accent)',
               background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)',
               fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-            <Lock size={16} /> {t('profile.adminDashboard')}
+            <Lock size={16} aria-hidden="true" /> {t('profile.adminDashboard')}
           </button>
         </div>
       )}
@@ -1432,7 +1434,7 @@ const EditProfile: React.FC = () => {
           style={{ height: 48, borderRadius: 18, border: '1px solid rgba(239,68,68,0.25)',
             background: 'rgba(239,68,68,0.08)', color: '#EF4444',
             fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-          <LogOut size={16} /> {t('profile.logout')}
+          <LogOut size={16} aria-hidden="true" /> {t('profile.logout')}
         </button>
       </div>
 

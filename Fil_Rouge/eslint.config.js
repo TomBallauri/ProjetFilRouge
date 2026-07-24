@@ -23,6 +23,11 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // Convention établie dans le code (ex: destructuring pour omettre un champ) : un
+      // identifiant préfixé par `_` est intentionnellement inutilisé, pas un oubli.
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_',
+      }],
     },
   }
 );

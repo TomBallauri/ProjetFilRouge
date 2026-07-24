@@ -60,9 +60,10 @@ function getTheme(darkMode: boolean): Theme {
   return darkMode ? DARK_THEME : LIGHT_THEME;
 }
 
-function pickChallengesArray(data: any): GeneratedChallenge[] | null {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.challenges)) return data.challenges;
+function pickChallengesArray(data: unknown): GeneratedChallenge[] | null {
+  if (Array.isArray(data)) return data as GeneratedChallenge[];
+  const challenges = (data as { challenges?: unknown } | null)?.challenges;
+  if (Array.isArray(challenges)) return challenges as GeneratedChallenge[];
   return null;
 }
 
