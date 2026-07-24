@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
-import { useNotificationPolling } from '../hooks/useNotificationPolling';
+import { useNotificationPolling, computeBadgeBreakdown } from '../hooks/useNotificationPolling';
 import { Home, Trophy, Lock, ShoppingBag, Star, User, Users, Sparkles, Zap, Flame } from 'lucide-react';
 
 type TabItem = { path: string; labelKey: string; icon: React.ReactNode; end: boolean };
@@ -39,13 +39,19 @@ const DIFF_ICONS: Record<string, typeof Zap> = {
 };
 
 const Sidebar: React.FC = () => {
-  const { darkMode, user, notifCount } = useStore();
+  const { darkMode, user, notifData } = useStore();
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
 
   // Lance le polling global des notifications (résultat stocké dans le store)
   useNotificationPolling();
+
+  // Compte par onglet plutôt qu'un total unique : une demande d'ami ne doit pas afficher
+  // son badge sur "Défis", et une invitation de série ne doit pas l'afficher sur "Amis".
+  const badgeCounts = user && notifData ? computeBadgeBreakdown(notifData, user.id) : { friends: 0, challenges: 0 };
+  const badgeCountFor = (path: string): number =>
+    path === '/friends' ? badgeCounts.friends : path === '/challenges' ? badgeCounts.challenges : 0;
 
   useEffect(() => {
     const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
@@ -95,7 +101,8 @@ const Sidebar: React.FC = () => {
       <aside className={`hidden md:flex flex-col w-56 shrink-0 border-r ${sidebarBg} sticky top-0 h-screen`}>
         <nav aria-label={t('sidebar.mainNav')} className="flex flex-col gap-1 pt-4 pb-4 flex-1">
           {menuItems.map(item => {
-            const hasBadge = item.path === '/challenges' && notifCount > 0;
+            const badgeCount = badgeCountFor(item.path);
+            const hasBadge = badgeCount > 0;
             return (
               <NavLink
                 key={item.path}
@@ -117,7 +124,7 @@ const Sidebar: React.FC = () => {
                       fontSize: 9, fontWeight: 800,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       padding: '0 3px', border: '2px solid var(--q-chrome)',
-                    }}>{notifCount > 9 ? '9+' : notifCount}</span>
+                    }}>{badgeCount > 9 ? '9+' : badgeCount}</span>
                   )}
                 </span>
                 <span>{t(item.labelKey)}</span>
@@ -197,7 +204,8 @@ const Sidebar: React.FC = () => {
         }}>
           {mobileTabs.map(tab => {
             const active = isActiveTab(tab.path, tab.end);
-            const hasBadge = tab.path === '/challenges' && notifCount > 0;
+            const badgeCount = badgeCountFor(tab.path);
+            const hasBadge = badgeCount > 0;
             return (
               <NavLink
                 key={tab.path}
@@ -225,7 +233,7 @@ const Sidebar: React.FC = () => {
                       fontSize: 8, fontWeight: 800,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       padding: '0 3px',
-                    }}>{notifCount > 9 ? '9+' : notifCount}</span>
+                    }}>{badgeCount > 9 ? '9+' : badgeCount}</span>
                   )}
                 </span>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.2 }}>{t(tab.labelKey)}</span>

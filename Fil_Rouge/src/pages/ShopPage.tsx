@@ -284,9 +284,9 @@ const ShopPage: React.FC = () => {
     <div className={`px-3 py-4 md:p-6 min-h-screen ${darkMode ? 'text-white' : 'text-gray-900'}`}>
 
       {notification && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold text-sm ${notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+        <output className={`fixed top-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold text-sm ${notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
           {notification.msg}
-        </div>
+        </output>
       )}
 
       {/* Header */}

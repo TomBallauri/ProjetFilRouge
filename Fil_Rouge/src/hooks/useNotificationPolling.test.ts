@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { isGroupUnread, computeBadge, mergeKnownGroups, detectNewMessages } from './useNotificationPolling';
+import { isGroupUnread, computeBadge, computeBadgeBreakdown, mergeKnownGroups, detectNewMessages } from './useNotificationPolling';
 import type { NotifData, NotifGroup } from '../lib/store';
 
 const USER_ID = 1;
@@ -63,6 +63,22 @@ describe('computeBadge', () => {
     localStorage.setItem(`notif_seen_${USER_ID}`, JSON.stringify({ groups: { '1': 10 } }));
     const data = notifData([group({ groupId: 1, latestMessageId: 10 })]);
     expect(computeBadge(data, USER_ID)).toBe(0);
+  });
+});
+
+describe('computeBadgeBreakdown', () => {
+  it('puts friend requests in "friends" and everything else in "challenges"', () => {
+    const data = notifData([group({ groupId: 1 })], { pendingFriendRequests: 2, pendingSeriesInvites: 1 });
+    // group 1 unread (+1) => challenges = 1 (invite) + 1 (unread group) = 2
+    expect(computeBadgeBreakdown(data, USER_ID)).toEqual({ friends: 2, challenges: 2 });
+  });
+
+  it('sums to the same total as computeBadge', () => {
+    const data = notifData([group({ groupId: 1 }), group({ groupId: 2, latestMessageUserId: USER_ID })], {
+      pendingFriendRequests: 2, pendingSeriesInvites: 1,
+    });
+    const { friends, challenges } = computeBadgeBreakdown(data, USER_ID);
+    expect(friends + challenges).toBe(computeBadge(data, USER_ID));
   });
 });
 

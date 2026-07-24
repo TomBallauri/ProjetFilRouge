@@ -51,7 +51,7 @@ const NotifToastContainer: React.FC = () => {
   if (!toasts.length) return null;
 
   return (
-    <div style={{ position: 'fixed', bottom: 80, right: 16, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div role="status" aria-live="polite" style={{ position: 'fixed', bottom: 80, right: 16, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8 }}>
       {toasts.map(toast => (
         <button
           key={toast.id}

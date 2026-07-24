@@ -17,6 +17,12 @@ const readNotifToggles = (): NotifToggles => {
   catch { return DEFAULT_NOTIF_TOGGLES; }
 };
 const readReduceMotion = (): boolean => localStorage.getItem('reduceMotion') === 'true';
+// Valeur de darkMode avant réhydratation par zustand persist : si l'utilisateur a déjà fait un
+// choix, persist l'écrase de toute façon au chargement — ça ne joue donc que pour une toute
+// première visite, où on préfère respecter la préférence système plutôt que forcer le clair.
+const prefersDarkMode = (): boolean =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-color-scheme: dark)').matches;
 // Si l'utilisateur n'a jamais choisi de langue, on affiche dans les réglages celle
 // détectée par i18n.ts au démarrage, pour que le sélecteur reste cohérent avec l'UI affichée.
 const readLanguage = (): string => localStorage.getItem('appLanguage') ?? CODE_TO_LANGUAGE_NAME[detectBrowserLanguageCode()];
@@ -81,7 +87,7 @@ export const useStore = create<StoreState>()(
     (set) => ({
       user: null,
       setUser: (user) => set({ user }),
-      darkMode: false,
+      darkMode: prefersDarkMode(),
       toggleDarkMode: () => set((state) => {
         const next = !state.darkMode;
         syncSettingsToServer({ darkMode: next });

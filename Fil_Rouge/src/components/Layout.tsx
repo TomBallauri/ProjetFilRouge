@@ -1,12 +1,17 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import NotifToastContainer from './NotifToastContainer';
-import OnboardingTour from './OnboardingTour';
 import GroupChatModal from './GroupChatModal';
+
+// Lazy : embarque driver.js (~193 Ko), une lib qui ne sert qu'au tutoriel d'onboarding.
+// Monté sans condition, ça finissait dans le chunk principal pour 100% des pages vues, y
+// compris pour les utilisateurs qui ont fini l'onboarding depuis longtemps. Chargé seulement
+// quand tourOpen passe à true (voir plus bas), le coût ne retombe que sur ceux qui l'ouvrent.
+const OnboardingTour = lazy(() => import('./OnboardingTour'));
 
 const Footer: React.FC = () => {
   const { darkMode } = useStore();
@@ -20,7 +25,7 @@ const Footer: React.FC = () => {
 };
 
 const Layout: React.FC = () => {
-  const { darkMode, openTour } = useStore();
+  const { darkMode, openTour, tourOpen } = useStore();
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
@@ -45,10 +50,11 @@ const Layout: React.FC = () => {
 
   return (
     <div className={`min-h-screen flex flex-col q-bg ${darkMode ? 'dark' : ''}`} style={{ background: 'var(--q-bg)' }}>
+      <a href="#main-content" className="q-skip-link">{t('layout.skipToContent')}</a>
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main ref={mainRef} className="flex-1 min-w-0 overflow-y-auto" aria-label={t('layout.mainContent')}>
+        <main id="main-content" tabIndex={-1} ref={mainRef} className="flex-1 min-w-0 overflow-y-auto" aria-label={t('layout.mainContent')}>
           <div className="max-w-7xl mx-auto px-4 md:px-6 pt-4 md:pt-6 pb-28 md:pb-6">
             <Outlet />
           </div>
@@ -56,7 +62,11 @@ const Layout: React.FC = () => {
       </div>
       <Footer />
       <NotifToastContainer />
-      <OnboardingTour />
+      {tourOpen && (
+        <Suspense fallback={null}>
+          <OnboardingTour />
+        </Suspense>
+      )}
       <GroupChatModal />
     </div>
   );

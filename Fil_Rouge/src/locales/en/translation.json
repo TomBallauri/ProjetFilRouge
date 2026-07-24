@@ -41,7 +41,8 @@
   },
   "layout": {
     "footer": "© {{year}} ChallengeHub — All rights reserved.",
-    "mainContent": "Main content"
+    "mainContent": "Main content",
+    "skipToContent": "Skip to main content"
   },
   "navbar": {
     "globalNav": "Global navigation",

@@ -90,11 +90,17 @@ export function isGroupUnread(g: NotifData['groups'][number], myUserId: number):
 }
 
 export function computeBadge(data: NotifData, myUserId: number): number {
-  // Friend requests and invites: always actionable — count until user acts.
-  // Streak: shown in panel + toast, not in badge (amber bell is the visual cue).
-  // Group messages: use "seen" tracking — but never count your own message as unread.
+  const { friends, challenges } = computeBadgeBreakdown(data, myUserId);
+  return friends + challenges;
+}
+
+// Même décompte que computeBadge, mais scindé par onglet de nav : les demandes d'ami
+// appartiennent à "Amis", les invitations de série + messages non lus à "Défis" — sinon
+// une demande d'ami affiche son badge sur l'onglet "Défis", ce qui est trompeur (voir Sidebar).
+// Streak : affichée dans le panneau + toast, pas dans un badge de nav (la cloche ambre suffit).
+export function computeBadgeBreakdown(data: NotifData, myUserId: number): { friends: number; challenges: number } {
   const unreadGroups = data.groups.filter(g => isGroupUnread(g, myUserId)).length;
-  return data.pendingFriendRequests + data.pendingSeriesInvites + unreadGroups;
+  return { friends: data.pendingFriendRequests, challenges: data.pendingSeriesInvites + unreadGroups };
 }
 
 // Fusionne les groupes connus entre polls plutôt que de tout remplacer par le contenu du
