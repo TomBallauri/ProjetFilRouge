@@ -116,7 +116,7 @@ router.post('/api/users/me/email/request-change', emailChangeLimiter, async (req
     });
     const confirmUrl = `${FRONTEND_URL}/confirm-email-change?token=${rawToken}`;
     await mailer.sendMail({
-      from: `"U-Quail" <${process.env.GMAIL_USER}>`,
+      from: process.env.MAIL_FROM,
       to: newEmail,
       subject: 'Confirme ta nouvelle adresse email U-Quail',
       html: `<p>Tu as demandé à changer l'adresse email de ton compte U-Quail pour celle-ci.</p>

@@ -75,7 +75,7 @@ router.post('/api/auth/forgot-password', forgotPasswordLimiter, async (req, res)
 
     const resetUrl = `${FRONTEND_URL}/reset-password?token=${rawToken}`;
     await mailer.sendMail({
-      from: `"U-Quail" <${process.env.GMAIL_USER}>`,
+      from: process.env.MAIL_FROM,
       to: email,
       subject: 'Réinitialise ton mot de passe U-Quail',
       html: `<p>Tu as demandé à réinitialiser ton mot de passe.</p>
