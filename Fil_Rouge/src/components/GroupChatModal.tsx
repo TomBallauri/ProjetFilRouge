@@ -4,18 +4,19 @@ import { useStore } from '../lib/store';
 import { useVisibilityPausedInterval } from '../hooks/useVisibilityPausedInterval';
 import { MessageCircle, X, Send, Loader2 } from 'lucide-react';
 import UserAvatar from './UserAvatar';
+import type { EquippedCosmetic } from '../lib/cosmetics';
 
 type Member = {
   id: number; groupId: number; userId: number; status: string;
-  user: { id: number; username: string; avatar?: string };
+  user: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] };
 };
 type Msg = {
   id: number; groupId: number; userId: number; content: string; createdAt: string;
-  user: { id: number; username: string; avatar?: string };
+  user: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] };
 };
 type GroupData = {
   id: number; seriesName: string; createdBy: number;
-  creator: { id: number; username: string; avatar?: string };
+  creator: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] };
   members: Member[];
   messages: Msg[];
 };
@@ -207,7 +208,7 @@ const GroupChatModal: React.FC = () => {
                 const isMe = msg.userId === user?.id;
                 return (
                   <div key={msg.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexDirection: isMe ? 'row-reverse' : 'row', opacity: msg.id < 0 ? 0.6 : 1 }}>
-                    {!isMe && <UserAvatar avatar={msg.user.avatar} username={msg.user.username} cosmetics={[]} size="sm" />}
+                    {!isMe && <UserAvatar avatar={msg.user.avatar} username={msg.user.username} cosmetics={msg.user.cosmetics ?? []} size="sm" />}
                     <div style={{ maxWidth: '72%' }}>
                       {!isMe && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--q-text3)', marginBottom: 3 }}>{msg.user.username}</div>}
                       <div style={{

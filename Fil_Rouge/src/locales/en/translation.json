@@ -4,6 +4,7 @@
     "close": "Close",
     "cancel": "Cancel",
     "save": "Save",
+    "delete": "Delete",
     "clear": "Clear",
     "back": "Back",
     "open": "Open",
@@ -40,7 +41,7 @@
     }
   },
   "layout": {
-    "footer": "© {{year}} ChallengeHub — All rights reserved.",
+    "footer": "© {{year}} U-Quail — All rights reserved.",
     "mainContent": "Main content",
     "skipToContent": "Skip to main content"
   },
@@ -203,7 +204,28 @@
     "creating": "Creating...",
     "publishMultiple": "Publish {{count}} challenges",
     "publishSingle": "Publish challenge",
-    "createPrivate": "Create privately"
+    "createPrivate": "Create privately",
+    "confirmTitle": "Confirm creation",
+    "confirmBodySingle": "Create this challenge?",
+    "confirmBodyMultiple": "Create these {{count}} challenges?",
+    "confirmButton": "Confirm"
+  },
+  "editChallenge": {
+    "title": "Edit challenge",
+    "titleLabel": "Title",
+    "descriptionLabel": "Description",
+    "categoryLabel": "Category",
+    "difficultyLabel": "Difficulty",
+    "isPublicLabel": "Visible to everyone",
+    "save": "Save",
+    "success": "Challenge updated.",
+    "error": "Error updating the challenge.",
+    "editButtonLabel": "Edit this challenge",
+    "deleteButtonLabel": "Delete this challenge",
+    "deleteConfirmTitle": "Delete this challenge?",
+    "deleteConfirmBody": "\"{{title}}\" will be permanently deleted. This action cannot be undone.",
+    "deleteSuccess": "Challenge deleted.",
+    "deleteError": "Error deleting the challenge."
   },
   "userProfile": {
     "notFound": "User not found",
@@ -343,7 +365,10 @@
     "noItems": "No items available.",
     "missingCoins": "You're missing {{amount}} coins!",
     "error": "Error",
-    "purchased": "\"{{name}}\" purchased! -{{price}} 🪙",
+    "purchaseConfirmed": "Purchase confirmed!",
+    "confirmBuyTitle": "Confirm purchase",
+    "confirmBuyBody": "Buy \"{{name}}\" for {{price}} coins?",
+    "confirmBuyButton": "Buy",
     "type": {
       "AVATAR_FRAME": "Avatar frame",
       "BANNER": "Banner",
@@ -379,7 +404,14 @@
     "createPrivateCount_one": "Create privately · {{count}} challenge",
     "createPrivateCount_other": "Create privately · {{count}} challenges",
     "placeholderSelection": "Tweak the plan, ask for adjustments...",
-    "placeholderChat": "Describe your goal..."
+    "placeholderChat": "Describe your goal...",
+    "confirmTitle": "Confirm creation",
+    "confirmBody_one": "Create this challenge?",
+    "confirmBody_other": "Create these {{count}} challenges?",
+    "confirmButton": "Confirm",
+    "editChallenge": "Edit this challenge",
+    "seriesNameLabel": "Series name",
+    "seriesNamePlaceholder": "E.g: 30-day sport challenge"
   },
   "friends": {
     "confirmRemove": "Remove {{username}} from your friends?",
@@ -626,7 +658,9 @@
       "noMessagesYet": "No messages yet. Be the first!",
       "writeMessagePlaceholder": "Write a message…",
       "done": "Done",
-      "start": "Start"
+      "start": "Start",
+      "unlocksIn_one": "Unlocks tomorrow",
+      "unlocksIn_other": "Unlocks in {{count}} days"
     },
     "groupCard": {
       "invitedYouText": "{{username}} invites you to this group challenge",

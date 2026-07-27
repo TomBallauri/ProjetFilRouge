@@ -15,16 +15,15 @@ function resolveUrl(url?: string): string {
   return url ?? '';
 }
 
-type Size = 'xs' | 'sm' | 'md' | 'xl' | 'lg';
+type Size = 'xs' | 'sm' | 'md' | 'xl' | 'lg' | '2xl';
 
-// frameInset: how many px the avatar shrinks inward to leave room for the frame image.
-// The frame fills the full outer div — no negative insets, no overflow issues.
-const SIZE_MAP: Record<Size, { box: string; text: string; frameInset: number }> = {
-  xs: { box: 'w-7 h-7',   text: 'text-[10px]', frameInset: 2 },
-  sm: { box: 'w-8 h-8',   text: 'text-xs', frameInset: 3 },
-  md: { box: 'w-10 h-10', text: 'text-sm', frameInset: 3 },
-  xl: { box: 'w-14 h-14', text: 'text-lg', frameInset: 4 },
-  lg: { box: 'w-16 h-16', text: 'text-xl', frameInset: 5 },
+const SIZE_MAP: Record<Size, { box: string; text: string }> = {
+  xs:  { box: 'w-7 h-7',   text: 'text-[10px]' },
+  sm:  { box: 'w-8 h-8',   text: 'text-xs' },
+  md:  { box: 'w-10 h-10', text: 'text-sm' },
+  xl:  { box: 'w-14 h-14', text: 'text-lg' },
+  lg:  { box: 'w-16 h-16', text: 'text-xl' },
+  '2xl': { box: 'w-20 h-20', text: 'text-2xl' },
 };
 
 type Props = {
@@ -47,18 +46,11 @@ const UserAvatar: React.FC<Props> = ({
   if (hasImageFrame) ringClass = '';
 
   const avatarUrl = resolveUrl(avatar);
-  const { box, text, frameInset } = SIZE_MAP[size];
-
-  // When a frame image is equipped, shrink the avatar inward so the frame
-  // fits entirely within the outer div — no overflow, no cropping.
-  const avatarInset = hasImageFrame ? frameInset : 0;
+  const { box, text } = SIZE_MAP[size];
 
   return (
     <div className={`relative flex-shrink-0 ${box} rounded-full ${ringClass} ${className}`}>
-      <div
-        className="absolute rounded-full overflow-hidden bg-gray-300"
-        style={{ inset: `${avatarInset}px` }}
-      >
+      <div className="absolute inset-0 rounded-full overflow-hidden bg-gray-300">
         {avatarUrl
           ? <img src={avatarUrl} alt={username} className="w-full h-full object-cover" />
           : <div className={`w-full h-full flex items-center justify-center font-bold ${text} text-gray-600`}>

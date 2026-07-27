@@ -1,4 +1,5 @@
 import { prisma } from './prisma.js';
+import { USER_MINI_SELECT } from './userUtils.js';
 
 // Guard : renvoie false si le client Prisma n'a pas encore été régénéré
 export const seriesGroupReady = () => !!prisma.seriesGroup;
@@ -22,9 +23,9 @@ export async function expireStaleInvites() {
 // Pour le listing (pas de messages — chargés séparément à l'ouverture du chat)
 export const GROUP_LIST_INCLUDE = {
   challenge: { select: { id: true, title: true, description: true, difficulty: true, category: true, coinReward: true, xpReward: true } },
-  creator: { select: { id: true, username: true, avatar: true } },
+  creator: { select: USER_MINI_SELECT },
   members: {
-    include: { user: { select: { id: true, username: true, avatar: true } } },
+    include: { user: { select: USER_MINI_SELECT } },
     orderBy: { invitedAt: 'asc' }
   },
 };
@@ -32,7 +33,7 @@ export const GROUP_LIST_INCLUDE = {
 export const GROUP_INCLUDE = {
   ...GROUP_LIST_INCLUDE,
   messages: {
-    include: { user: { select: { id: true, username: true, avatar: true } } },
+    include: { user: { select: USER_MINI_SELECT } },
     orderBy: { createdAt: 'asc' },
     take: 50
   }

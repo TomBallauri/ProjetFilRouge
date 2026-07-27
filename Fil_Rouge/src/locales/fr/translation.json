@@ -4,6 +4,7 @@
     "close": "Fermer",
     "cancel": "Annuler",
     "save": "Enregistrer",
+    "delete": "Supprimer",
     "clear": "Effacer",
     "back": "Retour",
     "open": "Ouvrir",
@@ -203,7 +204,28 @@
     "creating": "Création...",
     "publishMultiple": "Publier {{count}} défis",
     "publishSingle": "Publier le défi",
-    "createPrivate": "Créer en privé"
+    "createPrivate": "Créer en privé",
+    "confirmTitle": "Confirmer la création",
+    "confirmBodySingle": "Créer ce défi ?",
+    "confirmBodyMultiple": "Créer ces {{count}} défis ?",
+    "confirmButton": "Confirmer"
+  },
+  "editChallenge": {
+    "title": "Modifier le défi",
+    "titleLabel": "Titre",
+    "descriptionLabel": "Description",
+    "categoryLabel": "Catégorie",
+    "difficultyLabel": "Difficulté",
+    "isPublicLabel": "Visible par tous",
+    "save": "Enregistrer",
+    "success": "Défi mis à jour.",
+    "error": "Erreur lors de la modification du défi.",
+    "editButtonLabel": "Modifier ce défi",
+    "deleteButtonLabel": "Supprimer ce défi",
+    "deleteConfirmTitle": "Supprimer ce défi ?",
+    "deleteConfirmBody": "\"{{title}}\" sera définitivement supprimé. Cette action est irréversible.",
+    "deleteSuccess": "Défi supprimé.",
+    "deleteError": "Erreur lors de la suppression du défi."
   },
   "userProfile": {
     "notFound": "Utilisateur introuvable",
@@ -343,7 +365,10 @@
     "noItems": "Aucun article disponible.",
     "missingCoins": "Il te manque {{amount}} coins !",
     "error": "Erreur",
-    "purchased": "\"{{name}}\" acheté ! -{{price}} 🪙",
+    "purchaseConfirmed": "Achat validé !",
+    "confirmBuyTitle": "Confirmer l'achat",
+    "confirmBuyBody": "Acheter \"{{name}}\" pour {{price}} coins ?",
+    "confirmBuyButton": "Acheter",
     "type": {
       "AVATAR_FRAME": "Cadre d'avatar",
       "BANNER": "Bannière",
@@ -379,7 +404,14 @@
     "createPrivateCount_one": "Créer en privé · {{count}} défi",
     "createPrivateCount_other": "Créer en privé · {{count}} défis",
     "placeholderSelection": "Modifie le plan, demande des ajustements...",
-    "placeholderChat": "Décris ton objectif..."
+    "placeholderChat": "Décris ton objectif...",
+    "confirmTitle": "Confirmer la création",
+    "confirmBody_one": "Créer ce défi ?",
+    "confirmBody_other": "Créer ces {{count}} défis ?",
+    "confirmButton": "Confirmer",
+    "editChallenge": "Modifier ce défi",
+    "seriesNameLabel": "Nom de la série",
+    "seriesNamePlaceholder": "Ex: Challenge 30 jours de sport"
   },
   "friends": {
     "confirmRemove": "Retirer {{username}} de tes amis ?",
@@ -626,7 +658,9 @@
       "noMessagesYet": "Aucun message pour l'instant. Soyez les premiers !",
       "writeMessagePlaceholder": "Écrire un message…",
       "done": "Terminé",
-      "start": "Commencer"
+      "start": "Commencer",
+      "unlocksIn_one": "Se débloque demain",
+      "unlocksIn_other": "Se débloque dans {{count}} jours"
     },
     "groupCard": {
       "invitedYouText": "{{username}} t'invite à ce défi en groupe",

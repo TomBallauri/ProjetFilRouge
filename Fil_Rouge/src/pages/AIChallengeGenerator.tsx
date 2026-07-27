@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Sparkles, Check, Trophy, ChevronDown, ChevronUp, Globe, Lock, CircleDollarSign, Zap } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Check, Trophy, ChevronDown, ChevronUp, Globe, Lock, CircleDollarSign, Zap, Pencil } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -109,6 +109,7 @@ interface SendMessageParams {
   loading: boolean;
   messages: Message[];
   phase: 'chat' | 'selection';
+  lang: string;
   t: TFunc;
   setInput: React.Dispatch<React.SetStateAction<string>>;
   setError: React.Dispatch<React.SetStateAction<string>>;
@@ -124,7 +125,7 @@ interface SendMessageParams {
 
 async function sendChatMessage(params: SendMessageParams): Promise<void> {
   const {
-    input, loading, messages, phase, t,
+    input, loading, messages, phase, lang, t,
     setInput, setError, setMessages, setLoading,
     setChallenges, setSelected, setPhase, setPanelOpen, setExpandedCards, inputRef,
   } = params;
@@ -143,10 +144,15 @@ async function sendChatMessage(params: SendMessageParams): Promise<void> {
     const res = await fetch('/api/challenges/ai-generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ history: newMessages }),
+      body: JSON.stringify({ history: newMessages, lang }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    // Un vrai refus serveur (quota IA par utilisateur, ou limite globale Groq partagée par tous
+    // les utilisateurs) renvoie déjà un message précis — l'afficher tel quel plutôt que le message
+    // générique de connexion, sinon l'utilisateur ne sait jamais qu'il suffit de réessayer dans
+    // quelques instants. Un vrai souci réseau (fetch qui rejette, JSON invalide) tombe lui dans le
+    // catch générique ci-dessous, où le message générique reste approprié.
+    if (!res.ok) { setError(data.error || t('aiGenerator.connectionError')); return; }
 
     if (data.type === 'question' && data.content) {
       setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
@@ -180,8 +186,9 @@ async function sendChatMessage(params: SendMessageParams): Promise<void> {
 interface SaveSelectedParams {
   selected: Set<number>;
   challenges: GeneratedChallenge[];
-  messages: Message[];
+  seriesName: string;
   isPublic: boolean;
+  lang: string;
   t: TFunc;
   navigate: NavigateFn;
   setSaving: React.Dispatch<React.SetStateAction<boolean>>;
@@ -189,19 +196,20 @@ interface SaveSelectedParams {
 }
 
 async function saveSelectedChallenges(params: SaveSelectedParams): Promise<void> {
-  const { selected, challenges, messages, isPublic, t, navigate, setSaving, setError } = params;
+  const { selected, challenges, seriesName, isPublic, lang, t, navigate, setSaving, setError } = params;
   if (selected.size === 0) return;
   setSaving(true);
   setError('');
   try {
     const token = localStorage.getItem('token');
     const toSave = challenges.filter((_, i) => selected.has(i)).map(c => ({ ...c, isPublic }));
-    const firstUserMsg = messages.find(m => m.role === 'user')?.content ?? '';
-    const seriesName = toSave.length > 1 ? firstUserMsg.slice(0, 60).trim() || undefined : undefined;
+    // Le nom de série (déjà pré-rempli à partir du 1er message, mais modifiable par
+    // l'utilisateur — voir SelectionPanel) ne s'applique qu'à un vrai programme multi-jours.
+    const resolvedSeriesName = toSave.length > 1 ? (seriesName.trim() || undefined) : undefined;
     const res = await fetch('/api/challenges/bulk-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ challenges: toSave, ...(seriesName ? { seriesName } : {}) }),
+      body: JSON.stringify({ challenges: toSave, lang, ...(resolvedSeriesName ? { seriesName: resolvedSeriesName } : {}) }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -330,7 +338,7 @@ function MessagesList({ extraPb, messages, loading, darkMode, theme, t, suggesti
   );
 }
 
-function ChallengeCard({ challenge, index, darkMode, isSelected, isExpanded, t, onToggleSelect, onToggleExpand }: {
+function ChallengeCard({ challenge, index, darkMode, isSelected, isExpanded, t, onToggleSelect, onToggleExpand, onEdit }: {
   challenge: GeneratedChallenge;
   index: number;
   darkMode: boolean;
@@ -339,9 +347,27 @@ function ChallengeCard({ challenge, index, darkMode, isSelected, isExpanded, t, 
   t: TFunc;
   onToggleSelect: (i: number) => void;
   onToggleExpand: (i: number) => void;
+  onEdit: (i: number, updates: Partial<GeneratedChallenge>) => void;
 }) {
   const diff = DIFFICULTY_STYLES[challenge.difficulty] ?? DIFFICULTY_STYLES.EASY;
   const diffLabel = t(`common.difficulty.${challenge.difficulty.toLowerCase()}`);
+  const [editing, setEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(challenge.title);
+  const [descDraft, setDescDraft] = useState(challenge.description);
+  const inputClass = `w-full px-2 py-1.5 rounded-lg text-xs border ${darkMode ? 'bg-gray-900/60 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`;
+
+  const startEditing = () => {
+    setTitleDraft(challenge.title);
+    setDescDraft(challenge.description);
+    setEditing(true);
+  };
+  const saveEdit = () => {
+    const title = titleDraft.trim();
+    const description = descDraft.trim();
+    if (title) onEdit(index, { title, description: description || challenge.description });
+    setEditing(false);
+  };
+
   return (
     <div className={`rounded-xl border transition-all ${getCardBorderClasses(isSelected, diff, darkMode)}`}>
       <div className="flex gap-3 items-center px-3 py-2.5 cursor-pointer" onClick={() => onToggleSelect(index)}>
@@ -362,8 +388,31 @@ function ChallengeCard({ challenge, index, darkMode, isSelected, isExpanded, t, 
       </div>
       {isExpanded && (
         <div className={`px-3 pb-3 border-t ${darkMode ? 'border-gray-700/60' : 'border-gray-200/60'}`}>
-          <p className={`text-xs leading-relaxed pt-2 mb-1.5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{challenge.description}</p>
-          <p className={`text-xs font-semibold flex items-center gap-1 ${diff.text}`}><CircleDollarSign size={11} aria-hidden="true" /> {t('createChallenge.coinsAmount', { count: diff.coins })} <span style={{ opacity: 0.5 }}>·</span> <Zap size={11} aria-hidden="true" /> {diff.xp} XP</p>
+          {editing ? (
+            <div className="pt-2 space-y-1.5" onClick={e => e.stopPropagation()}>
+              <input value={titleDraft} onChange={e => setTitleDraft(e.target.value)} maxLength={80} className={inputClass} />
+              <textarea value={descDraft} onChange={e => setDescDraft(e.target.value)} maxLength={500} rows={3} className={`${inputClass} resize-none`} />
+              <div className="flex gap-2 pt-0.5">
+                <button onClick={() => setEditing(false)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                  {t('common.cancel')}
+                </button>
+                <button onClick={saveEdit} disabled={!titleDraft.trim()} className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white disabled:opacity-50">
+                  {t('common.save')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-2 pt-2 mb-1.5">
+                <p className={`text-xs leading-relaxed flex-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{challenge.description}</p>
+                <button onClick={e => { e.stopPropagation(); startEditing(); }} aria-label={t('aiGenerator.editChallenge')}
+                  className={`shrink-0 p-1 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}>
+                  <Pencil size={12} aria-hidden="true" />
+                </button>
+              </div>
+              <p className={`text-xs font-semibold flex items-center gap-1 ${diff.text}`}><CircleDollarSign size={11} aria-hidden="true" /> {t('createChallenge.coinsAmount', { count: diff.coins })} <span style={{ opacity: 0.5 }}>·</span> <Zap size={11} aria-hidden="true" /> {diff.xp} XP</p>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -400,7 +449,8 @@ function VisibilityToggle({ isPublic, darkMode, theme, t, onToggle }: {
 
 function SelectionPanel({
   darkMode, theme, t, panelOpen, setPanelOpen, challenges, selected, expandedCards,
-  onToggleSelect, onToggleExpand, onToggleAll, isPublic, onToggleVisibility,
+  onToggleSelect, onToggleExpand, onToggleAll, onEditChallenge,
+  seriesNameValue, onChangeSeriesName, isPublic, onToggleVisibility,
   error, saving, onSave,
 }: {
   darkMode: boolean;
@@ -414,6 +464,9 @@ function SelectionPanel({
   onToggleSelect: (i: number) => void;
   onToggleExpand: (i: number) => void;
   onToggleAll: () => void;
+  onEditChallenge: (i: number, updates: Partial<GeneratedChallenge>) => void;
+  seriesNameValue: string;
+  onChangeSeriesName: (name: string) => void;
   isPublic: boolean;
   onToggleVisibility: () => void;
   error: string;
@@ -442,6 +495,17 @@ function SelectionPanel({
         </div>
       </button>
 
+      {panelOpen && challenges.length > 1 && (
+        <div className="px-3 pb-1.5">
+          <label className={`block text-xs font-semibold mb-1 ${theme.textMuted}`} htmlFor="ai-series-name">
+            {t('aiGenerator.seriesNameLabel')}
+          </label>
+          <input id="ai-series-name" value={seriesNameValue} onChange={e => onChangeSeriesName(e.target.value)}
+            maxLength={80} placeholder={t('aiGenerator.seriesNamePlaceholder')}
+            className={`w-full px-3 py-2 rounded-xl text-sm border ${darkMode ? 'bg-gray-900/60 border-gray-600 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`} />
+        </div>
+      )}
+
       {panelOpen && (
         <div className="overflow-y-auto max-h-[32vh] px-3 pb-1 space-y-1.5">
           {challenges.map((ch, i) => (
@@ -455,6 +519,7 @@ function SelectionPanel({
               t={t}
               onToggleSelect={onToggleSelect}
               onToggleExpand={onToggleExpand}
+              onEdit={onEditChallenge}
             />
           ))}
         </div>
@@ -515,7 +580,7 @@ function InputBar({ darkMode, theme, phase, error, input, setInput, inputRef, on
 }
 
 const AIChallengeGenerator: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, darkMode } = useStore();
   const navigate = useNavigate();
 
@@ -529,7 +594,11 @@ const AIChallengeGenerator: React.FC = () => {
   const [error, setError] = useState('');
   const [panelOpen, setPanelOpen] = useState(true);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
+  // null = pas encore modifié par l'utilisateur → on retombe sur le nom dérivé du 1er message
+  // (voir seriesNameValue ci-dessous). Une fois qu'il tape quelque chose, son texte prime.
+  const [seriesNameOverride, setSeriesNameOverride] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -549,7 +618,7 @@ const AIChallengeGenerator: React.FC = () => {
   const theme = getTheme(darkMode);
 
   const sendMessage = () => sendChatMessage({
-    input, loading, messages, phase, t,
+    input, loading, messages, phase, lang: i18n.language, t,
     setInput, setError, setMessages, setLoading,
     setChallenges, setSelected, setPhase, setPanelOpen, setExpandedCards, inputRef,
   });
@@ -562,9 +631,25 @@ const AIChallengeGenerator: React.FC = () => {
     setSelected(selected.size === challenges.length ? new Set() : new Set(challenges.map((_, i) => i)));
   };
 
-  const saveSelected = () => saveSelectedChallenges({
-    selected, challenges, messages, isPublic, t, navigate, setSaving, setError,
-  });
+  // Permet à l'utilisateur de corriger le titre/la description proposés par l'IA avant de
+  // publier, sans avoir à repasser par le tchat pour redemander une reformulation.
+  const editChallenge = (i: number, updates: Partial<GeneratedChallenge>) =>
+    setChallenges(prev => prev.map((c, idx) => idx === i ? { ...c, ...updates } : c));
+
+  // Nom de série pré-rempli à partir du 1er message (même dérivation que l'ancien calcul dans
+  // saveSelectedChallenges), mais modifiable — voir seriesNameOverride.
+  const defaultSeriesName = (messages.find(m => m.role === 'user')?.content ?? '').slice(0, 60).trim();
+  const seriesNameValue = seriesNameOverride ?? defaultSeriesName;
+
+  const saveSelected = () => {
+    if (selected.size === 0) return;
+    setShowSaveConfirm(true);
+  };
+
+  const confirmSave = () => {
+    setShowSaveConfirm(false);
+    saveSelectedChallenges({ selected, challenges, seriesName: seriesNameValue, isPublic, lang: i18n.language, t, navigate, setSaving, setError });
+  };
 
   const handleSuggestionClick = (key: string) => {
     setInput(t(`aiGenerator.suggestions.${key}`));
@@ -601,6 +686,8 @@ const AIChallengeGenerator: React.FC = () => {
               panelOpen={panelOpen} setPanelOpen={setPanelOpen}
               challenges={challenges} selected={selected} expandedCards={expandedCards}
               onToggleSelect={toggleSelect} onToggleExpand={toggleExpand} onToggleAll={toggleAll}
+              onEditChallenge={editChallenge}
+              seriesNameValue={seriesNameValue} onChangeSeriesName={setSeriesNameOverride}
               isPublic={isPublic} onToggleVisibility={() => setIsPublic(p => !p)}
               error={error} saving={saving} onSave={saveSelected}
             />
@@ -628,6 +715,8 @@ const AIChallengeGenerator: React.FC = () => {
               panelOpen={panelOpen} setPanelOpen={setPanelOpen}
               challenges={challenges} selected={selected} expandedCards={expandedCards}
               onToggleSelect={toggleSelect} onToggleExpand={toggleExpand} onToggleAll={toggleAll}
+              onEditChallenge={editChallenge}
+              seriesNameValue={seriesNameValue} onChangeSeriesName={setSeriesNameOverride}
               isPublic={isPublic} onToggleVisibility={() => setIsPublic(p => !p)}
               error={error} saving={saving} onSave={saveSelected}
             />
@@ -638,6 +727,39 @@ const AIChallengeGenerator: React.FC = () => {
         </div>
       </div>
 
+      {showSaveConfirm && (
+        <div role="dialog" aria-modal="true" aria-label={t('aiGenerator.confirmTitle')} style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }} onClick={() => setShowSaveConfirm(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--q-chrome)', borderRadius: 24,
+            border: '1px solid var(--q-line)',
+            padding: '28px 24px', maxWidth: 320, width: '100%', textAlign: 'center',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--q-accent-soft)', border: '1.5px solid var(--q-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Trophy size={22} style={{ color: 'var(--q-accent)' }} aria-hidden="true" />
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--q-text)', marginBottom: 8 }}>{t('aiGenerator.confirmTitle')}</div>
+            <div style={{ fontSize: 13, color: 'var(--q-text2)', marginBottom: 24, lineHeight: 1.5 }}>
+              {t('aiGenerator.confirmBody', { count: selected.size })}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={() => setShowSaveConfirm(false)} style={{
+                flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
+                background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}>{t('common.cancel')}</button>
+              <button type="button" onClick={confirmSave} disabled={saving} style={{
+                flex: 1, padding: '12px', borderRadius: 12, border: 'none',
+                background: 'var(--q-accent)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                opacity: saving ? 0.6 : 1,
+              }}>{saving ? '…' : t('aiGenerator.confirmButton')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

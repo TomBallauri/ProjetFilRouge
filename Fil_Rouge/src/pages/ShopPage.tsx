@@ -7,6 +7,7 @@ import type { LucideIcon } from 'lucide-react';
 import BackButton from '../components/BackButton';
 import { usePageTitle } from '../hooks/usePageTitle';
 import PageLoader from '../components/PageLoader';
+import AnimatedCoins from '../components/AnimatedCoins';
 import { FRAME_CLASSES, BANNER_CLASSES, TITLE_CLASSES } from '../lib/cosmetics';
 import type { User } from '../types/User';
 
@@ -196,6 +197,7 @@ const ShopPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [buyLoading, setBuyLoading] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [confirmBuyTarget, setConfirmBuyTarget] = useState<Cosmetic | null>(null);
 
   const token = localStorage.getItem('token');
 
@@ -225,9 +227,16 @@ const ShopPage: React.FC = () => {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  const handleBuy = async (c: Cosmetic) => {
+  const handleBuy = (c: Cosmetic) => {
     if (!user) { navigate('/login'); return; }
     if ((user.coins ?? 0) < c.price) { showNotif(t('shop.missingCoins', { amount: c.price - (user.coins ?? 0) }), 'error'); return; }
+    setConfirmBuyTarget(c);
+  };
+
+  const confirmBuy = async () => {
+    const c = confirmBuyTarget;
+    if (!c || buyLoading !== null) return;
+    setConfirmBuyTarget(null);
     setBuyLoading(c.id);
     try {
       const res = await fetch(`/api/cosmetics/${c.id}/buy`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
@@ -235,7 +244,7 @@ const ShopPage: React.FC = () => {
       if (!res.ok) { showNotif(data.error || t('shop.error'), 'error'); return; }
       if (data.user) setUser(data.user);
       await fetchOwned();
-      showNotif(t('shop.purchased', { name: c.name, price: c.price }), 'success');
+      showNotif(t('shop.purchaseConfirmed'), 'success');
     } finally { setBuyLoading(null); }
   };
 
@@ -289,6 +298,42 @@ const ShopPage: React.FC = () => {
         </output>
       )}
 
+      {confirmBuyTarget && (
+        <div role="dialog" aria-modal="true" aria-label={t('shop.confirmBuyTitle')} style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }} onClick={() => setConfirmBuyTarget(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--q-chrome)', borderRadius: 24,
+            border: '1px solid var(--q-line)',
+            padding: '28px 24px', maxWidth: 320, width: '100%', textAlign: 'center',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(250,204,21,0.15)', border: '1.5px solid rgba(250,204,21,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <CircleDollarSign size={22} style={{ color: '#FACC15' }} aria-hidden="true" />
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--q-text)', marginBottom: 8 }}>{t('shop.confirmBuyTitle')}</div>
+            <div style={{ fontSize: 13, color: 'var(--q-text2)', marginBottom: 24, lineHeight: 1.5 }}>
+              {t('shop.confirmBuyBody', { name: confirmBuyTarget.name, price: confirmBuyTarget.price })}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={() => setConfirmBuyTarget(null)} disabled={buyLoading !== null} style={{
+                flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
+                background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                opacity: buyLoading !== null ? 0.6 : 1,
+              }}>{t('common.cancel')}</button>
+              <button type="button" onClick={confirmBuy} disabled={buyLoading !== null} style={{
+                flex: 1, padding: '12px', borderRadius: 12, border: 'none',
+                background: 'linear-gradient(135deg,#FACC15,#FB923C)',
+                color: '#1F2937', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                opacity: buyLoading !== null ? 0.6 : 1,
+              }}>{buyLoading !== null ? '…' : t('shop.confirmBuyButton')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -310,7 +355,7 @@ const ShopPage: React.FC = () => {
             padding: '7px 12px', borderRadius: 999, fontWeight: 700, fontSize: 13,
             fontVariantNumeric: 'tabular-nums',
             boxShadow: '0 4px 12px rgba(251,146,60,0.40)' }}>
-            <CircleDollarSign size={14} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString(i18n.language)}
+            <CircleDollarSign size={14} aria-hidden="true" /> <AnimatedCoins value={user.coins ?? 0} />
           </div>
         )}
       </div>

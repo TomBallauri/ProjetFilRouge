@@ -6,23 +6,25 @@ import { UserPlus, Check, X, Users, Trophy, Flame, Search, Clock, AlertTriangle 
 import UserAvatar from '../components/UserAvatar';
 import BackButton from '../components/BackButton';
 import PageLoader from '../components/PageLoader';
+import type { EquippedCosmetic } from '../lib/cosmetics';
 
 type Friend = {
   friendshipId: number;
   since: string;
-  user: { id: number; username: string; avatar?: string; level: number; xp: number };
+  user: { id: number; username: string; avatar?: string; level: number; xp: number; cosmetics?: EquippedCosmetic[] };
 };
 
 type FriendRequest = {
   id: number;
   createdAt: string;
-  sender: { id: number; username: string; avatar?: string; level: number };
+  sender: { id: number; username: string; avatar?: string; level: number; cosmetics?: EquippedCosmetic[] };
 };
 
 type SearchUser = {
   id: number;
   username: string;
   avatar?: string;
+  cosmetics?: EquippedCosmetic[];
   level: number;
   xp: number;
   currentStreak: number;
@@ -201,7 +203,7 @@ const FriendsPage: React.FC = () => {
           <button onClick={() => navigate(`/user/${f.id}`)}
             style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
               background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
-            <UserAvatar avatar={f.avatar} username={f.username} cosmetics={[]} size="sm" />
+            <UserAvatar avatar={f.avatar} username={f.username} cosmetics={f.cosmetics ?? []} size="sm" />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--q-text)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -245,7 +247,7 @@ const FriendsPage: React.FC = () => {
           <button onClick={() => navigate(`/user/${req.sender.id}`)}
             style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
               background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
-            <UserAvatar avatar={req.sender.avatar} username={req.sender.username} cosmetics={[]} size="sm" />
+            <UserAvatar avatar={req.sender.avatar} username={req.sender.username} cosmetics={req.sender.cosmetics ?? []} size="sm" />
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--q-text)' }}>{req.sender.username}</div>
               <div style={{ fontSize: 11, color: 'var(--q-text2)', marginTop: 2 }}>
@@ -385,7 +387,7 @@ const FriendsPage: React.FC = () => {
                     <button onClick={() => navigate(`/user/${u.id}`)}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
                         background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
-                      <UserAvatar avatar={u.avatar} username={u.username} cosmetics={[]} size="sm" />
+                      <UserAvatar avatar={u.avatar} username={u.username} cosmetics={u.cosmetics ?? []} size="sm" />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--q-text)',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

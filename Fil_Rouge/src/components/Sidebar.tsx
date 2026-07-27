@@ -54,12 +54,17 @@ const Sidebar: React.FC = () => {
     path === '/friends' ? badgeCounts.friends : path === '/challenges' ? badgeCounts.challenges : 0;
 
   useEffect(() => {
+    // Le token est nécessaire pour que le backend écarte les défis déjà complétés par CET
+    // utilisateur (sinon la suggestion peut retomber sur un défi déjà fait — voir challenges.routes.js).
+    const token = localStorage.getItem('token');
     const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
-    fetch(`/api/challenges/daily-suggestion${langParam}`)
+    fetch(`/api/challenges/daily-suggestion${langParam}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then(r => r.ok ? r.json() : null)
       .then(data => setDailyChallenge(data))
       .catch(() => {});
-  }, [i18n.language]);
+  }, [i18n.language, user?.id]);
 
   const menuItems: TabItem[] = [
     { path: '/',            labelKey: 'sidebar.home',        icon: <Home size={20} />,         end: true },

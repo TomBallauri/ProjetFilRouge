@@ -10,7 +10,7 @@ const DEEPL_URL = DEEPL_KEY?.endsWith(':fx')
 // erreur visible côté client (juste du contenu resté en français), donc sans ce log il n'y a
 // aucun moyen de diagnostiquer le problème depuis les logs serveur (ex: clé absente sur
 // l'environnement de prod, quota DeepL dépassé...).
-export async function translateTexts(texts, targetLang = 'EN') {
+export async function translateTexts(texts, targetLang = 'EN', sourceLang = 'FR') {
   if (!DEEPL_KEY) {
     console.error('[translateTexts] DEEPL_API_KEY manquante — traduction ignorée, repli sur le texte source.');
     return null;
@@ -19,7 +19,7 @@ export async function translateTexts(texts, targetLang = 'EN') {
     const res = await fetch(DEEPL_URL, {
       method: 'POST',
       headers: { Authorization: `DeepL-Auth-Key ${DEEPL_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: texts, target_lang: targetLang, source_lang: 'FR' }),
+      body: JSON.stringify({ text: texts, target_lang: targetLang, source_lang: sourceLang }),
     });
     if (!res.ok) {
       console.error(`[translateTexts] Échec DeepL (HTTP ${res.status}) — repli sur le texte source.`);

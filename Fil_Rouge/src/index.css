@@ -211,6 +211,18 @@ body {
 }
 .q-focus-flash { animation: q-focus-flash 1.4s ease-out 2; border-radius: inherit; }
 
+/* +N/-N flottant au-dessus du solde de pièces (voir AnimatedCoins.tsx) — monte légèrement puis
+   s'efface, pour rendre visible une variation qu'un simple changement de chiffre pourrait
+   laisser passer inaperçu. Le centrage horizontal (-50%) est géré ici, pas en style inline, car
+   l'animation remplace entièrement `transform` pendant qu'elle tourne. */
+@keyframes q-coin-delta {
+  0%   { opacity: 0; transform: translate(-50%, 4px); }
+  15%  { opacity: 1; transform: translate(-50%, 0); }
+  75%  { opacity: 1; transform: translate(-50%, -6px); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+.q-coin-delta { animation: q-coin-delta 1.2s ease-out both; }
+
 /* Lien "aller au contenu" — hors écran tant qu'il n'a pas le focus clavier (Tab depuis le
    haut de page), pour ne pas obliger un utilisateur clavier à retraverser toute la sidebar
    à chaque navigation. */

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib/store';
 import { Moon, Sun, User, LogOut, Zap, Trophy, ShoppingBag, CircleDollarSign } from 'lucide-react';
 import UserAvatar from './UserAvatar';
+import AnimatedCoins from './AnimatedCoins';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 
 const Navbar: React.FC = () => {
@@ -70,7 +71,7 @@ const Navbar: React.FC = () => {
                 style={{ background: 'linear-gradient(135deg, #FACC15, #FB923C)', color: '#fff',
                   boxShadow: '0 4px 12px -2px rgba(251,146,60,0.45)' }}>
                 <ShoppingBag size={12} className="hidden sm:block shrink-0" aria-hidden="true" />
-                <CircleDollarSign size={12} aria-hidden="true" /> <span className="whitespace-nowrap">{(user.coins ?? 0).toLocaleString('fr-FR')}</span>
+                <CircleDollarSign size={12} aria-hidden="true" /> <AnimatedCoins value={user.coins ?? 0} className="whitespace-nowrap" />
               </Link>
 
               {/* Niveau + XP — mini vibrant hero card */}
@@ -129,7 +130,7 @@ const Navbar: React.FC = () => {
                       <p className="font-bold text-sm text-white truncate relative z-10">{user.username}</p>
                       <p className="text-xs text-white/70 truncate relative z-10">{user.email}</p>
                       <div className="flex gap-2 mt-1 text-xs font-bold text-white/90 relative z-10">
-                        <span className="flex items-center gap-1"><CircleDollarSign size={11} aria-hidden="true" /> {(user.coins ?? 0).toLocaleString('fr-FR')}</span>
+                        <span className="flex items-center gap-1"><CircleDollarSign size={11} aria-hidden="true" /> <AnimatedCoins value={user.coins ?? 0} /></span>
                         <span style={{ color: 'rgba(255,255,255,0.7)' }}>·</span>
                         <span>{t('navbar.level', { level: user.level ?? 1 })}</span>
                       </div>

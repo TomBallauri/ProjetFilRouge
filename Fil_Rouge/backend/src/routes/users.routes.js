@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
 import { mailer } from '../lib/mailer.js';
 import { SECRET, authMiddleware, isAdmin } from '../lib/auth.js';
-import { sanitizeUser } from '../lib/userUtils.js';
+import { sanitizeUser, USER_MINI_SELECT } from '../lib/userUtils.js';
 import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/password.js';
 import { hashToken } from '../lib/tokens.js';
 import { FRONTEND_URL } from '../lib/config.js';
@@ -208,7 +208,7 @@ router.get('/api/users/search', authMiddleware, async (req, res) => {
         username: { contains: q, mode: 'insensitive' },
         id: { not: req.userId },
       },
-      select: { id: true, username: true, avatar: true, level: true, xp: true, currentStreak: true },
+      select: { ...USER_MINI_SELECT, level: true, xp: true, currentStreak: true },
       take: 20,
       orderBy: { username: 'asc' },
     });

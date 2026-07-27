@@ -243,7 +243,7 @@ const UQuail: React.FC = () => {
           <div className="absolute right-[-40px] top-[-40px] w-56 h-56 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
           <div className="absolute left-[-20px] bottom-[-30px] w-36 h-36 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
           <div className="relative z-10">
-            <p className="text-xs font-bold text-white/80 uppercase tracking-widest mb-3">ChallengeHub</p>
+            <p className="text-xs font-bold text-white/80 uppercase tracking-widest mb-3">U-Quail</p>
             <h1 className="text-3xl md:text-5xl font-bold text-white mb-4"
               style={{ fontFamily: 'var(--q-display)', letterSpacing: -0.5, lineHeight: 1.08 }}>
               {t('uquail.heroTitleLine1')}<br />{t('uquail.heroTitleLine2')}

@@ -41,22 +41,24 @@ const emptyChallenge = (): ChallengeForm => ({ id: crypto.randomUUID(), title: '
 
 type SubmitResult = { ok: true } | { ok: false; kind: 'network' } | { ok: false; kind: 'http'; error?: string };
 
-// Construit le endpoint + payload adaptés au cas mono ou multi défis.
-function buildSubmitRequest(challenges: ChallengeForm[], seriesName: string, isPublic: boolean) {
+// Construit le endpoint + payload adaptés au cas mono ou multi défis. `lang` est la langue de
+// l'interface au moment de la saisie (voir originalLang côté backend) — indispensable pour que la
+// traduction bidirectionnelle sache dans quel sens traduire ce défi (voir translateContent.js).
+function buildSubmitRequest(challenges: ChallengeForm[], seriesName: string, isPublic: boolean, lang: string) {
   const toSave = challenges.map(({ id: _id, ...c }) => ({ ...c, isPublic }));
   const endpoint = challenges.length === 1 ? '/api/challenges' : '/api/challenges/bulk-save';
   const trimmedSeries = seriesName.trim();
   const body = challenges.length === 1
-    ? JSON.stringify({ ...toSave[0] })
-    : JSON.stringify({ challenges: toSave, ...(trimmedSeries ? { seriesName: trimmedSeries } : {}) });
+    ? JSON.stringify({ ...toSave[0], lang })
+    : JSON.stringify({ challenges: toSave, lang, ...(trimmedSeries ? { seriesName: trimmedSeries } : {}) });
   return { endpoint, body };
 }
 
 // Envoie la création au backend ; isolé du composant pour ne pas alourdir sa
 // complexité (try/catch + vérif réponse) — voir handleSubmit.
-async function submitChallenges(challenges: ChallengeForm[], seriesName: string, isPublic: boolean): Promise<SubmitResult> {
+async function submitChallenges(challenges: ChallengeForm[], seriesName: string, isPublic: boolean, lang: string): Promise<SubmitResult> {
   const token = localStorage.getItem('token');
-  const { endpoint, body } = buildSubmitRequest(challenges, seriesName, isPublic);
+  const { endpoint, body } = buildSubmitRequest(challenges, seriesName, isPublic, lang);
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -196,12 +198,13 @@ function ChallengeCard({
 const CreateChallenge: React.FC = () => {
   const { user, darkMode } = useStore();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [challenges, setChallenges] = useState<ChallengeForm[]>([emptyChallenge()]);
   const [seriesName, setSeriesName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
 
   if (!user) { navigate('/login'); return null; }
 
@@ -266,13 +269,18 @@ const CreateChallenge: React.FC = () => {
   const removeChallenge = (i: number) =>
     setChallenges(prev => prev.filter((_, idx) => idx !== i));
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const invalid = challenges.find(c => !c.title.trim() || !c.description.trim());
     if (invalid) { setError(t('createChallenge.missingFields')); return; }
-    setLoading(true);
     setError('');
-    const result = await submitChallenges(challenges, seriesName, isPublic);
+    setShowConfirm(true);
+  };
+
+  const confirmSubmit = async () => {
+    setShowConfirm(false);
+    setLoading(true);
+    const result = await submitChallenges(challenges, seriesName, isPublic, i18n.language);
     setLoading(false);
     if (!result.ok) {
       setError(result.kind === 'network' ? t('createChallenge.networkError') : (result.error || t('createChallenge.createError')));
@@ -364,6 +372,40 @@ const CreateChallenge: React.FC = () => {
           </button>
         </form>
       </div>
+
+      {showConfirm && (
+        <div role="dialog" aria-modal="true" aria-label={t('createChallenge.confirmTitle')} style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }} onClick={() => setShowConfirm(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--q-chrome)', borderRadius: 24,
+            border: '1px solid var(--q-line)',
+            padding: '28px 24px', maxWidth: 320, width: '100%', textAlign: 'center',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--q-accent-soft)', border: '1.5px solid var(--q-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Trophy size={22} style={{ color: 'var(--q-accent)' }} aria-hidden="true" />
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--q-text)', marginBottom: 8 }}>{t('createChallenge.confirmTitle')}</div>
+            <div style={{ fontSize: 13, color: 'var(--q-text2)', marginBottom: 24, lineHeight: 1.5 }}>
+              {challenges.length > 1 ? t('createChallenge.confirmBodyMultiple', { count: challenges.length }) : t('createChallenge.confirmBodySingle')}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={() => setShowConfirm(false)} style={{
+                flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
+                background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}>{t('common.cancel')}</button>
+              <button type="button" onClick={confirmSubmit} disabled={loading} style={{
+                flex: 1, padding: '12px', borderRadius: 12, border: 'none',
+                background: 'var(--q-accent)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                opacity: loading ? 0.6 : 1,
+              }}>{loading ? '…' : t('createChallenge.confirmButton')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

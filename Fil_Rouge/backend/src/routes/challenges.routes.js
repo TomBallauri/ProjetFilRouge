@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
-import Groq from 'groq-sdk';
+import Groq, { RateLimitError } from 'groq-sdk';
 import { prisma } from '../lib/prisma.js';
 import { SECRET, authMiddleware, isAdmin } from '../lib/auth.js';
 import { sanitizeUser } from '../lib/userUtils.js';
@@ -18,19 +18,75 @@ import { withTranslatedChallenge, withTranslatedChallenges, withTranslatedUserCh
 
 const DAILY_BONUS_MULTIPLIER = 1.5;
 
-async function getDailyChallenge() {
-  const count = await prisma.challenge.count({ where: { isPublic: true } });
+// `userId` optionnel : quand fourni, écarte les défis déjà complétés par CET utilisateur avant
+// de piocher — sinon la "suggestion du jour" (même calcul, voir la route daily-suggestion)
+// pouvait retomber sur un défi que l'utilisateur avait déjà terminé. Ne PAS passer userId lors
+// de l'appel utilisé pour le bonus de récompense (voir POST /api/challenges/:id/complete) : à cet
+// endroit le défi vient tout juste d'être marqué COMPLETED, donc le filtrer changerait l'index et
+// casserait la comparaison avec le défi du jour "officiel" — un défi ne peut de toute façon jamais
+// être complété deux fois (contrainte unique userId+challengeId), donc ce filtre n'y sert à rien.
+async function getDailyChallenge(userId) {
+  const where = {
+    isPublic: true,
+    ...(userId ? { participants: { none: { userId, status: 'COMPLETED' } } } : {}),
+  };
+  const count = await prisma.challenge.count({ where });
   if (count === 0) return null;
   const today = new Date();
   const seed = today.getUTCFullYear() * 10000 + (today.getUTCMonth() + 1) * 100 + today.getUTCDate();
   const idx = seed % count;
   const rows = await prisma.challenge.findMany({
-    where: { isPublic: true },
+    where,
     orderBy: { id: 'asc' },
     skip: idx,
     take: 1,
   });
   return rows[0] ?? null;
+}
+
+// Déverrouillage progressif d'une série "Jour N" : le jour N ne devient complétable que N-1
+// jours (fuseau UTC) après le début de la série POUR CET utilisateur — jour 1 dispo tout de
+// suite, jour 2 le lendemain, etc. Rattrapage naturel : rien n'empêche de valider plusieurs
+// jours déjà débloqués le même jour si l'utilisateur a pris du retard, seul le fait d'aller
+// PLUS VITE que le calendrier est bloqué (voir bulk-save / ensureSeriesChallengesStarted, qui
+// inscrivent tous les jours en IN_PROGRESS d'un coup dès la création/l'inscription — sans ce
+// verrou, rien n'empêchait de tout valider en une seule fois).
+// Partagée avec GET /api/challenges/by-series/:seriesName (indique au front l'état de chaque
+// défi) et POST /api/challenges/:id/complete (fait respecter la règle), pour ne jamais faire
+// diverger le calcul entre affichage et application réelle.
+function seriesDayNumber(title) {
+  const m = /\d+/.exec(title);
+  return m ? Number.parseInt(m[0], 10) : null;
+}
+
+async function getSeriesStartDate(userId, seriesName) {
+  const first = await prisma.userChallenge.findFirst({
+    where: { userId, challenge: { seriesName } },
+    orderBy: { startedAt: 'asc' },
+    select: { startedAt: true },
+  });
+  return first?.startedAt ?? null;
+}
+
+function daysElapsedSince(startDate) {
+  const startUTC = new Date(startDate);
+  startUTC.setUTCHours(0, 0, 0, 0);
+  const todayUTC = new Date();
+  todayUTC.setUTCHours(0, 0, 0, 0);
+  return Math.round((todayUTC - startUTC) / 86_400_000);
+}
+
+// Renvoie null si le défi n'est pas verrouillé, sinon le nombre de jours restants avant
+// déverrouillage. `title` sans numéro de jour identifiable (ex: les 5 défis variés générés sans
+// durée précisée, voir le prompt système IA) n'est jamais verrouillé — l'ordre n'a alors aucun
+// sens à imposer.
+async function seriesLockInfo(userId, seriesName, title) {
+  const dayNumber = seriesDayNumber(title);
+  if (dayNumber === null) return null;
+  const startDate = await getSeriesStartDate(userId, seriesName);
+  if (!startDate) return null; // pas encore commencé — rien à verrouiller pour l'instant
+  const daysUntilUnlock = (dayNumber - 1) - daysElapsedSince(startDate);
+  return daysUntilUnlock > 0 ? daysUntilUnlock : null;
 }
 
 const router = Router();
@@ -125,10 +181,25 @@ router.get('/api/challenges/by-series/:seriesName', async (req, res) => {
       include: {
         creator: { select: { id: true, username: true, avatar: true } },
         _count: { select: { participants: true } }
-      }
+      },
+      // Sans orderBy, Postgres ne garantit aucun ordre stable entre deux appels — c'était la
+      // seule requête de tout le fichier à ne pas en avoir. `id` suffit ici (le frontend re-trie
+      // de toute façon par numéro de jour extrait du titre, voir SeriesDropdown), mais un ordre
+      // instable côté serveur reste une source réelle de "l'ordre change au rechargement".
+      orderBy: { id: 'asc' },
     });
     const challenges = await withTranslatedChallenges(rows, req.query.lang);
-    res.json(challenges);
+    // Une seule requête pour la date de début (partagée par tous les défis de la série), le
+    // reste du calcul se fait en mémoire par défi (voir seriesLockInfo) plutôt que de refaire
+    // la requête N fois.
+    const startDate = currentUserId ? await getSeriesStartDate(currentUserId, seriesName) : null;
+    res.json(challenges.map(c => {
+      const dayNumber = seriesDayNumber(c.title);
+      const daysUntilUnlock = startDate && dayNumber !== null
+        ? (dayNumber - 1) - daysElapsedSince(startDate)
+        : null;
+      return { ...c, daysUntilUnlock: daysUntilUnlock && daysUntilUnlock > 0 ? daysUntilUnlock : null };
+    }));
   } catch (error) {
     res.status(500).json({ error: 'Erreur' });
   }
@@ -136,7 +207,14 @@ router.get('/api/challenges/by-series/:seriesName', async (req, res) => {
 
 router.get('/api/challenges/daily-suggestion', async (req, res) => {
   try {
-    const daily = await getDailyChallenge();
+    // Optionnel : un visiteur non connecté (ou au token invalide) reçoit la suggestion globale
+    // du jour sans exclusion — seule une session valide permet d'écarter ses défis déjà complétés.
+    let currentUserId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      try { currentUserId = jwt.verify(authHeader.split(' ')[1], SECRET).userId; } catch {}
+    }
+    const daily = await getDailyChallenge(currentUserId);
     if (!daily) return res.json(null);
     const full = await prisma.challenge.findUnique({
       where: { id: daily.id },
@@ -171,18 +249,104 @@ router.post('/api/challenges', async (req, res) => {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, SECRET);
-    const { title, description, difficulty, category, isPublic } = req.body;
+    const { title, description, difficulty, category, isPublic, lang } = req.body;
     if (!title || !description || !difficulty || !category) {
       return res.status(400).json({ error: "Champs requis manquants" });
     }
     const rewards = { EASY: { coins: 50, xp: 100 }, MEDIUM: { coins: 150, xp: 300 }, HARD: { coins: 350, xp: 700 }, EXPERT: { coins: 700, xp: 1500 } };
     const r = rewards[difficulty] || rewards.EASY;
+    // `title`/`description` sont écrits dans la langue de l'interface du créateur au moment de
+    // la création — pas toujours le français (voir withTranslatedChallenge). Sans ça, un défi
+    // rédigé en anglais ne se retraduisait jamais vers le français (l'ancien système supposait
+    // toujours une source française).
+    const originalLang = lang === 'en' ? 'en' : 'fr';
     const challenge = await prisma.challenge.create({
-      data: { title, description, difficulty, category, coinReward: r.coins, xpReward: r.xp, createdBy: decoded.userId, isPublic: isPublic !== false }
+      data: { title, description, difficulty, category, coinReward: r.coins, xpReward: r.xp, createdBy: decoded.userId, isPublic: isPublic !== false, originalLang }
     });
     res.json(challenge);
   } catch (error) {
     res.status(400).json({ error: "Erreur lors de la création du défi" });
+  }
+});
+
+// Modification par l'auteur (pas besoin de repasser par l'admin, ni de supprimer/recréer le
+// défi) — réservé au créateur, contrairement à PUT /api/admin/challenges/:id qui est ouvert à
+// n'importe quel défi. Les récompenses sont recalculées depuis la difficulté (même barème que la
+// création ci-dessus), pas transmises par le client, pour rester cohérent avec le reste de l'app.
+router.put('/api/challenges/:id', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const challengeId = Number(req.params.id);
+    const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } });
+    if (!challenge) return res.status(404).json({ error: 'Défi non trouvé' });
+    if (challenge.createdBy !== decoded.userId) {
+      return res.status(403).json({ error: 'Tu ne peux modifier que tes propres défis' });
+    }
+    const { title, description, difficulty, category, isPublic, lang } = req.body;
+    if (!title || !description || !difficulty || !category) {
+      return res.status(400).json({ error: 'Champs requis manquants' });
+    }
+    const rewards = { EASY: { coins: 50, xp: 100 }, MEDIUM: { coins: 150, xp: 300 }, HARD: { coins: 350, xp: 700 }, EXPERT: { coins: 700, xp: 1500 } };
+    const r = rewards[difficulty] || rewards.EASY;
+    const updated = await prisma.challenge.update({
+      where: { id: challengeId },
+      data: {
+        title, description, difficulty, category,
+        coinReward: r.coins, xpReward: r.xp,
+        isPublic: isPublic !== false,
+        // La langue du texte édité peut différer de originalLang (ex: défi créé en français,
+        // puis modifié pendant que l'interface est en anglais) — on la met à jour ici.
+        originalLang: lang === 'en' ? 'en' : 'fr',
+        // Le cache de traduction (voir translateContent.js) correspond à l'ANCIEN texte —
+        // invalidé dans les DEUX sens ici pour être recalculé au prochain affichage, sinon
+        // un défi modifié resterait affiché avec une traduction devenue obsolète.
+        titleEn: null, descriptionEn: null,
+        titleFr: null, descriptionFr: null,
+      },
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: 'Erreur lors de la modification du défi' });
+  }
+});
+
+// Suppression par l'auteur. Contrairement à DELETE /api/admin/challenges/:id (qui tente
+// bêtement la suppression et renvoie une erreur si une contrainte de clé étrangère existe déjà),
+// ici on vérifie explicitement qu'aucun AUTRE joueur n'a rejoint/complété ce défi avant de
+// supprimer — un défi de série auto-inscrit toujours son créateur (voir bulk-save), donc bloquer
+// dès qu'un participant existe empêcherait systématiquement la suppression de ses propres défis
+// tout juste créés, ce qui est exactement le cas qu'on veut débloquer ici.
+router.delete('/api/challenges/:id', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const challengeId = Number(req.params.id);
+    const challenge = await prisma.challenge.findUnique({
+      where: { id: challengeId },
+      include: { participants: true, groups: { include: { members: true } } },
+    });
+    if (!challenge) return res.status(404).json({ error: 'Défi non trouvé' });
+    if (challenge.createdBy !== decoded.userId) {
+      return res.status(403).json({ error: 'Tu ne peux supprimer que tes propres défis' });
+    }
+    const otherParticipant = challenge.participants.some(p => p.userId !== decoded.userId);
+    const otherGroupMember = challenge.groups.some(g => g.members.some(m => m.userId !== decoded.userId));
+    if (otherParticipant || otherGroupMember) {
+      return res.status(400).json({ error: 'Impossible : un autre joueur a déjà rejoint ou complété ce défi.' });
+    }
+    await prisma.$transaction([
+      prisma.challengeGroup.deleteMany({ where: { challengeId } }), // cascade → membres + messages
+      prisma.userChallenge.deleteMany({ where: { challengeId } }),
+      prisma.challenge.delete({ where: { id: challengeId } }),
+    ]);
+    res.json({ message: 'Défi supprimé' });
+  } catch (error) {
+    res.status(400).json({ error: 'Erreur lors de la suppression du défi' });
   }
 });
 
@@ -290,6 +454,20 @@ router.post('/api/challenges/:id/complete', async (req, res) => {
     if (!uc) return res.status(404).json({ error: "Défi non commencé" });
     if (uc.status === 'COMPLETED') return res.status(400).json({ error: "Défi déjà complété" });
     const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } });
+
+    // Déverrouillage progressif par numéro de jour (voir seriesLockInfo) — bloque uniquement le
+    // fait d'aller plus vite que le calendrier, pas le rattrapage de jours déjà débloqués.
+    if (challenge.seriesName) {
+      const daysLeft = await seriesLockInfo(decoded.userId, challenge.seriesName, challenge.title);
+      if (daysLeft !== null) {
+        return res.status(400).json({
+          error: daysLeft === 1
+            ? 'Ce défi se débloque demain — reviens à ce moment-là !'
+            : `Ce défi se débloque dans ${daysLeft} jours.`,
+        });
+      }
+    }
+
     await prisma.userChallenge.update({
       where: { id: uc.id },
       data: { status: 'COMPLETED', completedAt: new Date() }
@@ -397,7 +575,11 @@ router.get('/api/users/me/challenges', async (req, res) => {
           ] },
         ],
       },
-      include: { challenge: true },
+      // `challenge: true` seul n'inclut PAS les relations du défi (son créateur) — sans ça,
+      // `challenge.creator` restait toujours undefined pour tout ce qui passe par "En cours"/
+      // "Terminés", et l'auteur d'un défi ne pouvait jamais le modifier/supprimer une fois
+      // démarré (le bouton crayon/poubelle du frontend teste challenge.creator?.id).
+      include: { challenge: { include: { creator: { select: { id: true, username: true, avatar: true } } } } },
       orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
     });
     const ordered = orderRowsByKeys(pageRows, keyOf, pageKeys);
@@ -458,7 +640,7 @@ router.get('/api/users/me/dashboard', authMiddleware, async (req, res) => {
             ...(soloChallengeIds.length ? [{ challengeId: { in: soloChallengeIds } }] : []),
           ],
         },
-        include: { challenge: true },
+        include: { challenge: { include: { creator: { select: { id: true, username: true, avatar: true } } } } },
         orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       });
       const ordered = orderRowsByKeys(pageRows, keyOf, pageKeys);
@@ -503,7 +685,19 @@ router.get('/api/users/me/dashboard', authMiddleware, async (req, res) => {
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 console.log('[AI] Groq API key:', process.env.GROQ_API_KEY ? `chargée (${process.env.GROQ_API_KEY.slice(0, 8)}...)` : '❌ MANQUANTE');
 
-const AI_SYSTEM_PROMPT = `Tu es un assistant de création de défis personnalisés pour une application de gamification.
+// Codes alignés sur LANGUAGE_TO_HTML_LANG / detectBrowserLanguageCode côté frontend (src/lib/i18n.ts).
+const AI_LANGUAGE_NAMES = { fr: 'français', en: 'English', es: 'español', de: 'Deutsch' };
+
+// `langCode` : langue de l'interface de l'utilisateur (envoyée par le frontend, voir la route
+// plus bas). Volontairement plus fiable qu'une consigne du style "réponds dans la langue de
+// l'utilisateur" laissée à l'appréciation du modèle — testé en réel, un message court et ambigu
+// ("Get into sports 🏋️") retombait quand même en français malgré une telle consigne, le français
+// dominant largement le reste du prompt. Donner la langue cible explicitement lève l'ambiguïté.
+function buildAiSystemPrompt(langCode) {
+  const langName = AI_LANGUAGE_NAMES[langCode] ?? AI_LANGUAGE_NAMES.fr;
+  return `Tu es un assistant de création de défis personnalisés pour une application de gamification.
+
+LANGUE OBLIGATOIRE POUR TOUTE CETTE CONVERSATION : ${langName}. Réponds strictement dans cette langue — questions de suivi, titres et descriptions compris — même si le message de l'utilisateur est dans une autre langue. Seules les valeurs techniques listées plus bas (catégories, difficultés) doivent rester exactement en anglais telles quelles, quelle que soit la langue de réponse — ce sont des identifiants internes, jamais affichés tels quels.
 
 PROCESSUS:
 1. L'utilisateur décrit son objectif
@@ -511,7 +705,7 @@ PROCESSUS:
 3. Dès que tu as assez d'informations, génère les défis
 
 NOMBRE DE DÉFIS À GÉNÉRER:
-- Programme sur N jours → N défis (un par jour, nommés "Jour 1:", "Jour 2:", etc.)
+- Programme sur N jours → N défis (un par jour, avec le numéro du jour dans le titre, dans la langue de réponse — ex: "Day 1:" en anglais, "Jour 1:" en français)
 - Sans durée précisée → 5 défis variés
 
 CATÉGORIES (utilise EXACTEMENT ces valeurs):
@@ -531,9 +725,10 @@ Titres: max 80 caractères. Descriptions: max 500 caractères, claires et action
 FORMAT DE RÉPONSE — JSON uniquement, rien d'autre:
 Question: {"type":"question","content":"Ta question"}
 Défis: {"type":"challenges","challenges":[{"title":"...","description":"...","category":"...","difficulty":"..."}]}`;
+}
 
 router.post('/api/challenges/ai-generate', authMiddleware, aiGenerateLimiter, async (req, res) => {
-  const { history } = req.body;
+  const { history, lang } = req.body;
   if (!history || !Array.isArray(history) || history.length === 0) {
     return res.status(400).json({ error: 'Historique de conversation requis' });
   }
@@ -542,7 +737,7 @@ router.post('/api/challenges/ai-generate', authMiddleware, aiGenerateLimiter, as
       model: 'llama-3.3-70b-versatile',
       max_tokens: 2048,
       messages: [
-        { role: 'system', content: AI_SYSTEM_PROMPT },
+        { role: 'system', content: buildAiSystemPrompt(lang) },
         ...history.map(m => ({ role: m.role, content: m.content })),
       ],
     });
@@ -555,6 +750,12 @@ router.post('/api/challenges/ai-generate', authMiddleware, aiGenerateLimiter, as
       res.json({ type: 'question', content: text });
     }
   } catch (error) {
+    // Quota Groq (limite globale de la clé API, partagée par tous les utilisateurs — distincte
+    // du plafond par utilisateur d'aiGenerateLimiter ci-dessus) : un message dédié plutôt que
+    // l'erreur générique, pour que l'utilisateur sache qu'il suffit de réessayer un peu plus tard.
+    if (error instanceof RateLimitError) {
+      return res.status(429).json({ error: 'Trop de demandes IA en ce moment, réessaie dans quelques instants.' });
+    }
     console.error('AI generation error:', error);
     res.status(500).json({ error: 'Erreur lors de la génération par IA' });
   }
@@ -564,10 +765,14 @@ router.post('/api/challenges/bulk-save', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Token manquant' });
   const token = authHeader.split(' ')[1];
-  const { challenges, seriesName } = req.body;
+  const { challenges, seriesName, lang } = req.body;
   if (!challenges || !Array.isArray(challenges) || challenges.length === 0) {
     return res.status(400).json({ error: 'Défis requis' });
   }
+  // Langue réelle des titres/descriptions envoyés (interface du créateur au moment de l'appel,
+  // voir withTranslatedChallenge) — un plan généré par l'IA en anglais doit pouvoir se retraduire
+  // vers le français, pas seulement l'inverse.
+  const originalLang = lang === 'en' ? 'en' : 'fr';
   // Aucune série légitime ne dépasse quelques semaines : sans plafond, un body forgé
   // pourrait déclencher des milliers de créations concurrentes en un seul appel.
   if (challenges.length > 50) {
@@ -601,6 +806,7 @@ router.post('/api/challenges/bulk-save', async (req, res) => {
           coinReward: r.coins, xpReward: r.xp,
           createdBy: decoded.userId,
           isPublic: isPublic !== false,
+          originalLang,
           ...(withSeries && resolvedSeries ? { seriesName: resolvedSeries } : {}),
           participants: { create: { userId: decoded.userId, status: 'IN_PROGRESS' } },
         },

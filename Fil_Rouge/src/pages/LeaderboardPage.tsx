@@ -199,7 +199,7 @@ const LeaderboardPage: React.FC = () => {
                     const u = top3[idx];
                     if (!u) return null;
                     const medal = MEDAL_COLOR[rank];
-                    const avatarSize = rank === 1 ? 'lg' : 'md';
+                    const avatarSize = rank === 1 ? '2xl' : 'xl';
                     return (
                       <button key={u.id} onClick={() => goToProfile(u)}
                         aria-label={t('leaderboard.profileRankLabel', { username: u.username, rank })}

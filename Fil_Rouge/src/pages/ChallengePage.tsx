@@ -6,10 +6,11 @@ import { isGroupUnread } from '../hooks/useNotificationPolling';
 import { useStore } from '../lib/store';
 import type { User } from '../types/User';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, Star, Zap, Search, Plus, CheckCircle, Clock, Flame, SlidersHorizontal, X, ChevronDown, ChevronUp, Gamepad2, Activity, UtensilsCrossed, Dumbbell, Palette, BookOpen, Users, Leaf, Music, Heart, Wrench, LayoutGrid, Sparkles, Send, MessageCircle, Mail, PartyPopper, Timer, Loader2, CircleDollarSign, UserPlus } from 'lucide-react';
+import { Trophy, Star, Zap, Search, Plus, CheckCircle, Clock, Flame, SlidersHorizontal, X, ChevronDown, ChevronUp, Gamepad2, Activity, UtensilsCrossed, Dumbbell, Palette, BookOpen, Users, Leaf, Music, Heart, Wrench, LayoutGrid, Sparkles, Send, MessageCircle, Mail, PartyPopper, Timer, Loader2, CircleDollarSign, UserPlus, Pencil, Trash2, Lock } from 'lucide-react';
 import BackButton from '../components/BackButton';
 import UserAvatar from '../components/UserAvatar';
 import PageLoader from '../components/PageLoader';
+import EditChallengeModal from '../components/EditChallengeModal';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 
 type Challenge = {
@@ -24,8 +25,14 @@ type Challenge = {
   createdAt: string;
   seriesName?: string | null;
   seriesNameEn?: string | null;
+  seriesNameFr?: string | null;
+  originalLang?: string;
   creator?: { id: number; username: string; avatar?: string };
   _count?: { participants: number };
+  // Renvoyé par GET /api/challenges/by-series/:name — nombre de jours restants avant que CE
+  // défi (identifié par son numéro de jour dans le titre) ne se débloque pour l'utilisateur
+  // connecté ; absent/null si déjà déverrouillé ou si le défi n'a pas de numéro de jour.
+  daysUntilUnlock?: number | null;
 };
 
 type UserChallenge = { id: number; challengeId: number; status: string };
@@ -33,7 +40,7 @@ type UserChallengeWithData = { id: number; challengeId: number; status: string; 
 
 type GroupMember = {
   id: number; groupId: number; userId: number; status: string;
-  user: { id: number; username: string; avatar?: string };
+  user: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] };
 };
 type GroupMessageType = {
   id: number; groupId: number; userId: number; content: string; createdAt: string;
@@ -42,11 +49,11 @@ type GroupMessageType = {
 type ChallengeGroupType = {
   id: number; challengeId: number; createdBy: number; createdAt: string;
   challenge: Pick<Challenge, 'id' | 'title' | 'description' | 'difficulty' | 'category' | 'coinReward' | 'xpReward'>;
-  creator: { id: number; username: string; avatar?: string };
+  creator: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] };
   members: GroupMember[];
   messages: GroupMessageType[];
 };
-type Friend = { friendshipId: number; user: { id: number; username: string; avatar?: string } };
+type Friend = { friendshipId: number; user: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] } };
 
 const CATEGORY_GRAD: Record<string, { grad: string; glow: string; Icon: React.FC<{ size?: number | string }> }> = {
   GAMING:     { grad: 'linear-gradient(135deg,#A78BFA,#EC4899)', glow: 'rgba(167,139,250,0.5)', Icon: Gamepad2 },
@@ -352,10 +359,12 @@ type ChallengeCardProps = {
   onComplete: (id: number) => void;
   onLogin: () => void;
   onInvite?: (challenge: Challenge) => void;
+  onEdit?: (challenge: Challenge) => void;
+  onDelete?: (challenge: Challenge) => void;
   isDaily?: boolean;
 };
 
-const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoading, user, onStart, onComplete, onLogin, onInvite, isDaily }) => {
+const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoading, user, onStart, onComplete, onLogin, onInvite, onEdit, onDelete, isDaily }) => {
   const { t } = useTranslation();
   const diff = DIFF_GRAD[challenge.difficulty] ?? DIFF_GRAD.EASY;
   const cat  = CATEGORY_GRAD[challenge.category] ?? CATEGORY_GRAD.GAMING;
@@ -415,8 +424,38 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
               </span>
             )}
           </div>
-          {status === 'COMPLETED'   && <CheckCircle size={16} aria-hidden="true" className="text-emerald-400 float-right mt-0.5" />}
-          {status === 'IN_PROGRESS' && <Clock size={16} aria-hidden="true" className="text-sky-400 float-right mt-0.5" />}
+        </div>
+        {/* Statut + actions auteur regroupés dans une seule rangée alignée à droite — le statut
+            utilisait `float-right` avant, ce qui le laissait flotter indépendamment des boutons
+            crayon/poubelle au lieu d'être aligné avec eux. */}
+        <div className="flex-shrink-0 flex items-center gap-1.5">
+          {status === 'COMPLETED'   && <CheckCircle size={16} aria-hidden="true" className="text-emerald-400" />}
+          {status === 'IN_PROGRESS' && <Clock size={16} aria-hidden="true" className="text-sky-400" />}
+          {/* Auteur seulement — évite d'avoir à supprimer/recréer le défi pour corriger une coquille */}
+          {user && challenge.creator?.id === user.id && (
+            <>
+              {onEdit && (
+                <button type="button" onClick={() => onEdit(challenge)} aria-label={t('editChallenge.editButtonLabel')}
+                  className="q-press" style={{
+                    width: 30, height: 30, borderRadius: 10, border: '1px solid var(--q-line)',
+                    background: 'var(--q-bg-flat)', color: 'var(--q-text2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  }}>
+                  <Pencil size={13} aria-hidden="true" />
+                </button>
+              )}
+              {onDelete && (
+                <button type="button" onClick={() => onDelete(challenge)} aria-label={t('editChallenge.deleteButtonLabel')}
+                  className="q-press" style={{
+                    width: 30, height: 30, borderRadius: 10, border: '1px solid var(--q-line)',
+                    background: 'var(--q-bg-flat)', color: '#EF4444',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  }}>
+                  <Trash2 size={13} aria-hidden="true" />
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -441,7 +480,9 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
           <Zap size={11} aria-hidden="true" className="inline mr-0.5" />
           {challenge.xpReward}{isDaily ? ` → ${Math.floor(challenge.xpReward * 1.5)}` : ''} XP
         </span>
-        {challenge._count && (
+        {/* `_count.participants` compte 1 dès que le créateur seul a commencé le défi — pas
+            un vrai groupe. On n'affiche le badge que si quelqu'un d'autre a aussi rejoint. */}
+        {challenge._count && challenge._count.participants > 1 && (
           <span className="ml-auto font-semibold" style={{ color: 'var(--q-text3)' }}>
             {t('challengePage.card.participants', { count: challenge._count.participants })}
           </span>
@@ -491,11 +532,11 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, label, count, grad,
 };
 
 
-type SeriesGroupMember = { id: number; userId: number; status: string; confirmedAt?: string | null; user: { id: number; username: string; avatar?: string } };
+type SeriesGroupMember = { id: number; userId: number; status: string; confirmedAt?: string | null; user: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] } };
 type SeriesGroupData = { id: number; seriesName: string; createdBy: number; completedAt?: string | null; members: SeriesGroupMember[]; progress?: { userId: number; done: number; total: number }[] };
-type FriendEntry = { friendshipId: number; user: { id: number; username: string; avatar?: string } };
-type SeriesGroupMsg = { id: number; groupId: number; userId: number; content: string; createdAt: string; user: { id: number; username: string; avatar?: string } };
-type PendingSeriesInvite = { id: number; seriesName: string; creator: { id: number; username: string; avatar?: string }; members: SeriesGroupMember[] };
+type FriendEntry = { friendshipId: number; user: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] } };
+type SeriesGroupMsg = { id: number; groupId: number; userId: number; content: string; createdAt: string; user: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] } };
+type PendingSeriesInvite = { id: number; seriesName: string; creator: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] }; members: SeriesGroupMember[] };
 
 const SeriesDropdown: React.FC<{
   name: string;
@@ -509,11 +550,17 @@ const SeriesDropdown: React.FC<{
   onJoined?: () => void;
   onGroupChange?: () => void;
   showNotif: (msg: string, type: 'success' | 'error') => void;
+  onEdit?: (challenge: Challenge) => void;
+  onDelete?: (challenge: Challenge) => void;
+  // Rafraîchit les données complètes de cette série (voir seriesFullChallenges côté parent) —
+  // utilisé après une complétion pour que `daysUntilUnlock` (voir Challenge.daysUntilUnlock)
+  // reflète immédiatement le nouveau déverrouillage, sans attendre un rechargement de page.
+  onRefreshSeries?: () => void;
   // Ouverture + scroll automatiques quand on arrive depuis une carte de la page d'accueil
   // ("Ta journée") — voir focusChallengeId dans ChallengePage.
   forceOpenSeries?: string | null;
   focusChallengeId?: number | null;
-}> = ({ name, displayName, challenges, actionLoading, getUserStatus, onStart, onComplete, user, onJoined, onGroupChange, showNotif, forceOpenSeries, focusChallengeId }) => {
+}> = ({ name, displayName, challenges, actionLoading, getUserStatus, onStart, onComplete, user, onJoined, onGroupChange, showNotif, onEdit, onDelete, onRefreshSeries, forceOpenSeries, focusChallengeId }) => {
   const { t } = useTranslation();
   // `name` reste la clé stable (FR) utilisée pour les endpoints by-series/series-groups
   // (join/invite/kick/chat...) ; `label` est uniquement pour l'affichage traduit.
@@ -601,6 +648,11 @@ const SeriesDropdown: React.FC<{
   // pour que le bouton "Marquer la série comme terminée" apparaisse tout de suite si c'était le dernier)
   const handleCompleteAndRefresh = async (id: number) => {
     await onComplete(id);
+    // Sans ça, `daysUntilUnlock` (voir Challenge.daysUntilUnlock) reste celui du dernier
+    // chargement de la série — le prochain jour à débloquer resterait affiché comme verrouillé
+    // jusqu'au prochain rechargement complet de la page, alors que la complétion vient de faire
+    // avancer la date de référence.
+    onRefreshSeries?.();
     if (!group) return;
     fetch(`/api/series-groups/by-series/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token()}` } })
       .then(r => r.json())
@@ -912,7 +964,7 @@ const SeriesDropdown: React.FC<{
                       background: sel ? 'var(--q-accent-soft)' : 'transparent',
                       cursor: 'pointer', textAlign: 'left',
                     }}>
-                      <UserAvatar avatar={f.user.avatar} username={f.user.username} cosmetics={[]} size="sm" />
+                      <UserAvatar avatar={f.user.avatar} username={f.user.username} cosmetics={f.user.cosmetics ?? []} size="sm" />
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--q-text)', flex: 1 }}>{f.user.username}</span>
                       {sel && <CheckCircle size={13} style={{ color: 'var(--q-accent)' }} />}
                     </button>
@@ -944,7 +996,7 @@ const SeriesDropdown: React.FC<{
             const isMe = m.userId === user?.id;
             return (
               <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <UserAvatar avatar={m.user.avatar} username={m.user.username} cosmetics={[]} size="sm" />
+                <UserAvatar avatar={m.user.avatar} username={m.user.username} cosmetics={m.user.cosmetics ?? []} size="sm" />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: m.status === 'INVITED' ? 'var(--q-text3)' : 'var(--q-text)' }}>
@@ -1056,7 +1108,7 @@ const SeriesDropdown: React.FC<{
                     background: sel ? 'var(--q-accent-soft)' : 'transparent',
                     cursor: 'pointer', textAlign: 'left',
                   }}>
-                    <UserAvatar avatar={f.user.avatar} username={f.user.username} cosmetics={[]} size="sm" />
+                    <UserAvatar avatar={f.user.avatar} username={f.user.username} cosmetics={f.user.cosmetics ?? []} size="sm" />
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--q-text)' }}>{f.user.username}</span>
                     {sel && <CheckCircle size={13} style={{ color: 'var(--q-accent)', marginLeft: 'auto' }} />}
                   </button>
@@ -1158,9 +1210,34 @@ const SeriesDropdown: React.FC<{
                   borderTop: i > 0 || user ? '1px solid var(--q-line)' : 'none',
                   opacity: done ? 0.55 : 1,
                 }}>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                   {diff && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: diff.grad }}>{diff.icon} {t(`common.difficulty.${c.difficulty.toLowerCase()}`)}</span>}
                   {cat && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff', background: cat.grad }}><cat.Icon size={11} aria-hidden="true" /> {t(`common.category.${c.category}`)}</span>}
+                  {/* Auteur seulement — évite d'avoir à supprimer/recréer la série pour corriger une coquille */}
+                  {user && c.creator?.id === user.id && (
+                    <span className="flex items-center gap-1.5" style={{ marginLeft: 'auto' }}>
+                      {onEdit && (
+                        <button type="button" onClick={() => onEdit(c)} aria-label={t('editChallenge.editButtonLabel')}
+                          className="q-press" style={{
+                            width: 26, height: 26, borderRadius: 8, border: '1px solid var(--q-line)',
+                            background: 'var(--q-bg-flat)', color: 'var(--q-text2)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                          }}>
+                          <Pencil size={12} aria-hidden="true" />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button type="button" onClick={() => onDelete(c)} aria-label={t('editChallenge.deleteButtonLabel')}
+                          className="q-press" style={{
+                            width: 26, height: 26, borderRadius: 8, border: '1px solid var(--q-line)',
+                            background: 'var(--q-bg-flat)', color: '#EF4444',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                          }}>
+                          <Trash2 size={12} aria-hidden="true" />
+                        </button>
+                      )}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--q-text)', marginBottom: 4 }}>{c.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--q-text2)', marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -1173,6 +1250,18 @@ const SeriesDropdown: React.FC<{
                 {done ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#34D399', fontSize: 12, fontWeight: 700 }}>
                     <CheckCircle size={14} aria-hidden="true" /> {t('challengePage.series.done')}
+                  </div>
+                ) : inProgress && !!c.daysUntilUnlock ? (
+                  // Ce jour de la série n'est pas encore déverrouillé (voir seriesLockInfo côté
+                  // backend) — grisé plutôt que cliquable pour rien : sans ça, l'utilisateur ne
+                  // découvrait le blocage qu'après avoir cliqué et reçu le toast d'erreur.
+                  <div style={{
+                    width: '100%', padding: '9px', borderRadius: 12,
+                    background: 'var(--q-bg-flat)', border: '1px solid var(--q-line)',
+                    color: 'var(--q-text3)', fontSize: 13, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}>
+                    <Lock size={13} aria-hidden="true" /> {t('challengePage.series.unlocksIn', { count: c.daysUntilUnlock })}
                   </div>
                 ) : (
                   <button type="button" disabled={actionLoading === c.id} onClick={() => inProgress ? handleCompleteAndRefresh(c.id) : onStart(c.id)} style={{
@@ -1206,10 +1295,22 @@ function buildChallengesQueryParams(skip: number, filters: { category: string; d
   return params;
 }
 
+// Résout le nom de série à afficher selon la langue courante de l'interface, en tenant compte de
+// `originalLang` (langue réelle du 1er défi de la série — voir withTranslatedChallenge côté
+// backend) : si la langue cible correspond déjà à originalLang, `seriesName` (déjà dans la bonne
+// langue) est utilisé tel quel via `undefined` (SeriesDropdown retombe alors sur `name`) ; sinon
+// on prend la traduction mise en cache dans le sens correspondant (seriesNameEn ou seriesNameFr).
+function resolveSeriesDisplayName(seriesChallenges: { seriesNameEn?: string | null; seriesNameFr?: string | null; originalLang?: string }[], uiLang: string): string | undefined {
+  const target = uiLang === 'en' ? 'en' : 'fr';
+  const original = seriesChallenges[0]?.originalLang ?? 'fr';
+  if (target === original) return undefined;
+  return (target === 'en' ? seriesChallenges[0]?.seriesNameEn : seriesChallenges[0]?.seriesNameFr) ?? undefined;
+}
+
 const ChallengePage: React.FC = () => {
   const { t, i18n } = useTranslation();
   usePageTitle(t('challengePage.pageTitle'));
-  const { user, setUser } = useStore();
+  const { user, setUser, notifData } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -1223,6 +1324,9 @@ const ChallengePage: React.FC = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [editingChallenge, setEditingChallenge] = useState<Challenge | null>(null);
+  const [confirmDeleteChallenge, setConfirmDeleteChallenge] = useState<Challenge | null>(null);
+  const [deletingChallenge, setDeletingChallenge] = useState(false);
   const [rewardPopup, setRewardPopup] = useState<{ coins: number; xp: number; isDailyBonus: boolean; multiplier?: number; streakUp?: number; groupSize?: number; groupBonusMultiplier?: number } | null>(null);
   const [inProgressOpen, setInProgressOpen] = useState(true);
   const [availableOpen, setAvailableOpen] = useState(true);
@@ -1294,6 +1398,20 @@ const ChallengePage: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, location.key, i18n.language]);
 
+  // Le poll global des notifications (toutes les 20s, voir useNotificationPolling) détecte une
+  // nouvelle invitation à une série avant ce composant, mais ne met à jour que le compteur
+  // global (cloche) — sans ce second effet, une invitation reçue pendant que cette page est déjà
+  // ouverte ne s'affichait qu'après un rechargement complet. `notifData.pendingSeriesInvites`
+  // ne change (en valeur, donc en dépendance d'effet) que lorsque le nombre réel évolue.
+  useEffect(() => {
+    if (!token || notifData?.pendingSeriesInvites === undefined) return;
+    fetch('/api/series-groups/pending-invites', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setPendingSeriesInvites(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifData?.pendingSeriesInvites]);
+
   // Lit la cible passée par la page d'accueil (voir focusChallengeId ci-dessus) et nettoie
   // l'état de navigation tout de suite pour ne pas la rejouer sur un retour en arrière.
   useEffect(() => {
@@ -1360,8 +1478,12 @@ const ChallengePage: React.FC = () => {
   }, [challenges, inProgressItems, completedItems, mySeriesGroups, user]);
 
   useEffect(() => {
+    // Le token est nécessaire pour que le backend écarte les défis déjà complétés par CET
+    // utilisateur (sinon la suggestion peut retomber sur un défi déjà fait — voir challenges.routes.js).
     const langParam = i18n.language !== 'fr' ? `?lang=${i18n.language}` : '';
-    fetch(`/api/challenges/daily-suggestion${langParam}`)
+    fetch(`/api/challenges/daily-suggestion${langParam}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.id) {
@@ -1370,7 +1492,7 @@ const ChallengePage: React.FC = () => {
         }
       })
       .catch(() => {});
-  }, [i18n.language]);
+  }, [i18n.language, token]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1506,6 +1628,35 @@ const ChallengePage: React.FC = () => {
   const showNotif = (msg: string, type: 'success' | 'error') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3500);
+  };
+
+  const handleDeleteChallenge = async () => {
+    if (!confirmDeleteChallenge || deletingChallenge) return;
+    const id = confirmDeleteChallenge.id;
+    setDeletingChallenge(true);
+    try {
+      const res = await fetch(`/api/challenges/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) { showNotif(data.error || t('editChallenge.deleteError'), 'error'); return; }
+      setChallenges(prev => prev.filter(c => c.id !== id));
+      setInProgressItems(prev => prev.filter(uc => uc.challenge.id !== id));
+      setCompletedItems(prev => prev.filter(uc => uc.challenge.id !== id));
+      setDailyChallenge(prev => prev?.id === id ? null : prev);
+      if (editingChallenge?.id === id) setEditingChallenge(null);
+      // Cache séparé des défis de série (voir seriesFullChallenges) — sans ce nettoyage, un défi
+      // de série supprimé n'aurait disparu qu'après un rechargement complet de la page.
+      setSeriesFullChallenges(prev => {
+        const next: typeof prev = {};
+        for (const [name, list] of Object.entries(prev)) next[name] = list.filter(c => c.id !== id);
+        return next;
+      });
+      showNotif(t('editChallenge.deleteSuccess'), 'success');
+    } catch {
+      showNotif(t('editChallenge.deleteError'), 'error');
+    } finally {
+      setDeletingChallenge(false);
+      setConfirmDeleteChallenge(null);
+    }
   };
 
   const handleOpenInvite = (challenge: Challenge) => {
@@ -1698,12 +1849,17 @@ const ChallengePage: React.FC = () => {
     } finally { setActionLoading(null); }
   };
 
+  // Réutilisé pour les défis de série ci-dessous (computeResolvedSeriesGroupings) — sinon la
+  // recherche ne filtrait que les défis solo, jamais les séries (`seriesFullChallenges` en est
+  // totalement indépendant).
+  const matchesSearch = (c: Challenge): boolean => {
+    const q = search.toLowerCase();
+    return c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q);
+  };
+
   const filtered = isDailyFilter && dailyChallenge
     ? [dailyChallenge]
-    : challenges.filter(c =>
-        c.title.toLowerCase().includes(search.toLowerCase()) ||
-        c.description.toLowerCase().includes(search.toLowerCase())
-      );
+    : challenges.filter(matchesSearch);
 
   const available = filtered.filter(c => getUserStatus(c.id) === null);
 
@@ -1732,6 +1888,18 @@ const ChallengePage: React.FC = () => {
       .map(g => g.seriesName)
   );
 
+  // Série où l'utilisateur n'a que le statut INVITED (pas encore rejoint) : /api/series-groups/mine
+  // renvoie tous les groupes dont il est membre, quel que soit le statut — sans cette exclusion,
+  // une série dont les défis sont publics apparaissait comme un accordéon normal (avec progression,
+  // détails des défis) alors que l'utilisateur ne l'a même pas encore rejointe. Seule la bannière
+  // dédiée "Invitations de série" (renderPendingSeriesInvites) doit la représenter tant que ce n'est
+  // pas accepté — voir computeResolvedSeriesGroupings ci-dessous.
+  const invitedNotJoinedSeriesNames = new Set(
+    mySeriesGroups
+      .filter(g => g.members.some(m => m.userId === user?.id && m.status === 'INVITED'))
+      .map(g => g.seriesName)
+  );
+
   // Regroupe la liste des défis "résolus" en entier (voir fetchSeriesChallenges) par série,
   // en fonction de leur statut de complétion — extrait pour ne pas garder ces boucles/conditions
   // directement dans le corps du composant (cf. computeSoloAvailable/computeSoloInProgress/
@@ -1744,12 +1912,19 @@ const ChallengePage: React.FC = () => {
     if (isDailyFilter) return { seriesMap, inProgressSeriesMap, completedSeriesMap, resolvedSeriesNames };
     for (const [name, full] of Object.entries(seriesFullChallenges)) {
       if (!full.length) continue;
+      // Invitation pas encore acceptée : la série reste "résolue" (le repli solo ne doit pas
+      // essayer de la reconstituer non plus) mais n'apparaît dans AUCUNE des 3 sections — seule
+      // la bannière d'invitation dédiée la représente tant que ce n'est pas rejoint.
+      if (invitedNotJoinedSeriesNames.has(name)) { resolvedSeriesNames.add(name); continue; }
       const statuses = full.map(c => getUserStatus(c.id));
       const allDone = statuses.every(s => s === 'COMPLETED');
       const anyProgress = statuses.some(s => s === 'IN_PROGRESS' || s === 'COMPLETED');
       if (allDone && !activeSeriesGroupNames.has(name)) completedSeriesMap.set(name, full);
       else if (anyProgress || activeSeriesGroupNames.has(name)) inProgressSeriesMap.set(name, full);
-      else seriesMap.set(name, full);
+      // Recherche : comme pour les défis solo (voir `filtered` ci-dessus), seule la section
+      // "Disponibles" est filtrée par le texte recherché — "En cours"/"Terminés" restent
+      // affichés tels quels, une série entière disparaît si aucun de ses défis ne correspond.
+      else if (full.some(matchesSearch)) seriesMap.set(name, full);
       resolvedSeriesNames.add(name);
     }
     return { seriesMap, inProgressSeriesMap, completedSeriesMap, resolvedSeriesNames };
@@ -2475,11 +2650,13 @@ const ChallengePage: React.FC = () => {
             {inProgressSeriesEntries.length > 0 && (
               <div className="flex flex-col gap-2 mb-3">
                 {inProgressSeriesEntries.map(([name, seriesChallenges]) => (
-                  <SeriesDropdown key={name} name={name} displayName={i18n.language !== 'fr' ? (seriesChallenges[0]?.seriesNameEn ?? undefined) : undefined} challenges={seriesChallenges}
+                  <SeriesDropdown key={name} name={name} displayName={resolveSeriesDisplayName(seriesChallenges, i18n.language)} challenges={seriesChallenges}
                     actionLoading={actionLoading} getUserStatus={getUserStatus}
                     onStart={handleStart} onComplete={handleComplete} user={user}
                     onJoined={async () => { await fetchUserChallenges(); await fetchInProgressItems(0); }}
                     onGroupChange={fetchMySeriesGroups} showNotif={showNotif}
+                    onEdit={setEditingChallenge} onDelete={setConfirmDeleteChallenge}
+                    onRefreshSeries={() => fetchSeriesChallenges(name)}
                     forceOpenSeries={focusSeriesName} focusChallengeId={focusChallengeId} />
                 ))}
               </div>
@@ -2491,7 +2668,8 @@ const ChallengePage: React.FC = () => {
                     className={uc.challenge.id === focusChallengeId ? 'q-focus-flash' : undefined}>
                     <ChallengeCard challenge={uc.challenge} status="IN_PROGRESS" isLoading={actionLoading === uc.challenge.id}
                       user={user} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')}
-                      onInvite={handleOpenInvite} isDaily={uc.challenge.id === dailyChallengeId} />
+                      onInvite={handleOpenInvite} onEdit={setEditingChallenge} onDelete={setConfirmDeleteChallenge}
+                      isDaily={uc.challenge.id === dailyChallengeId} />
                   </div>
                 ))}
               </div>
@@ -2522,11 +2700,13 @@ const ChallengePage: React.FC = () => {
             {seriesEntries.length > 0 && (
               <div className="flex flex-col gap-2 mb-3">
                 {seriesEntries.map(([name, seriesChallenges]) => (
-                  <SeriesDropdown key={name} name={name} displayName={i18n.language !== 'fr' ? (seriesChallenges[0]?.seriesNameEn ?? undefined) : undefined} challenges={seriesChallenges}
+                  <SeriesDropdown key={name} name={name} displayName={resolveSeriesDisplayName(seriesChallenges, i18n.language)} challenges={seriesChallenges}
                     actionLoading={actionLoading} getUserStatus={getUserStatus}
                     onStart={handleStart} onComplete={handleComplete} user={user}
                     onJoined={async () => { await fetchUserChallenges(); await fetchInProgressItems(0); }}
-                    onGroupChange={fetchMySeriesGroups} showNotif={showNotif} />
+                    onGroupChange={fetchMySeriesGroups} showNotif={showNotif}
+                    onEdit={setEditingChallenge} onDelete={setConfirmDeleteChallenge}
+                    onRefreshSeries={() => fetchSeriesChallenges(name)} />
                 ))}
               </div>
             )}
@@ -2536,7 +2716,8 @@ const ChallengePage: React.FC = () => {
                 {soloAvailable.map(c => (
                   <ChallengeCard key={c.id} challenge={c} status={null} isLoading={actionLoading === c.id}
                     user={user} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')}
-                    onInvite={handleOpenInvite} isDaily={c.id === dailyChallengeId} />
+                    onInvite={handleOpenInvite} onEdit={setEditingChallenge} onDelete={setConfirmDeleteChallenge}
+                    isDaily={c.id === dailyChallengeId} />
                 ))}
               </div>
             )}
@@ -2570,11 +2751,13 @@ const ChallengePage: React.FC = () => {
             {completedSeriesEntries.length > 0 && (
               <div className="flex flex-col gap-2 mb-3">
                 {completedSeriesEntries.map(([name, seriesChallenges]) => (
-                  <SeriesDropdown key={name} name={name} displayName={i18n.language !== 'fr' ? (seriesChallenges[0]?.seriesNameEn ?? undefined) : undefined} challenges={seriesChallenges}
+                  <SeriesDropdown key={name} name={name} displayName={resolveSeriesDisplayName(seriesChallenges, i18n.language)} challenges={seriesChallenges}
                     actionLoading={actionLoading} getUserStatus={getUserStatus}
                     onStart={handleStart} onComplete={handleComplete} user={user}
                     onJoined={async () => { await fetchUserChallenges(); await fetchInProgressItems(0); }}
-                    onGroupChange={fetchMySeriesGroups} showNotif={showNotif} />
+                    onGroupChange={fetchMySeriesGroups} showNotif={showNotif}
+                    onEdit={setEditingChallenge} onDelete={setConfirmDeleteChallenge}
+                    onRefreshSeries={() => fetchSeriesChallenges(name)} />
                 ))}
               </div>
             )}
@@ -2583,6 +2766,7 @@ const ChallengePage: React.FC = () => {
                 {soloCompleted.map(uc => (
                   <ChallengeCard key={uc.id} challenge={uc.challenge} status="COMPLETED" isLoading={false}
                     user={user} onStart={handleStart} onComplete={handleComplete} onLogin={() => navigate('/login')}
+                    onEdit={setEditingChallenge} onDelete={setConfirmDeleteChallenge}
                     isDaily={uc.challenge.id === dailyChallengeId} />
                 ))}
               </div>
@@ -2625,6 +2809,67 @@ const ChallengePage: React.FC = () => {
 
       {/* ── Modal invitation dans un groupe existant ── */}
       {renderInviteExistingModal()}
+
+      {/* ── Modal de modification d'un défi (auteur uniquement) ── */}
+      <EditChallengeModal
+        challenge={editingChallenge}
+        onClose={() => setEditingChallenge(null)}
+        showNotif={showNotif}
+        onSaved={(updated) => {
+          // Patch en place plutôt qu'un refetch : évite de faire sauter le scroll / réinitialiser
+          // la pagination des listes "en cours" / "disponibles" / "terminés" pour un simple edit.
+          const patch = (c: Challenge): Challenge => c.id === updated.id ? { ...c, ...updated } : c;
+          setChallenges(prev => prev.map(patch));
+          setInProgressItems(prev => prev.map(uc => uc.challenge.id === updated.id ? { ...uc, challenge: patch(uc.challenge) } : uc));
+          setCompletedItems(prev => prev.map(uc => uc.challenge.id === updated.id ? { ...uc, challenge: patch(uc.challenge) } : uc));
+          setDailyChallenge(prev => prev && prev.id === updated.id ? { ...prev, ...updated } : prev);
+          // Les défis de série ne viennent PAS des listes ci-dessus mais d'un cache séparé
+          // (voir seriesFullChallenges / fetchSeriesChallenges) — sans ce patch, une modif sur un
+          // défi de série n'apparaissait qu'après un rechargement complet de la page.
+          setSeriesFullChallenges(prev => {
+            const next: typeof prev = {};
+            for (const [name, list] of Object.entries(prev)) next[name] = list.map(patch);
+            return next;
+          });
+        }}
+      />
+
+      {/* ── Confirmation de suppression d'un défi (auteur uniquement) ── */}
+      {confirmDeleteChallenge && (
+        <div role="dialog" aria-modal="true" aria-label={t('editChallenge.deleteConfirmTitle')} style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }} onClick={() => !deletingChallenge && setConfirmDeleteChallenge(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--q-chrome)', borderRadius: 24,
+            border: '1px solid var(--q-line)',
+            padding: '28px 24px', maxWidth: 320, width: '100%', textAlign: 'center',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(239,68,68,0.12)', border: '1.5px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Trash2 size={22} color="#EF4444" aria-hidden="true" />
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--q-text)', marginBottom: 8 }}>{t('editChallenge.deleteConfirmTitle')}</div>
+            <div style={{ fontSize: 13, color: 'var(--q-text2)', marginBottom: 24, lineHeight: 1.5 }}>
+              {t('editChallenge.deleteConfirmBody', { title: confirmDeleteChallenge.title })}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={() => setConfirmDeleteChallenge(null)} disabled={deletingChallenge} style={{
+                flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
+                background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                opacity: deletingChallenge ? 0.6 : 1,
+              }}>{t('common.cancel')}</button>
+              <button type="button" onClick={handleDeleteChallenge} disabled={deletingChallenge} style={{
+                flex: 1, padding: '12px', borderRadius: 12, border: 'none',
+                background: 'linear-gradient(135deg,#EF4444,#DC2626)',
+                color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                opacity: deletingChallenge ? 0.6 : 1,
+              }}>{deletingChallenge ? '…' : t('common.delete')}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div aria-live="polite" aria-atomic="true" className="sr-only">{notification?.msg}</div>
       {notification && (

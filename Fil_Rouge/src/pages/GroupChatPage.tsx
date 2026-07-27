@@ -6,18 +6,19 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { useVisibilityPausedInterval } from '../hooks/useVisibilityPausedInterval';
 import { ArrowLeft, Send, Users, Loader2 } from 'lucide-react';
 import UserAvatar from '../components/UserAvatar';
+import type { EquippedCosmetic } from '../lib/cosmetics';
 
 type Member = {
   id: number; groupId: number; userId: number; status: string;
-  user: { id: number; username: string; avatar?: string };
+  user: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] };
 };
 type Msg = {
   id: number; groupId: number; userId: number; content: string; createdAt: string;
-  user: { id: number; username: string; avatar?: string };
+  user: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] };
 };
 type GroupData = {
   id: number; seriesName: string; createdBy: number;
-  creator: { id: number; username: string; avatar?: string };
+  creator: { id: number; username: string; avatar?: string; cosmetics?: EquippedCosmetic[] };
   members: Member[];
   messages: Msg[];
 };
@@ -184,7 +185,7 @@ const GroupChatPage: React.FC = () => {
         <div style={{ display: 'flex', marginLeft: 'auto' }}>
           {joined.slice(0, 4).map((m, i) => (
             <div key={m.userId} style={{ marginLeft: i === 0 ? 0 : -8, zIndex: joined.length - i, borderRadius: '50%', border: '2px solid var(--q-chrome)' }}>
-              <UserAvatar avatar={m.user.avatar} username={m.user.username} size="xs" cosmetics={[]} />
+              <UserAvatar avatar={m.user.avatar} username={m.user.username} size="xs" cosmetics={m.user.cosmetics ?? []} />
             </div>
           ))}
         </div>
@@ -211,7 +212,7 @@ const GroupChatPage: React.FC = () => {
             }}>
               {!isMe && (
                 <div style={{ width: 28, flexShrink: 0, alignSelf: 'flex-end', marginBottom: 2 }}>
-                  {showAvatar && <UserAvatar avatar={msg.user.avatar} username={msg.user.username} size="xs" cosmetics={[]} />}
+                  {showAvatar && <UserAvatar avatar={msg.user.avatar} username={msg.user.username} size="xs" cosmetics={msg.user.cosmetics ?? []} />}
                 </div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>

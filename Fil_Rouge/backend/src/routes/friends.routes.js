@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../lib/auth.js';
+import { USER_MINI_SELECT } from '../lib/userUtils.js';
 
 const router = Router();
 
@@ -57,8 +58,8 @@ router.get('/api/friends', authMiddleware, async (req, res) => {
     const rows = await prisma.friend.findMany({
       where: { OR: [{ senderId: req.userId }, { receiverId: req.userId }], status: 'ACCEPTED' },
       include: {
-        sender:   { select: { id: true, username: true, avatar: true, level: true, xp: true } },
-        receiver: { select: { id: true, username: true, avatar: true, level: true, xp: true } },
+        sender:   { select: { ...USER_MINI_SELECT, level: true, xp: true } },
+        receiver: { select: { ...USER_MINI_SELECT, level: true, xp: true } },
       }
     });
     const friends = rows.map(r => ({
@@ -77,7 +78,7 @@ router.get('/api/friends/requests', authMiddleware, async (req, res) => {
   try {
     const requests = await prisma.friend.findMany({
       where: { receiverId: req.userId, status: 'PENDING' },
-      include: { sender: { select: { id: true, username: true, avatar: true, level: true } } },
+      include: { sender: { select: { ...USER_MINI_SELECT, level: true } } },
       orderBy: { createdAt: 'desc' }
     });
     res.json(requests);

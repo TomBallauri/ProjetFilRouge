@@ -3,19 +3,9 @@ import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../lib/auth.js';
 import { streakService } from '../lib/streak.js';
 import { isInviteExpired, expireStaleInvites, GROUP_LIST_INCLUDE, GROUP_INCLUDE } from '../lib/groupHelpers.js';
+import { USER_MINI_SELECT } from '../lib/userUtils.js';
 
-const MSG_USER_SELECT = {
-  select: {
-    id: true, username: true, avatar: true,
-    cosmetics: {
-      where: { equipped: true },
-      select: {
-        cosmeticId: true, equipped: true,
-        cosmetic: { select: { id: true, name: true, type: true, rarity: true, imageUrl: true } }
-      }
-    }
-  }
-};
+const MSG_USER_SELECT = { select: USER_MINI_SELECT };
 
 const router = Router();
 

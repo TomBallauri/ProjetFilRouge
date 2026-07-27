@@ -7,32 +7,44 @@ import { translateTexts } from './translate.js';
 // aux descriptions (phrases complètes où des guillemets peuvent être légitimes).
 const stripDecorativeQuotes = (text) => text.replace(/["'“”‘’]/g, '').trim();
 
-// Traduit et met en cache (colonnes titleEn/descriptionEn) un défi à la volée.
-// Ne fait un appel DeepL que si la traduction n'a jamais été calculée — sinon
-// on relit simplement le cache déjà en base.
-// `seriesNameEn` (déjà résolu par ensureSeriesNamesTranslated, voir plus bas) est
-// ajouté tel quel dans le résultat, SANS jamais écraser `seriesName` — ce dernier
-// reste la clé stable (en français) utilisée pour l'URL des endpoints by-series
-// et les groupes de série ; seul `seriesNameEn` sert à l'affichage.
-export async function withTranslatedChallenge(challenge, lang, seriesNameEn) {
-  if (lang !== 'en') return challenge;
-  const resolvedSeriesNameEn = challenge.seriesName
-    ? (challenge.seriesNameEn ?? seriesNameEn ?? null)
-    : null;
-  if (challenge.titleEn) {
+// Seules fr/en sont réellement gérées (voir detectBrowserLanguageCode côté frontend) — toute
+// autre valeur (ou absence de lang) retombe sur 'fr'.
+const targetLangOf = (lang) => (lang === 'en' ? 'en' : 'fr');
+
+// Traduit un défi dans les DEUX sens et met en cache le résultat. `originalLang` (définie à la
+// création/dernière édition — voir POST /api/challenges et PUT /api/challenges/:id) indique la
+// langue réelle de `title`/`description`, qui n'est PAS toujours le français (ex: un défi créé
+// via le générateur IA pendant que l'interface était en anglais). Si la langue demandée est déjà
+// `originalLang`, rien à faire ; sinon on traduit vers l'AUTRE langue, mise en cache dans
+// titleEn/descriptionEn (si originalLang='fr') ou titleFr/descriptionFr (si originalLang='en') —
+// jamais les deux paires à la fois pour un même défi, une seule direction est jamais nécessaire.
+// `seriesName` reste la clé stable utilisée pour l'URL des endpoints by-series et les groupes de
+// série, quelle que soit sa langue d'origine — seul seriesNameEn/seriesNameFr sert à l'affichage
+// (déjà résolu par ensureSeriesNamesTranslated, voir plus bas).
+export async function withTranslatedChallenge(challenge, lang, resolvedSeriesName) {
+  const target = targetLangOf(lang);
+  const original = challenge.originalLang ?? 'fr';
+  if (target === original) return challenge;
+
+  const seriesNameKey = target === 'en' ? 'seriesNameEn' : 'seriesNameFr';
+  const seriesNameOut = challenge.seriesName ? (challenge[seriesNameKey] ?? resolvedSeriesName ?? null) : null;
+  const titleField = target === 'en' ? 'titleEn' : 'titleFr';
+  const descField = target === 'en' ? 'descriptionEn' : 'descriptionFr';
+
+  if (challenge[titleField]) {
     return {
       ...challenge,
-      title: challenge.titleEn,
-      description: challenge.descriptionEn ?? challenge.description,
-      seriesNameEn: resolvedSeriesNameEn,
+      title: challenge[titleField],
+      description: challenge[descField] ?? challenge.description,
+      [seriesNameKey]: seriesNameOut,
     };
   }
-  const translated = await translateTexts([challenge.title, challenge.description]);
-  if (!translated) return { ...challenge, seriesNameEn: resolvedSeriesNameEn }; // repli silencieux vers le FR
-  const titleEn = stripDecorativeQuotes(translated[0]);
-  const descriptionEn = translated[1];
-  await prisma.challenge.update({ where: { id: challenge.id }, data: { titleEn, descriptionEn } }).catch(() => {});
-  return { ...challenge, title: titleEn, description: descriptionEn, seriesNameEn: resolvedSeriesNameEn };
+  const translated = await translateTexts([challenge.title, challenge.description], target.toUpperCase(), original.toUpperCase());
+  if (!translated) return { ...challenge, [seriesNameKey]: seriesNameOut }; // repli silencieux vers le texte source
+  const titleTranslated = stripDecorativeQuotes(translated[0]);
+  const descTranslated = translated[1];
+  await prisma.challenge.update({ where: { id: challenge.id }, data: { [titleField]: titleTranslated, [descField]: descTranslated } }).catch(() => {});
+  return { ...challenge, title: titleTranslated, description: descTranslated, [seriesNameKey]: seriesNameOut };
 }
 
 export async function withTranslatedCosmetic(cosmetic, lang) {
@@ -48,21 +60,27 @@ export async function withTranslatedCosmetic(cosmetic, lang) {
   return { ...cosmetic, name: nameEn, description: descriptionEn };
 }
 
-// Traduit chaque nom de série UNE seule fois (et non une fois par ligne de défi qui
-// le partage) : dédoublonne d'abord, puis propage le résultat à toutes les lignes
-// de la série via updateMany — évite de saturer le quota DeepL avec des appels
-// redondants pour un texte identique.
-async function ensureSeriesNamesTranslated(challenges) {
-  const map = new Map(); // seriesName (FR) -> seriesNameEn
-  const toTranslate = [...new Set(
-    challenges.filter(c => c.seriesName && !c.seriesNameEn).map(c => c.seriesName)
-  )];
-  await Promise.allSettled(toTranslate.map(async (name) => {
-    const translated = await translateTexts([name]);
+// Traduit chaque nom de série UNE seule fois (et non une fois par ligne de défi qui le partage) :
+// dédoublonne d'abord, puis propage le résultat à toutes les lignes de la série via updateMany —
+// évite de saturer le quota DeepL avec des appels redondants pour un texte identique. Bidirectionnel
+// comme withTranslatedChallenge : ignore les séries déjà dans la langue demandée.
+async function ensureSeriesNamesTranslated(challenges, lang) {
+  const target = targetLangOf(lang);
+  const seriesNameKey = target === 'en' ? 'seriesNameEn' : 'seriesNameFr';
+  const originalBySeriesName = new Map();
+  for (const c of challenges) {
+    if (!c.seriesName || c[seriesNameKey]) continue;
+    const original = c.originalLang ?? 'fr';
+    if (original === target) continue;
+    if (!originalBySeriesName.has(c.seriesName)) originalBySeriesName.set(c.seriesName, original);
+  }
+  const map = new Map(); // seriesName (clé stable) -> nom traduit dans la langue cible
+  await Promise.allSettled([...originalBySeriesName.entries()].map(async ([name, original]) => {
+    const translated = await translateTexts([name], target.toUpperCase(), original.toUpperCase());
     if (!translated) return;
-    const seriesNameEn = stripDecorativeQuotes(translated[0]);
-    map.set(name, seriesNameEn);
-    await prisma.challenge.updateMany({ where: { seriesName: name, seriesNameEn: null }, data: { seriesNameEn } }).catch(() => {});
+    const value = stripDecorativeQuotes(translated[0]);
+    map.set(name, value);
+    await prisma.challenge.updateMany({ where: { seriesName: name, [seriesNameKey]: null }, data: { [seriesNameKey]: value } }).catch(() => {});
   }));
   return map;
 }
@@ -76,8 +94,7 @@ async function withTranslatedList(items, translateOne, lang) {
 }
 
 export async function withTranslatedChallenges(challenges, lang) {
-  if (lang !== 'en') return challenges;
-  const seriesMap = await ensureSeriesNamesTranslated(challenges);
+  const seriesMap = await ensureSeriesNamesTranslated(challenges, lang);
   const results = await Promise.allSettled(
     challenges.map(c => withTranslatedChallenge(c, lang, seriesMap.get(c.seriesName)))
   );
@@ -89,7 +106,6 @@ export const withTranslatedCosmetics = (cosmetics, lang) => withTranslatedList(c
 // Variante pour les listes de UserChallenge (le défi est imbriqué sous `.challenge`,
 // utilisée par GET /api/users/me/challenges et /api/users/me/profile-data).
 export async function withTranslatedUserChallenges(userChallenges, lang) {
-  if (lang !== 'en') return userChallenges;
   const rawChallenges = userChallenges.map(uc => uc.challenge);
   const translatedChallenges = await withTranslatedChallenges(rawChallenges, lang);
   return userChallenges.map((uc, i) => ({ ...uc, challenge: translatedChallenges[i] }));

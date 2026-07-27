@@ -428,6 +428,8 @@ const InfoSection: React.FC<InfoSectionProps> = ({
   </div>
 );
 
+const COSMETICS_PAGE_SIZE = 9;
+
 type CosmeticsSectionProps = {
   t: TFunc;
   ownedCosmetics: OwnedCosmetic[];
@@ -443,6 +445,10 @@ const CosmeticsSection: React.FC<CosmeticsSectionProps> = ({
   t, ownedCosmetics, cosmeticsLabel, cosmeticLoading, isOpen, onToggle, handleEquip, handleUnequip,
 }) => {
   const equippedBadgeCount = ownedCosmetics.filter(uc => uc.cosmetic.type === 'BADGE' && uc.equipped).length;
+  // Par 9 (3x3 dans la grille) plutôt que tout afficher d'un coup — une collection bien
+  // fournie de cosmétiques rendait la section démesurément longue une fois dépliée.
+  const [visibleCount, setVisibleCount] = useState(COSMETICS_PAGE_SIZE);
+  const visibleCosmetics = ownedCosmetics.slice(0, visibleCount);
   return (
     <div style={{ padding: '0 18px', marginTop: 8 }}>
       <div data-tour="profile-cosmetics" className="rounded-2xl overflow-hidden" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
@@ -470,7 +476,7 @@ const CosmeticsSection: React.FC<CosmeticsSectionProps> = ({
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {ownedCosmetics.map(uc => {
+                {visibleCosmetics.map(uc => {
                   const rarityColor = TITLE_CLASSES[uc.cosmetic.rarity] ?? '';
                   const isLoading = cosmeticLoading === uc.cosmeticId;
                   const TypeIcon = TYPE_ICONS[uc.cosmetic.type] ?? Package;
@@ -507,6 +513,13 @@ const CosmeticsSection: React.FC<CosmeticsSectionProps> = ({
                   );
                 })}
               </div>
+            )}
+            {visibleCount < ownedCosmetics.length && (
+              <button onClick={() => setVisibleCount(c => c + COSMETICS_PAGE_SIZE)}
+                className="q-press w-full mt-3 py-2.5 rounded-xl text-sm font-bold"
+                style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                {t('profile.loadMore', { count: ownedCosmetics.length - visibleCount })}
+              </button>
             )}
           </div>
         )}
@@ -920,7 +933,7 @@ const EditProfile: React.FC = () => {
 
   const [openSection, setOpenSection] = useState<string | null>('appearance');
   const [openProfileSections, setOpenProfileSections] = useState<OpenProfileSections>({
-    cosmetics: true, info: true, defis: true, history: true, settings: true,
+    cosmetics: false, info: false, defis: false, history: false, settings: false,
   });
   const toggleProfileSection = (key: ProfileSectionKey) =>
     setOpenProfileSections(prev => ({ ...prev, [key]: !prev[key] }));

@@ -88,6 +88,13 @@ model Challenge {
   description   String
   titleEn       String?
   descriptionEn String?
+  // `title`/`description` sont écrits dans `originalLang` (langue de l'interface du créateur
+  // au moment de la création/dernière édition) — pas toujours du français. `titleFr`/
+  // `descriptionFr` sont le pendant de `titleEn`/`descriptionEn` pour le sens inverse (défi
+  // créé en anglais, affiché en français) — voir withTranslatedChallenge dans translateContent.js.
+  originalLang  String           @default("fr")
+  titleFr       String?
+  descriptionFr String?
   difficulty   String // EASY, MEDIUM, HARD, EXPERT
   category     String // GAMING, SPORT, CUISINE, FITNESS, CREATIVITY, KNOWLEDGE, SOCIAL
   coinReward   Int
@@ -96,6 +103,7 @@ model Challenge {
   isPublic     Boolean          @default(true)
   seriesName   String?
   seriesNameEn String?
+  seriesNameFr String?
   createdBy    Int?
   createdAt    DateTime         @default(now())
   creator      User?            @relation(fields: [createdBy], references: [id])

@@ -7,11 +7,12 @@ import {
   isInviteExpired,
   expireStaleInvites,
 } from '../lib/groupHelpers.js';
+import { USER_MINI_SELECT } from '../lib/userUtils.js';
 
 const SERIES_GROUP_INCLUDE = {
-  creator: { select: { id: true, username: true, avatar: true } },
+  creator: { select: USER_MINI_SELECT },
   members: {
-    include: { user: { select: { id: true, username: true, avatar: true } } },
+    include: { user: { select: USER_MINI_SELECT } },
     orderBy: { invitedAt: 'asc' }
   }
 };
@@ -280,8 +281,8 @@ router.get('/api/series-groups/pending-invites', authMiddleware, async (req, res
     const groups = await prisma.seriesGroup.findMany({
       where: { members: { some: { userId: req.userId, status: 'INVITED' } } },
       include: {
-        creator: { select: { id: true, username: true, avatar: true } },
-        members: { include: { user: { select: { id: true, username: true, avatar: true } } } },
+        creator: { select: USER_MINI_SELECT },
+        members: { include: { user: { select: USER_MINI_SELECT } } },
       },
     });
     res.json(groups);
@@ -302,13 +303,13 @@ router.get('/api/series-groups/:id', authMiddleware, async (req, res) => {
       prisma.seriesGroup.findUnique({
         where: { id: groupId },
         include: {
-          creator: { select: { id: true, username: true, avatar: true } },
+          creator: { select: USER_MINI_SELECT },
           members: {
-            include: { user: { select: { id: true, username: true, avatar: true } } },
+            include: { user: { select: USER_MINI_SELECT } },
             orderBy: { invitedAt: 'asc' },
           },
           messages: {
-            include: { user: { select: { id: true, username: true, avatar: true } } },
+            include: { user: { select: USER_MINI_SELECT } },
             orderBy: { createdAt: 'asc' },
             take: 100,
           },
@@ -330,7 +331,7 @@ router.get('/api/series-groups/:id/messages', authMiddleware, async (req, res) =
       prisma.seriesGroupMember.findUnique({ where: { groupId_userId: { groupId, userId: req.userId } } }),
       prisma.seriesGroupMessage.findMany({
         where: { groupId },
-        include: { user: { select: { id: true, username: true, avatar: true } } },
+        include: { user: { select: USER_MINI_SELECT } },
         orderBy: { createdAt: 'asc' },
         take: 100,
       })
@@ -353,7 +354,7 @@ router.post('/api/series-groups/:id/messages', authMiddleware, async (req, res) 
     if (!member || member.status === 'INVITED') return res.status(403).json({ error: 'Non autorisé' });
     const message = await prisma.seriesGroupMessage.create({
       data: { groupId, userId: req.userId, content: content.trim() },
-      include: { user: { select: { id: true, username: true, avatar: true } } },
+      include: { user: { select: USER_MINI_SELECT } },
     });
     res.json(message);
   } catch { res.status(500).json({ error: 'Erreur' }); }
