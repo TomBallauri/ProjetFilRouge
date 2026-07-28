@@ -591,6 +591,12 @@
     "dailyNotAvailable": "Le défi du jour n'est pas encore disponible.",
     "noChallengesFound": "Aucun défi trouvé.",
     "resetFilters": "Réinitialiser les filtres",
+    "today": {
+      "title": "À faire",
+      "empty": "Rien à faire pour l'instant — commence un défi dans « Disponibles » !",
+      "pastEmpty": "Aucun défi complété ce jour-là.",
+      "futureEmpty": "Rien de prévu — les défis n'ont pas de date fixe, tu peux les faire quand tu veux !"
+    },
     "dailySuggestion": "Suggestion du jour",
     "dailyFilteredOnly": "Filtré — défi du jour uniquement",
     "dailyBonusHint": "+50% de récompenses si complété aujourd'hui",
@@ -614,6 +620,7 @@
       "coins": "coins",
       "participants_one": "{{count}} participant",
       "participants_other": "{{count}} participants",
+      "group": "Groupe",
       "groupChallenge": "Défi en groupe"
     },
     "celebration": {
@@ -660,7 +667,8 @@
       "done": "Terminé",
       "start": "Commencer",
       "unlocksIn_one": "Se débloque demain",
-      "unlocksIn_other": "Se débloque dans {{count}} jours"
+      "unlocksIn_other": "Se débloque dans {{count}} jours",
+      "finishPreviousDay": "Termine d'abord le jour précédent"
     },
     "groupCard": {
       "invitedYouText": "{{username}} t'invite à ce défi en groupe",
@@ -707,6 +715,7 @@
       "membersJoined_other": "{{count}} membres"
     },
     "activeGroupsTitle": "Défis en groupe",
+    "groupsSectionTitle": "Groupes",
     "loadingAriaLabel": "Chargement",
     "notif": {
       "joinedGroup": "Tu as rejoint le groupe !",

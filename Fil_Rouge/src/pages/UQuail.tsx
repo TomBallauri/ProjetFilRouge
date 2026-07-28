@@ -35,6 +35,9 @@ type UserChallenge = {
   };
 };
 
+// Sous-ensemble de GET /api/challenges/by-series/:name — seul `daysUntilUnlock` nous intéresse ici.
+type SeriesChallengeLock = { id: number; daysUntilUnlock?: number | null };
+
 type PublicChallenge = {
   id: number; title: string; description: string;
   difficulty: string; category: string;
@@ -170,6 +173,10 @@ const UQuail: React.FC = () => {
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [panelUnreadGroups, setPanelUnreadGroups] = useState<{ groupId: number; seriesName: string }[]>([]);
+  // Verrou "Jour N" par série (voir seriesLockInfo côté backend) — tous les jours d'une série
+  // démarrent IN_PROGRESS en même temps (bulk-save), donc `challenges` seul ne suffit pas à savoir
+  // lesquels sont réellement complétables aujourd'hui pour la section "Ta journée" ci-dessous.
+  const [seriesLocks, setSeriesLocks] = useState<Record<string, SeriesChallengeLock[]>>({});
 
   useEffect(() => {
     if (!user) return;
@@ -204,6 +211,27 @@ const UQuail: React.FC = () => {
       .then(data => setTopUsers(Array.isArray(data) ? data.slice(0, 3) : []))
       .catch(() => {});
   }, [user, i18n.language]);
+
+  // Une fois la liste "en cours" chargée, on va chercher le verrou de chaque série concernée
+  // (voir seriesLocks ci-dessus) — nécessaire pour ne pas afficher un "Jour 3" pas encore
+  // déverrouillé comme si l'utilisateur pouvait le faire aujourd'hui.
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const names = new Set(
+      challenges.filter(c => c.status === 'IN_PROGRESS' && c.challenge.seriesName).map(c => c.challenge.seriesName!)
+    );
+    names.forEach(name => {
+      if (seriesLocks[name]) return;
+      fetch(`/api/challenges/by-series/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then((data: SeriesChallengeLock[] | null) => {
+          if (Array.isArray(data)) setSeriesLocks(prev => ({ ...prev, [name]: data }));
+        })
+        .catch(() => {});
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [challenges]);
 
   useEffect(() => {
     if (!user?.id) { setHomeCosmetics([]); return; }
@@ -291,8 +319,16 @@ const UQuail: React.FC = () => {
   // Au sein d'une même série, on affiche les jours dans l'ordre (2, 3, 4…) plutôt que par
   // date de création — la sauvegarde en masse des défis IA les crée tous "en cours" en
   // parallèle, ce qui ne garantit pas que le jour le plus ancien apparaisse en premier.
+  // Écarte les jours de série pas encore déverrouillés (voir seriesLocks ci-dessus) — sinon
+  // "Ta journée" pouvait mettre en avant un "Jour 3" que l'utilisateur ne peut pas encore valider.
   const inProgress = challenges
     .filter(c => c.status === 'IN_PROGRESS')
+    .filter(c => {
+      const seriesName = c.challenge.seriesName;
+      if (!seriesName) return true;
+      const locked = seriesLocks[seriesName]?.find(l => l.id === c.challengeId)?.daysUntilUnlock;
+      return !locked;
+    })
     .sort(compareBySeriesDayNumber);
   const levelTitle = t(getLevelTitleKey(user.level ?? 1));
 

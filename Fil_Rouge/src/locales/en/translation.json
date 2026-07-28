@@ -591,6 +591,12 @@
     "dailyNotAvailable": "The daily challenge isn't available yet.",
     "noChallengesFound": "No challenges found.",
     "resetFilters": "Reset filters",
+    "today": {
+      "title": "To do",
+      "empty": "Nothing to do right now — start a challenge from \"Available\"!",
+      "pastEmpty": "No challenge completed that day.",
+      "futureEmpty": "Nothing scheduled — challenges have no fixed date, do them whenever you like!"
+    },
     "dailySuggestion": "Daily suggestion",
     "dailyFilteredOnly": "Filtered — daily challenge only",
     "dailyBonusHint": "+50% rewards if completed today",
@@ -614,6 +620,7 @@
       "coins": "coins",
       "participants_one": "{{count}} participant",
       "participants_other": "{{count}} participants",
+      "group": "Group",
       "groupChallenge": "Group challenge"
     },
     "celebration": {
@@ -660,7 +667,8 @@
       "done": "Done",
       "start": "Start",
       "unlocksIn_one": "Unlocks tomorrow",
-      "unlocksIn_other": "Unlocks in {{count}} days"
+      "unlocksIn_other": "Unlocks in {{count}} days",
+      "finishPreviousDay": "Finish the previous day first"
     },
     "groupCard": {
       "invitedYouText": "{{username}} invites you to this group challenge",
@@ -707,6 +715,7 @@
       "membersJoined_other": "{{count}} members"
     },
     "activeGroupsTitle": "Group challenges",
+    "groupsSectionTitle": "Groups",
     "loadingAriaLabel": "Loading",
     "notif": {
       "joinedGroup": "You joined the group!",

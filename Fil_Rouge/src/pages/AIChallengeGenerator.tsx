@@ -320,7 +320,7 @@ function MessagesList({ extraPb, messages, loading, darkMode, theme, t, suggesti
   t: TFunc;
   suggestionKeys: readonly string[];
   onSuggestionClick: (key: string) => void;
-  bottomRef: React.RefObject<HTMLDivElement | null>;
+  bottomRef: React.RefObject<HTMLDivElement>;
 }) {
   return (
     <div className={`px-4 pt-4 space-y-3 ${extraPb}`}>
@@ -547,7 +547,7 @@ function InputBar({ darkMode, theme, phase, error, input, setInput, inputRef, on
   error: string;
   input: string;
   setInput: React.Dispatch<React.SetStateAction<string>>;
-  inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement>;
   onSend: () => void;
   loading: boolean;
   t: TFunc;

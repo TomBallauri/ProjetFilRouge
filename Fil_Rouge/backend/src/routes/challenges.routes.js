@@ -59,13 +59,24 @@ function seriesDayNumber(title) {
   return m ? Number.parseInt(m[0], 10) : null;
 }
 
-async function getSeriesStartDate(userId, seriesName) {
-  const first = await prisma.userChallenge.findFirst({
-    where: { userId, challenge: { seriesName } },
-    orderBy: { startedAt: 'asc' },
-    select: { startedAt: true },
+// Progression de CET utilisateur pour chaque jour numéroté d'une série, en une seule requête —
+// partagée par seriesLockInfo ci-dessous (affichage ET application), pour ne jamais refaire une
+// requête par défi.
+async function getSeriesProgressByDayNumber(userId, seriesName) {
+  const rows = await prisma.challenge.findMany({
+    where: { seriesName },
+    select: {
+      title: true,
+      participants: { where: { userId }, select: { status: true, completedAt: true } },
+    },
   });
-  return first?.startedAt ?? null;
+  const map = new Map();
+  for (const c of rows) {
+    const dayNumber = seriesDayNumber(c.title);
+    if (dayNumber === null || c.participants.length === 0) continue;
+    map.set(dayNumber, c.participants[0]);
+  }
+  return map;
 }
 
 function daysElapsedSince(startDate) {
@@ -76,17 +87,26 @@ function daysElapsedSince(startDate) {
   return Math.round((todayUTC - startUTC) / 86_400_000);
 }
 
-// Renvoie null si le défi n'est pas verrouillé, sinon le nombre de jours restants avant
-// déverrouillage. `title` sans numéro de jour identifiable (ex: les 5 défis variés générés sans
-// durée précisée, voir le prompt système IA) n'est jamais verrouillé — l'ordre n'a alors aucun
-// sens à imposer.
-async function seriesLockInfo(userId, seriesName, title) {
-  const dayNumber = seriesDayNumber(title);
-  if (dayNumber === null) return null;
-  const startDate = await getSeriesStartDate(userId, seriesName);
-  if (!startDate) return null; // pas encore commencé — rien à verrouiller pour l'instant
-  const daysUntilUnlock = (dayNumber - 1) - daysElapsedSince(startDate);
-  return daysUntilUnlock > 0 ? daysUntilUnlock : null;
+// Renvoie null si le défi n'est pas verrouillé, sinon des infos sur son verrou. `dayNumber` sans
+// numéro identifiable (ex: les 5 défis variés générés sans durée précisée, voir le prompt système
+// IA) n'est jamais verrouillé — l'ordre n'a alors aucun sens à imposer. Jour 1 jamais verrouillé
+// non plus (rien à attendre avant de commencer).
+//
+// Ancré sur la DERNIÈRE VALIDATION (jour N-1) plutôt que sur la date de début de la série : le
+// jour N ne devient complétable qu'un jour (fuseau UTC) après que l'utilisateur a validé le jour
+// N-1, quelle que soit la date à laquelle il a rejoint la série. Une série mise de côté pendant des
+// semaines ne se retrouve donc plus intégralement débloquée au retour (l'ancien calcul, basé sur le
+// temps écoulé depuis le début de la série, permettait ça) — seul le jour qui suit le dernier
+// vraiment complété continue de compter, tout le reste reste bloqué tant que ce jour précédent
+// n'est pas fait.
+function seriesLockInfo(dayNumber, progressByDayNumber) {
+  if (dayNumber === null || dayNumber <= 1) return null;
+  const prev = progressByDayNumber.get(dayNumber - 1);
+  if (!prev || prev.status !== 'COMPLETED' || !prev.completedAt) {
+    return { previousDayIncomplete: true, daysUntilUnlock: null };
+  }
+  const daysUntilUnlock = 1 - daysElapsedSince(prev.completedAt);
+  return daysUntilUnlock > 0 ? { previousDayIncomplete: false, daysUntilUnlock } : null;
 }
 
 const router = Router();
@@ -189,16 +209,14 @@ router.get('/api/challenges/by-series/:seriesName', async (req, res) => {
       orderBy: { id: 'asc' },
     });
     const challenges = await withTranslatedChallenges(rows, req.query.lang);
-    // Une seule requête pour la date de début (partagée par tous les défis de la série), le
+    // Une seule requête pour la progression de toute la série (partagée par tous ses défis), le
     // reste du calcul se fait en mémoire par défi (voir seriesLockInfo) plutôt que de refaire
     // la requête N fois.
-    const startDate = currentUserId ? await getSeriesStartDate(currentUserId, seriesName) : null;
+    const progressByDayNumber = currentUserId ? await getSeriesProgressByDayNumber(currentUserId, seriesName) : new Map();
     res.json(challenges.map(c => {
       const dayNumber = seriesDayNumber(c.title);
-      const daysUntilUnlock = startDate && dayNumber !== null
-        ? (dayNumber - 1) - daysElapsedSince(startDate)
-        : null;
-      return { ...c, daysUntilUnlock: daysUntilUnlock && daysUntilUnlock > 0 ? daysUntilUnlock : null };
+      const lock = seriesLockInfo(dayNumber, progressByDayNumber);
+      return { ...c, daysUntilUnlock: lock?.daysUntilUnlock ?? null, previousDayIncomplete: !!lock?.previousDayIncomplete };
     }));
   } catch (error) {
     res.status(500).json({ error: 'Erreur' });
@@ -455,15 +473,20 @@ router.post('/api/challenges/:id/complete', async (req, res) => {
     if (uc.status === 'COMPLETED') return res.status(400).json({ error: "Défi déjà complété" });
     const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } });
 
-    // Déverrouillage progressif par numéro de jour (voir seriesLockInfo) — bloque uniquement le
-    // fait d'aller plus vite que le calendrier, pas le rattrapage de jours déjà débloqués.
+    // Déverrouillage progressif par numéro de jour, ancré sur la dernière validation (voir
+    // seriesLockInfo) — bloque le fait d'aller plus vite qu'un jour de série par jour calendaire,
+    // qu'un jour précédent n'ait pas encore été validé, ou les deux.
     if (challenge.seriesName) {
-      const daysLeft = await seriesLockInfo(decoded.userId, challenge.seriesName, challenge.title);
-      if (daysLeft !== null) {
+      const dayNumber = seriesDayNumber(challenge.title);
+      const progressByDayNumber = await getSeriesProgressByDayNumber(decoded.userId, challenge.seriesName);
+      const lock = seriesLockInfo(dayNumber, progressByDayNumber);
+      if (lock) {
         return res.status(400).json({
-          error: daysLeft === 1
-            ? 'Ce défi se débloque demain — reviens à ce moment-là !'
-            : `Ce défi se débloque dans ${daysLeft} jours.`,
+          error: lock.previousDayIncomplete
+            ? 'Termine d\'abord le jour précédent de cette série.'
+            : (lock.daysUntilUnlock === 1
+              ? 'Ce défi se débloque demain — reviens à ce moment-là !'
+              : `Ce défi se débloque dans ${lock.daysUntilUnlock} jours.`),
         });
       }
     }
@@ -602,6 +625,27 @@ router.get('/api/users/me/challenges/completed-dates', authMiddleware, async (re
     select: { completedAt: true },
   });
   res.json({ dates: rows.map(r => r.completedAt) });
+});
+
+// Détail des défis complétés sur une plage bornée (bornes incluses) — alimente le clic sur un
+// jour passé de la mini-grille "À faire" (voir renderTodaySection côté frontend), qui a besoin
+// du défi complet (titre, catégorie...), pas juste sa date comme completed-dates ci-dessus.
+// Volontairement séparée de cette dernière plutôt que d'y ajouter `include: { challenge }` : cette
+// route n'est jamais appelée sans bornes (la mini-grille ne couvre qu'une semaine), donc jamais à
+// risque de traduire tout l'historique d'un compte ancien à chaque affichage.
+router.get('/api/users/me/challenges/completed-in-range', authMiddleware, async (req, res) => {
+  const from = new Date(req.query.from);
+  const to = new Date(req.query.to);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+    return res.status(400).json({ error: 'Plage de dates invalide' });
+  }
+  const rows = await prisma.userChallenge.findMany({
+    where: { userId: req.userId, status: 'COMPLETED', completedAt: { gte: from, lte: to } },
+    include: { challenge: { include: { creator: { select: { id: true, username: true, avatar: true } } } } },
+    orderBy: { completedAt: 'desc' },
+  });
+  const translated = await withTranslatedUserChallenges(rows, req.query.lang);
+  res.json(translated.map(uc => ({ completedAt: uc.completedAt, challenge: uc.challenge })));
 });
 
 // Dashboard: toutes les données utilisateur en un seul appel

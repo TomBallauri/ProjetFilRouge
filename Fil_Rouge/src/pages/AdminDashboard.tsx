@@ -291,9 +291,9 @@ const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (!user?.isAdmin) return;
     const endpoints: Record<Tab, { url: string; auth?: boolean; setter: (data: unknown) => void }> = {
-      users: { url: '/api/users', auth: true, setter: setUsers },
-      challenges: { url: '/api/admin/challenges', auth: true, setter: setChallenges },
-      cosmetics: { url: '/api/cosmetics', setter: setCosmetics },
+      users: { url: '/api/users', auth: true, setter: (data) => setUsers(data as AdminUser[]) },
+      challenges: { url: '/api/admin/challenges', auth: true, setter: (data) => setChallenges(data as AdminChallenge[]) },
+      cosmetics: { url: '/api/cosmetics', setter: (data) => setCosmetics(data as AdminCosmetic[]) },
     };
     const { url, auth, setter } = endpoints[tab];
     setLoading(true);
