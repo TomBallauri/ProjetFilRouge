@@ -64,7 +64,9 @@ const CosmeticPreview: React.FC<{ cosmetic: Cosmetic }> = ({ cosmetic }) => {
   if (cosmetic.type === 'AVATAR_FRAME') {
     const frameClass = FRAME_CLASSES[cosmetic.rarity] ?? '';
     if (cosmetic.imageUrl) {
-      const frameInset = 5;
+      // 5 ne dégageait pas assez le décor de cadre placé près d'un coin de son canevas 288×288
+      // (zone qu'un cercle exclut) — voir la même correction dans UserAvatar.tsx/ProfilePage.tsx.
+      const frameInset = 8;
       return (
         <div className="relative w-16 h-16 mx-auto my-2">
           <div className="absolute rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white text-xl font-bold"
@@ -334,56 +336,59 @@ const ShopPage: React.FC = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <BackButton />
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-              <ShoppingBag className="text-pink-500" size={26} aria-hidden="true" />
-              {t('shop.pageTitle')}
-            </h1>
-            <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              {t('shop.subtitle')}
-            </p>
+      {/* Header + barre recherche : sticky pour rester visibles au scroll */}
+      <div className="sticky top-0 z-20 -mt-4 pt-4 md:-mt-6 md:pt-6 pb-1" style={{ background: 'var(--q-bg)' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <BackButton />
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+                <ShoppingBag className="text-pink-500" size={26} aria-hidden="true" />
+                {t('shop.pageTitle')}
+              </h1>
+              <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                {t('shop.subtitle')}
+              </p>
+            </div>
           </div>
-        </div>
-        {user && (
-          <div data-tour="page-boutique" style={{ display: 'flex', alignItems: 'center', gap: 6,
-            background: 'linear-gradient(135deg,#FACC15,#FB923C)',
-            color: '#fff',
-            padding: '7px 12px', borderRadius: 999, fontWeight: 700, fontSize: 13,
-            fontVariantNumeric: 'tabular-nums',
-            boxShadow: '0 4px 12px rgba(251,146,60,0.40)' }}>
-            <CircleDollarSign size={14} aria-hidden="true" /> <AnimatedCoins value={user.coins ?? 0} />
-          </div>
-        )}
-      </div>
-
-      {/* Barre recherche + filtres */}
-      <div className={`${card} border rounded-xl p-3 mb-3 flex gap-2`}>
-        <div className="flex items-center gap-2 flex-1">
-          <Search size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={t('shop.searchPlaceholder')}
-            aria-label={t('shop.searchPlaceholder')}
-            className={`flex-1 bg-transparent text-sm outline-none min-w-0 ${darkMode ? 'placeholder-gray-500' : 'placeholder-gray-400'}`}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} aria-label={t('shop.clearSearch')} className="text-gray-400 hover:text-gray-600">
-              <X size={14} aria-hidden="true" />
-            </button>
+          {user && (
+            <div data-tour="page-boutique" style={{ display: 'flex', alignItems: 'center', gap: 6,
+              background: 'linear-gradient(135deg,#FACC15,#FB923C)',
+              color: '#fff',
+              padding: '7px 12px', borderRadius: 999, fontWeight: 700, fontSize: 13,
+              fontVariantNumeric: 'tabular-nums',
+              boxShadow: '0 4px 12px rgba(251,146,60,0.40)' }}>
+              <CircleDollarSign size={14} aria-hidden="true" /> <AnimatedCoins value={user.coins ?? 0} />
+            </div>
           )}
         </div>
-        <button
-          onClick={() => setFiltersOpen(o => !o)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold flex-shrink-0 transition-colors ${filterBtnClass}`}
-        >
-          <SlidersHorizontal size={14} aria-hidden="true" />
-          {t('shop.filters')}{activeFilters > 0 && ` (${activeFilters})`}
-        </button>
+
+        {/* Barre recherche + filtres */}
+        <div className={`${card} border rounded-xl p-3 mb-3 flex gap-2`}>
+          <div className="flex items-center gap-2 flex-1">
+            <Search size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={t('shop.searchPlaceholder')}
+              aria-label={t('shop.searchPlaceholder')}
+              className={`flex-1 bg-transparent text-sm outline-none min-w-0 ${darkMode ? 'placeholder-gray-500' : 'placeholder-gray-400'}`}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} aria-label={t('shop.clearSearch')} className="text-gray-400 hover:text-gray-600">
+                <X size={14} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setFiltersOpen(o => !o)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold flex-shrink-0 transition-colors ${filterBtnClass}`}
+          >
+            <SlidersHorizontal size={14} aria-hidden="true" />
+            {t('shop.filters')}{activeFilters > 0 && ` (${activeFilters})`}
+          </button>
+        </div>
       </div>
 
       {/* Filtres dépliables */}

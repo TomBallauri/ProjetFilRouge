@@ -184,7 +184,11 @@ const LeaderboardPage: React.FC = () => {
             <div style={{ padding: '8px 0 0' }}>
               <div style={{
                 background: 'var(--q-vibrant-gold)',
-                borderRadius: 28, padding: '24px 16px 0',
+                // Le padding doit couvrir au moins le rayon de l'arrondi (28) sur les côtés qui
+                // touchent un coin — sinon, avec `overflow: hidden`, l'arrondi de la carte mord
+                // sur la zone où l'avatar le plus proche du bord (2e/3e place) est positionné et
+                // coupe une partie de son cadre cosmétique (visible en haut ou sur les côtés).
+                borderRadius: 28, padding: '30px 30px 4px',
                 position: 'relative', overflow: 'hidden',
                 border: '1px solid rgba(255,255,255,0.25)',
                 boxShadow: '0 1px 0 rgba(255,255,255,0.35) inset, 0 14px 32px -10px rgba(250,204,21,0.55)',
@@ -199,7 +203,7 @@ const LeaderboardPage: React.FC = () => {
                     const u = top3[idx];
                     if (!u) return null;
                     const medal = MEDAL_COLOR[rank];
-                    const avatarSize = rank === 1 ? '2xl' : 'xl';
+                    const avatarSize = rank === 1 ? 'lg' : 'xl';
                     return (
                       <button key={u.id} onClick={() => goToProfile(u)}
                         aria-label={t('leaderboard.profileRankLabel', { username: u.username, rank })}

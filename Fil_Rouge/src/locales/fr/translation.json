@@ -595,7 +595,9 @@
       "title": "À faire",
       "empty": "Rien à faire pour l'instant — commence un défi dans « Disponibles » !",
       "pastEmpty": "Aucun défi complété ce jour-là.",
-      "futureEmpty": "Rien de prévu — les défis n'ont pas de date fixe, tu peux les faire quand tu veux !"
+      "futureEmpty": "Rien de prévu — les défis n'ont pas de date fixe, tu peux les faire quand tu veux !",
+      "prevWeek": "Semaine précédente",
+      "nextWeek": "Semaine suivante"
     },
     "dailySuggestion": "Suggestion du jour",
     "dailyFilteredOnly": "Filtré — défi du jour uniquement",
@@ -668,6 +670,8 @@
       "start": "Commencer",
       "unlocksIn_one": "Se débloque demain",
       "unlocksIn_other": "Se débloque dans {{count}} jours",
+      "unlocksInEstimate_one": "≈ Demain, si tu gardes le rythme",
+      "unlocksInEstimate_other": "≈ Dans {{count}} jours, si tu gardes le rythme",
       "finishPreviousDay": "Termine d'abord le jour précédent"
     },
     "groupCard": {

@@ -595,7 +595,9 @@
       "title": "To do",
       "empty": "Nothing to do right now — start a challenge from \"Available\"!",
       "pastEmpty": "No challenge completed that day.",
-      "futureEmpty": "Nothing scheduled — challenges have no fixed date, do them whenever you like!"
+      "futureEmpty": "Nothing scheduled — challenges have no fixed date, do them whenever you like!",
+      "prevWeek": "Previous week",
+      "nextWeek": "Next week"
     },
     "dailySuggestion": "Daily suggestion",
     "dailyFilteredOnly": "Filtered — daily challenge only",
@@ -668,6 +670,8 @@
       "start": "Start",
       "unlocksIn_one": "Unlocks tomorrow",
       "unlocksIn_other": "Unlocks in {{count}} days",
+      "unlocksInEstimate_one": "≈ Tomorrow, if you keep the pace",
+      "unlocksInEstimate_other": "≈ In {{count}} days, if you keep the pace",
       "finishPreviousDay": "Finish the previous day first"
     },
     "groupCard": {

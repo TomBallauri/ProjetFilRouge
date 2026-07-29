@@ -6,13 +6,14 @@ import { isGroupUnread } from '../hooks/useNotificationPolling';
 import { useStore } from '../lib/store';
 import type { User } from '../types/User';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, Star, Zap, Search, Plus, CheckCircle, Clock, Flame, SlidersHorizontal, X, ChevronDown, ChevronUp, ChevronRight, Gamepad2, Activity, UtensilsCrossed, Dumbbell, Palette, BookOpen, Users, Leaf, Music, Heart, Wrench, LayoutGrid, Sparkles, Send, MessageCircle, Mail, PartyPopper, Timer, Loader2, CircleDollarSign, UserPlus, Pencil, Trash2, Lock, CalendarCheck } from 'lucide-react';
+import { Trophy, Star, Zap, Search, Plus, CheckCircle, Clock, Flame, SlidersHorizontal, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Gamepad2, Activity, UtensilsCrossed, Dumbbell, Palette, BookOpen, Users, Leaf, Music, Heart, Wrench, LayoutGrid, Sparkles, Send, MessageCircle, Mail, PartyPopper, Timer, Loader2, CircleDollarSign, UserPlus, Pencil, Trash2, Lock, CalendarCheck } from 'lucide-react';
 import BackButton from '../components/BackButton';
 import UserAvatar from '../components/UserAvatar';
 import PageLoader from '../components/PageLoader';
 import EditChallengeModal from '../components/EditChallengeModal';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 import { startOfWeek, startOfDay, sameDay } from '../lib/completedChallengesStats';
+import { seriesDayNumber } from '../lib/challengeSort';
 
 type Challenge = {
   id: number;
@@ -437,11 +438,20 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
   };
 
   return (
-    <div className="rounded-2xl transition-transform hover:-translate-y-0.5"
+    // Enveloppe en padding (voir la même note dans SeriesDropdown plus bas) plutôt qu'un double
+    // background-clip padding-box/border-box, qui souffre d'un bug de repaint sur certains
+    // navigateurs quand un élément voisin change de hauteur (repli d'une autre section).
+    <div className="transition-transform hover:-translate-y-0.5" style={{
+      borderRadius: isDaily ? 17.5 : 16,
+      padding: isDaily ? 1.5 : 0,
+      background: isDaily ? 'var(--q-vibrant-gold)' : 'transparent',
+      boxShadow: isDaily ? '0 8px 20px -8px rgba(251,146,60,0.55)' : 'none',
+    }}>
+    <div className="rounded-2xl"
       style={{
+        border: isDaily ? 'none' : '1px solid var(--q-line)',
         background: 'var(--q-chrome)',
-        boxShadow: isDaily ? '0 0 0 2px #FACC15, var(--q-shadow)' : 'var(--q-shadow)',
-        border: isDaily ? '1px solid #FACC15' : '1px solid var(--q-line)',
+        boxShadow: 'var(--q-shadow)',
       }}>
 
       <div className="flex items-start gap-3 p-4">
@@ -456,12 +466,6 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
             <div className="flex flex-nowrap gap-1.5 mb-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
               <VibrantChip grad={diff.grad} glow={diff.glow}>{diff.icon}{t(`common.difficulty.${challenge.difficulty.toLowerCase()}`)}</VibrantChip>
               <VibrantChip grad={cat.grad} glow={cat.glow}><CatIcon size={11} aria-hidden="true" /> {t(`common.category.${challenge.category}`)}</VibrantChip>
-              {isDaily && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-amber-900 flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)', boxShadow: '0 3px 10px -2px rgba(251,146,60,0.5)' }}>
-                  <Sparkles size={10} aria-hidden="true" /> +50%
-                </span>
-              )}
               {/* Rendu visible même carte repliée — auparavant seul le compteur de participants
                   (une fois la carte dépliée) laissait deviner qu'un défi se jouait déjà à plusieurs. */}
               {activeGroup && (
@@ -506,6 +510,12 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
               <Zap size={11} aria-hidden="true" className="inline mr-0.5" />
               {challenge.xpReward}{isDaily ? ` → ${Math.floor(challenge.xpReward * 1.5)}` : ''} XP
             </span>
+            {isDaily && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-amber-900 flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#FACC15,#FB923C)', boxShadow: '0 3px 10px -2px rgba(251,146,60,0.5)' }}>
+                <Sparkles size={10} aria-hidden="true" /> +50%
+              </span>
+            )}
             {/* `_count.participants` compte 1 dès que le créateur seul a commencé le défi — pas
                 un vrai groupe. On n'affiche le badge que si quelqu'un d'autre a aussi rejoint. */}
             {challenge._count && challenge._count.participants > 1 && (
@@ -577,6 +587,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
           )}
         </div>
       )}
+    </div>
     </div>
   );
 };
@@ -667,16 +678,28 @@ const SeriesDropdown: React.FC<{
   // Badge "nouveau message" sur l'en-tête repliée — sans ça, un message reçu dans un groupe
   // n'est visible qu'après avoir déjà ouvert la série (le compteur du panneau membre est à
   // l'intérieur), donc impossible de savoir quelle série a du nouveau depuis la liste.
-  const seriesNotif = notifData?.groups.find(g => g.seriesName === name);
-  const hasUnreadMessage = !!(seriesNotif && user && isGroupUnread(seriesNotif, user.id));
-  // Marque la série comme lue dans le même store que la cloche de notifs (voir UQuail.tsx) —
-  // sans ça, ouvrir le tchat ici ne fait disparaître le badge que de ce composant, pas de la
-  // notif globale, qui resterait affichée jusqu'à l'ouverture du panneau d'accueil.
+  //
+  // Rien n'empêche un même utilisateur d'appartenir à PLUSIEURS SeriesGroup pour le même
+  // seriesName (ex: un ancien groupe resté vide + un nouveau créé plus tard) — le panneau membre
+  // le gère déjà (GET /api/series-groups/by-series/:seriesName, "most JOINED members" côté
+  // backend), mais un simple `.find()` ici prenait toujours le PREMIER groupe trouvé, quitte à
+  // afficher "rien de neuf" alors qu'un doublon plus loin dans la liste avait le vrai message :
+  // on regarde donc TOUS les groupes de cette série, pas juste le premier.
+  const seriesNotifs = notifData?.groups.filter(g => g.seriesName === name) ?? [];
+  const unreadSeriesNotif = user ? seriesNotifs.find(g => isGroupUnread(g, user.id)) : undefined;
+  const hasUnreadMessage = !!unreadSeriesNotif;
+  // Marque TOUS les groupes de cette série comme lus (pas seulement celui avec le message non lu)
+  // dans le même store que la cloche de notifs (voir UQuail.tsx) — sans ça, ouvrir le tchat ici ne
+  // fait disparaître le badge que de ce composant, pas de la notif globale, qui resterait affichée
+  // jusqu'à l'ouverture du panneau d'accueil.
   const markSeriesSeen = () => {
-    if (!user || !seriesNotif?.latestMessageId) return;
+    if (!user) return;
     const seenKey = `notif_seen_${user.id}`;
     const currentSeen = JSON.parse(localStorage.getItem(seenKey) ?? '{}');
-    const seenGroups = { ...currentSeen.groups, [String(seriesNotif.groupId)]: seriesNotif.latestMessageId };
+    const seenGroups = { ...currentSeen.groups };
+    for (const g of seriesNotifs) {
+      if (g.latestMessageId) seenGroups[String(g.groupId)] = g.latestMessageId;
+    }
     localStorage.setItem(seenKey, JSON.stringify({ ...currentSeen, groups: seenGroups }));
   };
   const [unreadHeaderCount, setUnreadHeaderCount] = useState(0);
@@ -701,20 +724,20 @@ const SeriesDropdown: React.FC<{
   // neuf et ne déclenchent aucun appel), en comparant aux mêmes IDs "vus" que le badge lui-même
   // pour rester cohérent avec lui.
   useEffect(() => {
-    if (!hasUnreadMessage || !user || !seriesNotif) { setUnreadHeaderCount(0); return; }
+    if (!hasUnreadMessage || !user || !unreadSeriesNotif) { setUnreadHeaderCount(0); return; }
     let cancelled = false;
-    fetch(`/api/series-groups/${seriesNotif.groupId}/messages`, { headers: { Authorization: `Bearer ${token()}` } })
+    fetch(`/api/series-groups/${unreadSeriesNotif.groupId}/messages`, { headers: { Authorization: `Bearer ${token()}` } })
       .then(r => r.ok ? r.json() : null)
       .then((data: SeriesGroupMsg[] | null) => {
         if (cancelled || !Array.isArray(data)) return;
         const seen = JSON.parse(localStorage.getItem(`notif_seen_${user.id}`) ?? '{}');
-        const seenId = seen.groups?.[String(seriesNotif.groupId)] ?? 0;
+        const seenId = seen.groups?.[String(unreadSeriesNotif.groupId)] ?? 0;
         setUnreadHeaderCount(data.filter(m => m.id > seenId && m.userId !== user.id).length);
       })
       .catch(() => {});
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasUnreadMessage, seriesNotif?.groupId, seriesNotif?.latestMessageId, user?.id]);
+  }, [hasUnreadMessage, unreadSeriesNotif?.groupId, unreadSeriesNotif?.latestMessageId, user?.id]);
 
   // Le dropdown se re-rend souvent sans changement de `challenges` (frappe dans le tchat,
   // ticks de polling...) : useMemo évite de re-trier à chaque fois pour rien.
@@ -1247,11 +1270,21 @@ const SeriesDropdown: React.FC<{
   };
 
   return (
+    // Enveloppe en padding (plutôt qu'un double background-clip padding-box/border-box) pour la
+    // bordure dégradée : cette dernière technique souffre d'un bug de repaint sur certains
+    // navigateurs quand un élément voisin change de hauteur (ex: repli du panneau "À faire") —
+    // le contour dégradé restait alors partiellement effacé jusqu'au prochain repaint forcé.
+    <div style={{
+      borderRadius: hasGroup ? 17.5 : 16,
+      padding: hasGroup ? 1.5 : 0,
+      background: hasGroup ? 'var(--q-vibrant-lavender)' : 'transparent',
+      boxShadow: hasGroup ? '0 8px 20px -10px rgba(167,139,250,0.5)' : 'none',
+    }}>
     <div style={{
       borderRadius: 16,
-      border: hasGroup ? '1.5px solid #A78BFA' : '1px solid var(--q-line)',
-      boxShadow: hasGroup ? '0 0 0 2px rgba(167,139,250,0.18)' : 'none',
-      background: 'var(--q-chrome)', overflow: 'hidden',
+      border: hasGroup ? 'none' : '1px solid var(--q-line)',
+      background: 'var(--q-chrome)',
+      overflow: 'hidden',
     }}>
       {/* Header */}
       <button type="button" onClick={() => setOpen(prev => !prev)} style={{
@@ -1397,6 +1430,7 @@ const SeriesDropdown: React.FC<{
         </div>
       )}
     </div>
+    </div>
   );
 };
 
@@ -1414,13 +1448,18 @@ function buildChallengesQueryParams(skip: number, filters: { category: string; d
 }
 
 // Résout le nom de série à afficher selon la langue courante de l'interface, en tenant compte de
-// `originalLang` (langue réelle du 1er défi de la série — voir withTranslatedChallenge côté
-// backend) : si la langue cible correspond déjà à originalLang, `seriesName` (déjà dans la bonne
-// langue) est utilisé tel quel via `undefined` (SeriesDropdown retombe alors sur `name`) ; sinon
-// on prend la traduction mise en cache dans le sens correspondant (seriesNameEn ou seriesNameFr).
+// la langue d'origine du NOM DE SÉRIE (déduite par vote majoritaire des `originalLang` de ses
+// défis, pas seulement du 1er de la liste — un défi édité individuellement sous une autre langue
+// d'interface a son propre originalLang qui diffère alors du reste de la série sans que le nom de
+// série lui-même ait changé de langue ; voir la même logique côté backend dans
+// ensureSeriesNamesTranslated, translateContent.js). Si la langue cible correspond déjà à cette
+// langue d'origine, `seriesName` (déjà dans la bonne langue) est utilisé tel quel via `undefined`
+// (SeriesDropdown retombe alors sur `name`) ; sinon on prend la traduction mise en cache dans le
+// sens correspondant (seriesNameEn ou seriesNameFr).
 function resolveSeriesDisplayName(seriesChallenges: { seriesNameEn?: string | null; seriesNameFr?: string | null; originalLang?: string }[], uiLang: string): string | undefined {
   const target = uiLang === 'en' ? 'en' : 'fr';
-  const original = seriesChallenges[0]?.originalLang ?? 'fr';
+  const enCount = seriesChallenges.filter(c => (c.originalLang ?? 'fr') === 'en').length;
+  const original = enCount > seriesChallenges.length - enCount ? 'en' : 'fr';
   if (target === original) return undefined;
   return (target === 'en' ? seriesChallenges[0]?.seriesNameEn : seriesChallenges[0]?.seriesNameFr) ?? undefined;
 }
@@ -1490,6 +1529,10 @@ const ChallengePage: React.FC = () => {
   const [weekCompletions, setWeekCompletions] = useState<{ completedAt: string; challenge: Challenge }[]>([]);
   // Jour sélectionné dans la mini-grille (0=lundi..6=dimanche) — "aujourd'hui" par défaut.
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>((new Date().getDay() + 6) % 7);
+  // Décalage (en semaines) de la mini-grille par rapport à la semaine en cours — permet de
+  // naviguer vers les semaines suivantes (voir renderTodaySection) pour anticiper les défis de
+  // série encore verrouillés au-delà des 7 prochains jours (voir upcomingByOffset).
+  const [weekOffset, setWeekOffset] = useState(0);
   // Pagination client de "À faire" (10 par 10) — ces listes sont déjà entièrement en mémoire
   // (pas de pagination serveur ici), donc un simple compteur de lignes visibles suffit. Remis à
   // 10 à chaque changement de jour sélectionné pour ne pas garder la pagination d'un autre jour.
@@ -1651,7 +1694,11 @@ const ChallengePage: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.has('daily')) setIsDailyFilter(true);
+    // Le défi du jour vit dans la section "Disponible" (repliée par défaut, voir availableOpen
+    // plus haut) — sans ce dépli, le lien "voir le défi du jour" amenait sur une page où il fallait
+    // encore un clic pour révéler la carte (et sa pastille +50%, visible uniquement une fois la
+    // carte ouverte via son propre `isDaily`, voir ChallengeCard).
+    if (params.has('daily')) { setIsDailyFilter(true); setAvailableOpen(true); }
   }, [location.search]);
 
   useEffect(() => {
@@ -1664,7 +1711,11 @@ const ChallengePage: React.FC = () => {
 
   useEffect(() => {
     if (!user || !token) { setWeekCompletions([]); return; }
+    // Suit `weekOffset` (voir mini-grille dans renderTodaySection) — sinon consulter un jour
+    // passé d'une semaine différente de la semaine en cours continuait à afficher les complétions
+    // de LA semaine en cours (fenêtre de dates jamais mise à jour).
     const from = startOfWeek(new Date());
+    from.setDate(from.getDate() + weekOffset * 7);
     const to = new Date(from); to.setDate(to.getDate() + 7); // exclusif, voir `lte` côté backend
     const langParam = i18n.language !== 'fr' ? `&lang=${i18n.language}` : '';
     fetch(`/api/users/me/challenges/completed-in-range?from=${from.toISOString()}&to=${to.toISOString()}${langParam}`, {
@@ -1673,7 +1724,7 @@ const ChallengePage: React.FC = () => {
       .then(r => r.ok ? r.json() : null)
       .then((data: { completedAt: string; challenge: Challenge }[] | null) => setWeekCompletions(data ?? []))
       .catch(() => {});
-  }, [user, token, i18n.language]);
+  }, [user, token, i18n.language, weekOffset]);
 
   const sortChallenges = (arr: Challenge[]) => [...arr].sort((a, b) => {
     const catCmp = a.category.localeCompare(b.category, 'fr');
@@ -1968,18 +2019,6 @@ const ChallengePage: React.FC = () => {
     } finally { setGroupActionLoading(null); }
   };
 
-  const handleCompleteGroup = async (groupId: number) => {
-    if (!token) return;
-    setGroupActionLoading(groupId);
-    try {
-      const res = await fetch(`/api/groups/${groupId}/complete`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (!res.ok) { showNotif(data.error || t('challengePage.notif.genericError'), 'error'); return; }
-      await fetchGroups();
-      showNotif(data.allCompleted ? t('challengePage.notif.groupAllCompleted') : t('challengePage.notif.groupCompletedWaiting'), 'success');
-    } finally { setGroupActionLoading(null); }
-  };
-
   const toggleDailyFilter = () => {
     const next = !isDailyFilter;
     setIsDailyFilter(next);
@@ -2227,11 +2266,15 @@ const ChallengePage: React.FC = () => {
     return map;
   }, [groups]);
 
-  // Nombre total de groupes (série ou défi unique confondus) avec un message non lu — même
-  // logique que la pastille par série (voir isGroupUnread plus haut, `hasUnreadMessage`), mais
-  // agrégée au niveau de la catégorie ("Groupes"/"En cours") pour être visible sans avoir à
-  // dérouler chaque série une par une.
-  const groupsUnreadCount = user && notifData ? notifData.groups.filter(g => isGroupUnread(g, user.id)).length : 0;
+  // Le badge "En cours" ne doit compter que les messages non lus des groupes réellement affichés
+  // dans cette section (pas le total global de tous les groupes rejoints, y compris les séries
+  // déjà terminées et déplacées vers le profil — voir completedSeriesMap) : sans ce filtre, la
+  // pastille pouvait signaler un non-lu venant d'une série absente de la liste, sans qu'aucune
+  // ligne ne l'explique.
+  const inProgressSeriesNames = new Set(inProgressSeriesEntries.map(([name]) => name));
+  const inProgressGroupsUnreadCount = user && notifData
+    ? notifData.groups.filter(g => inProgressSeriesNames.has(g.seriesName) && isGroupUnread(g, user.id)).length
+    : 0;
 
   const openExistingGroupInvite = (g: ChallengeGroupType) => {
     setInviteExistingGroup(g);
@@ -2246,7 +2289,7 @@ const ChallengePage: React.FC = () => {
   // dans "En cours" mais absent d'"À faire", notamment pour un compte avec beaucoup de séries), et
   // "À faire" n'a plus qu'à afficher une ligne compacte cliquable plutôt que sa propre carte
   // complète (statut de groupe, tchat, invitation...) qui dupliquait ce que "En cours" fait déjà.
-  type TodayRow = { id: number; title: string; description: string; category: string; difficulty: string; seriesName: string | null };
+  type TodayRow = { id: number; title: string; description: string; category: string; difficulty: string; seriesName: string | null; isEstimate?: boolean };
   const actionableToday: TodayRow[] = useMemo(() => {
     const result: TodayRow[] = soloInProgress.map(uc => ({
       id: uc.challenge.id, title: uc.challenge.title, description: uc.challenge.description, category: uc.challenge.category, difficulty: uc.challenge.difficulty, seriesName: null,
@@ -2267,21 +2310,31 @@ const ChallengePage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soloInProgress, inProgressSeriesEntries, userChallenges]);
 
-  // Jours de série encore verrouillés, regroupés par nombre de jours avant déverrouillage — le
-  // déverrouillage d'un jour de série est déterministe (voir seriesLockInfo côté backend), donc on
-  // peut l'afficher à l'avance pour un jour futur de la mini-grille sans rien "deviner". Même
-  // source (`inProgressSeriesEntries`) que ci-dessus pour la même raison de cohérence.
+  // Planning prévisionnel : projette une date pour CHAQUE jour restant non complété d'une série,
+  // même quand le backend ne confirme rien encore (voir seriesLockInfo, previousDayIncomplete) —
+  // en supposant que l'utilisateur enchaîne un jour par jour à partir d'aujourd'hui. Seul le tout
+  // premier jour restant d'une série a une donnée réelle du backend (jour actionnable aujourd'hui,
+  // offset 0, ou compte à rebours confirmé si le jour précédent est déjà complété) ; chaque jour
+  // suivant est déduit en ajoutant 1 (`isEstimate: true`). Recalculé à chaque rendu à partir de
+  // l'état réel : si un jour n'est pas fait à temps, tout le planning se décale tout seul au
+  // rendu suivant, sans qu'on ait besoin de mémoriser un retard nulle part.
   const upcomingByOffset = useMemo(() => {
     const map = new Map<number, TodayRow[]>();
     for (const [seriesName, chs] of inProgressSeriesEntries) {
-      for (const c of chs) {
-        if (!c.daysUntilUnlock || c.daysUntilUnlock <= 0) continue;
-        if (!map.has(c.daysUntilUnlock)) map.set(c.daysUntilUnlock, []);
-        map.get(c.daysUntilUnlock)!.push({ id: c.id, title: c.title, description: c.description, category: c.category, difficulty: c.difficulty, seriesName });
-      }
+      const remaining = [...chs]
+        .filter(c => getUserStatus(c.id) !== 'COMPLETED')
+        .sort((a, b) => (seriesDayNumber(a.title) ?? 0) - (seriesDayNumber(b.title) ?? 0));
+      let runningOffset = 0;
+      remaining.forEach((c, i) => {
+        runningOffset = i === 0 ? (c.daysUntilUnlock && c.daysUntilUnlock > 0 ? c.daysUntilUnlock : 0) : runningOffset + 1;
+        if (runningOffset <= 0) return; // 1er jour restant, actionnable aujourd'hui — déjà dans actionableToday
+        if (!map.has(runningOffset)) map.set(runningOffset, []);
+        map.get(runningOffset)!.push({ id: c.id, title: c.title, description: c.description, category: c.category, difficulty: c.difficulty, seriesName, isEstimate: i > 0 });
+      });
     }
     return map;
-  }, [inProgressSeriesEntries]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inProgressSeriesEntries, userChallenges]);
 
   // Bascule le focus sur un défi déjà affiché plus bas sur CETTE MÊME page (pas de navigation —
   // contrairement à UQuail.tsx qui doit passer par location.state pour venir d'une autre page) :
@@ -2292,11 +2345,13 @@ const ChallengePage: React.FC = () => {
     setFocusSeriesName(seriesName);
   };
 
-  // Mini-calendrier "cette semaine" (lundi → dimanche) : une pastille marque les jours où
-  // l'utilisateur a déjà complété au moins un défi (voir completedDates ci-dessus).
+  // Mini-calendrier (lundi → dimanche de la semaine affichée, décalée de `weekOffset`) : une
+  // pastille marque les jours où l'utilisateur a déjà complété au moins un défi (voir
+  // completedDates ci-dessus).
   const weekDays = useMemo(() => {
     const today = startOfDay(new Date());
     const start = startOfWeek(today);
+    start.setDate(start.getDate() + weekOffset * 7);
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start); d.setDate(d.getDate() + i);
       return {
@@ -2306,10 +2361,23 @@ const ChallengePage: React.FC = () => {
         hasCompleted: completedDates.some(iso => sameDay(new Date(iso), d)),
       };
     });
-  }, [completedDates]);
+  }, [completedDates, weekOffset]);
+
+  // Revient sur "aujourd'hui" en changeant de semaine si elle contient le jour courant, sinon sur
+  // le lundi de la semaine affichée — sans ça, `selectedDayIndex` gardait l'index de la semaine
+  // précédente (ex: index du vendredi) et pointait sur le mauvais jour une fois la semaine changée.
+  useEffect(() => {
+    const idx = weekDays.findIndex(d => d.isToday);
+    setSelectedDayIndex(idx >= 0 ? idx : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekOffset]);
 
   const selectedDay = weekDays[selectedDayIndex] ?? weekDays[0];
-  const todayIndexInWeek = weekDays.findIndex(d => d.isToday);
+  // Diff en jours calendaires réels entre le jour sélectionné et aujourd'hui — plutôt qu'une
+  // différence d'index dans `weekDays` (qui ne marche que pour la semaine en cours : dès qu'on
+  // navigue vers une autre semaine via `weekOffset`, "aujourd'hui" n'a plus forcément d'index dans
+  // le tableau affiché).
+  const futureOffset = Math.round((selectedDay.date.getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
   // Défis complétés le jour sélectionné (uniquement pertinent pour un jour passé — voir
   // renderTodaySection, qui affiche actionableToday à la place quand isToday est vrai).
   const selectedDayCompletions = useMemo(
@@ -2336,44 +2404,25 @@ const ChallengePage: React.FC = () => {
     finally { setInviteExistingLoading(false); }
   };
 
+  // Rendu d'une invitation à un groupe de défi solo (hors série) en attente — seul cas encore
+  // affiché dans la section "Groupes" (voir renderGroupsSection) depuis que les groupes déjà
+  // rejoints en ont été retirés (déjà visibles via le panneau groupe de ChallengeCard).
   const renderGroupCard = (g: ChallengeGroupType) => {
     if (!user) return null;
-    const myMember = g.members.find(m => m.userId === user.id);
-    const isPending = myMember?.status === 'INVITED';
-    const isJoined = myMember?.status === 'JOINED';
-    const isCompleted = myMember?.status === 'COMPLETED';
-    const joinedMembers = g.members.filter(m => m.status !== 'INVITED');
-    const completedCount = joinedMembers.filter(m => m.status === 'COMPLETED').length;
-    const allDone = joinedMembers.length > 0 && completedCount === joinedMembers.length;
-    const canInvite = (isJoined || user.id === g.createdBy) && g.members.length < 4 && !allDone;
-    const allDoneStatus = allDone
-      ? <><PartyPopper size={10} aria-hidden="true" /> {t('challengePage.groupCard.allCompleted')}</>
-      : <><Users size={10} aria-hidden="true" /> {t('challengePage.groupCard.membersCompleted', { count: joinedMembers.length, completed: completedCount, total: joinedMembers.length })}</>;
     return (
       <div key={g.id} className="rounded-2xl p-3" style={{
-        background: 'var(--q-chrome)', border: `1px solid ${isPending ? '#A78BFA' : 'var(--q-line)'}`,
-        boxShadow: isPending ? '0 0 0 2px rgba(167,139,250,0.25)' : 'var(--q-shadow)',
+        background: 'var(--q-chrome)', border: '1px solid #A78BFA',
+        boxShadow: '0 0 0 2px rgba(167,139,250,0.25)',
       }}>
         <div className="flex items-start gap-2 mb-2">
           <div className="flex-1 min-w-0">
             <div className="font-bold text-sm" style={{ color: 'var(--q-text)' }}>{g.challenge.title}</div>
             <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--q-text2)' }}>
-              {isPending
-                ? <><Mail size={10} aria-hidden="true" /> {t('challengePage.groupCard.invitedYouText', { username: g.creator.username })}</>
-                : allDoneStatus}
+              <Mail size={10} aria-hidden="true" /> {t('challengePage.groupCard.invitedYouText', { username: g.creator.username })}
             </div>
           </div>
-          {isPending && (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)' }}>{t('challengePage.groupCard.invitation')}</span>
-          )}
-          {!isPending && (
-            <button onClick={() => openChat(g.id)}
-              className="q-press flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
-              style={{ background: 'var(--q-accent-soft)', color: 'var(--q-accent)', border: '1px solid var(--q-accent)' }}>
-              <MessageCircle size={11} aria-hidden="true" /> {t('challengePage.series.chat')}
-            </button>
-          )}
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#A78BFA,#EC4899)' }}>{t('challengePage.groupCard.invitation')}</span>
         </div>
         {/* Membres */}
         <div className="flex gap-1.5 mb-2 flex-wrap">
@@ -2392,48 +2441,18 @@ const ChallengePage: React.FC = () => {
           })}
         </div>
         {/* Actions */}
-        {isPending && (
-          <div className="flex gap-2">
-            <button onClick={() => handleJoinGroup(g.id)} disabled={groupActionLoading === g.id}
-              className="q-press flex-1 py-2 rounded-full font-bold text-xs text-white disabled:opacity-60 flex items-center justify-center gap-1"
-              style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)' }}>
-              {groupActionLoading === g.id ? <Loader2 size={12} className="animate-spin" /> : <><CheckCircle size={11} /> {t('challengePage.join')}</>}
-            </button>
-            <button onClick={() => handleDeclineGroup(g.id)} disabled={groupActionLoading === g.id}
-              className="q-press flex-1 py-2 rounded-full font-bold text-xs disabled:opacity-60"
-              style={{ background: 'var(--q-line)', color: 'var(--q-text2)' }}>
-              {t('challengePage.decline')}
-            </button>
-          </div>
-        )}
-        {isJoined && !allDone && (
-          <button onClick={() => handleCompleteGroup(g.id)} disabled={groupActionLoading === g.id}
-            className="q-press w-full py-2 rounded-full font-bold text-xs text-white disabled:opacity-60 flex items-center justify-center gap-1"
+        <div className="flex gap-2">
+          <button onClick={() => handleJoinGroup(g.id)} disabled={groupActionLoading === g.id}
+            className="q-press flex-1 py-2 rounded-full font-bold text-xs text-white disabled:opacity-60 flex items-center justify-center gap-1"
             style={{ background: 'linear-gradient(135deg,#34D399,#38BDF8)' }}>
-            {groupActionLoading === g.id
-              ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
-              : <><CheckCircle size={11} aria-hidden="true" /> {t('challengePage.card.markCompleted')}</>}
+            {groupActionLoading === g.id ? <Loader2 size={12} className="animate-spin" /> : <><CheckCircle size={11} /> {t('challengePage.join')}</>}
           </button>
-        )}
-        {isCompleted && !allDone && (
-          <div className="w-full py-2 rounded-full font-bold text-xs text-center flex items-center justify-center gap-1"
-            style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399' }}>
-            <CheckCircle size={11} aria-hidden="true" /> {t('challengePage.groupCard.completedWaitingOthers')}
-          </div>
-        )}
-        {allDone && (
-          <div className="w-full py-2 rounded-full font-bold text-xs text-center flex items-center justify-center gap-1"
-            style={{ background: 'linear-gradient(135deg,rgba(52,211,153,0.2),rgba(56,189,248,0.2))', color: '#34D399' }}>
-            <PartyPopper size={11} aria-hidden="true" /> {t('challengePage.groupCard.groupChallengeCompleted')}
-          </div>
-        )}
-        {canInvite && (
-          <button onClick={() => openExistingGroupInvite(g)}
-            className="q-press w-full py-2 rounded-full font-bold text-xs flex items-center justify-center gap-1 mt-1"
-            style={{ background: 'var(--q-bg)', color: 'var(--q-text2)', border: '1px dashed var(--q-line)' }}>
-            <Plus size={11} aria-hidden="true" /> {t('challengePage.groupCard.inviteFriendsSlots', { count: 4 - g.members.length })}
+          <button onClick={() => handleDeclineGroup(g.id)} disabled={groupActionLoading === g.id}
+            className="q-press flex-1 py-2 rounded-full font-bold text-xs disabled:opacity-60"
+            style={{ background: 'var(--q-line)', color: 'var(--q-text2)' }}>
+            {t('challengePage.decline')}
           </button>
-        )}
+        </div>
       </div>
     );
   };
@@ -2747,34 +2766,28 @@ const ChallengePage: React.FC = () => {
     );
   };
 
-  // ── Groupes : invitations en attente + groupes actifs + groupes terminés ──
-  // Fusionné en une seule section repliable (voir groupsSectionOpen) — trois notifications de la
-  // même famille (jouer un défi à plusieurs) qui n'avaient auparavant aucune raison d'être trois
-  // blocs séparés empilés sur la page.
+  // ── Groupes : invitations en attente uniquement (série ou défi unique) ──
+  // Les groupes déjà rejoints (actifs ou terminés) ne sont plus listés ici : ils sont déjà
+  // visibles directement sur la carte de leur série (bordure/badge "hasGroup", panneau membre) ou
+  // de leur défi (bouton "Tchat"/"Inviter" sur ChallengeCard, voir activeGroup) — les répéter ici
+  // n'apportait rien de plus et faisait apparaître/disparaître toute la section à chaque
+  // chargement de page (voir `groupsLoading` ci-dessous, qui attend maintenant la fin du fetch
+  // avant de décider quoi que ce soit, plutôt que d'afficher un conteneur qui se démonte une fois
+  // vide). Seules les invitations EN ATTENTE (série via pendingSeriesInvites, ou défi unique via
+  // ce filtre sur `groups`) restent affichées : c'est la seule action qui n'a pas déjà sa place
+  // ailleurs (accepter/refuser, avant même que le défi/la série n'apparaisse dans une liste).
+  const pendingSoloGroupInvites = user ? groups.filter(g => g.members.find(m => m.userId === user.id)?.status === 'INVITED') : [];
   const renderGroupsSection = (): React.ReactNode => {
-    if (!user) return null;
-    const activeGroups = groups.filter(g => {
-      const joined = g.members.filter(m => m.status !== 'INVITED');
-      return joined.length === 0 || joined.some(m => m.status !== 'COMPLETED');
-    });
-    const completedGroups = groups.filter(g => {
-      const joined = g.members.filter(m => m.status !== 'INVITED');
-      return joined.length > 0 && joined.every(m => m.status === 'COMPLETED');
-    });
-    const totalCount = pendingSeriesInvites.length + activeGroups.length + completedGroups.length;
-    if (!groupsLoading && totalCount === 0) return null;
+    const totalInvites = pendingSeriesInvites.length + pendingSoloGroupInvites.length;
+    if (!user || groupsLoading || totalInvites === 0) return null;
 
     return (
       <div className="rounded-2xl overflow-hidden mb-4" style={{ background: 'var(--q-chrome)', border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)' }}>
         <SectionHeader icon={<Users size={18} color="#fff" aria-hidden="true" />} label={t('challengePage.groupsSectionTitle')}
-          count={totalCount} grad="linear-gradient(135deg,#A78BFA,#EC4899)"
-          onClick={() => setGroupsSectionOpen(o => !o)} isOpen={groupsSectionOpen}
-          unreadCount={groupsUnreadCount} />
+          count={totalInvites} grad="linear-gradient(135deg,#A78BFA,#EC4899)"
+          onClick={() => setGroupsSectionOpen(o => !o)} isOpen={groupsSectionOpen} />
         {groupsSectionOpen && (
           <div className="flex flex-col gap-2 px-4 pb-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
-            {groupsLoading && (
-              <Loader2 size={16} className="animate-spin mx-auto my-2" style={{ color: 'var(--q-text3)' }} aria-label={t('challengePage.loadingAriaLabel')} />
-            )}
             {pendingSeriesInvites.map(invite => (
               <div key={invite.id} style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
@@ -2821,12 +2834,7 @@ const ChallengePage: React.FC = () => {
                 </div>
               </div>
             ))}
-            {activeGroups.map(g => renderGroupCard(g))}
-            {completedGroups.length > 0 && (
-              <div className="flex flex-col gap-2 opacity-75">
-                {completedGroups.map(g => renderGroupCard(g))}
-              </div>
-            )}
+            {pendingSoloGroupInvites.map(g => renderGroupCard(g))}
           </div>
         )}
       </div>
@@ -2920,7 +2928,6 @@ const ChallengePage: React.FC = () => {
   };
 
   const todayCount = actionableToday.length;
-  const futureOffset = selectedDayIndex - todayIndexInWeek;
   const upcomingForSelected = upcomingByOffset.get(futureOffset) ?? [];
   // Le badge reflète ce qui est réellement affiché sous la grille pour le jour sélectionné —
   // sinon "À faire" garde le compteur d'aujourd'hui même en consultant un autre jour, ce qui
@@ -2965,7 +2972,12 @@ const ChallengePage: React.FC = () => {
           <Lock size={16} aria-hidden="true" style={{ color: 'var(--q-text3)', flexShrink: 0 }} />,
           {
             onRowClick: () => focusChallengeInPage(item.id, item.seriesName),
-            sublabel: <div className="text-xs mt-0.5 font-semibold" style={{ color: 'var(--q-text3)' }}>{t('challengePage.series.unlocksIn', { count: futureOffset })}</div>,
+            // "Estimé" (isEstimate) pour tout jour au-delà du 1er restant d'une série : sa date
+            // dépend d'avoir bouclé les jours précédents pile un par jour, ce que le backend ne
+            // peut pas confirmer à l'avance (voir upcomingByOffset) — d'où le libellé différent.
+            sublabel: <div className="text-xs mt-0.5 font-semibold" style={{ color: 'var(--q-text3)' }}>
+              {t(item.isEstimate ? 'challengePage.series.unlocksInEstimate' : 'challengePage.series.unlocksIn', { count: futureOffset })}
+            </div>,
           },
         ))}
         {renderLoadMoreToday(upcomingForSelected.length)}
@@ -3000,6 +3012,33 @@ const ChallengePage: React.FC = () => {
 
         {todayOpen && (
           <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
+            {/* Navigation semaine par semaine — permet notamment de voir les semaines à venir,
+                au-delà des 7 jours de la semaine en cours (voir upcomingByOffset plus haut). */}
+            <div className="flex items-center justify-between mb-2">
+              <button type="button" onClick={() => setWeekOffset(o => o - 1)}
+                aria-label={t('challengePage.today.prevWeek')}
+                className="q-press" style={{
+                  width: 26, height: 26, borderRadius: 8, border: 'none', flexShrink: 0,
+                  background: 'var(--q-bg-flat)', color: 'var(--q-text2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                }}>
+                <ChevronLeft size={14} aria-hidden="true" />
+              </button>
+              <span className="text-xs font-bold" style={{ color: 'var(--q-text)' }}>
+                {weekDays[0].date.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' })}
+                {' – '}
+                {weekDays[6].date.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' })}
+              </span>
+              <button type="button" onClick={() => setWeekOffset(o => o + 1)}
+                aria-label={t('challengePage.today.nextWeek')}
+                className="q-press" style={{
+                  width: 26, height: 26, borderRadius: 8, border: 'none', flexShrink: 0,
+                  background: 'var(--q-bg-flat)', color: 'var(--q-text2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                }}>
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
+            </div>
             <div className="grid grid-cols-7 gap-1.5 mb-3">
               {weekDays.map((d, i) => (
                 <button key={d.date.toISOString()} type="button" onClick={() => setSelectedDayIndex(i)}
@@ -3110,7 +3149,7 @@ const ChallengePage: React.FC = () => {
         <SectionHeader icon={<Clock size={18} color="#fff" aria-hidden="true" />} label={t('challengePage.sectionInProgress')}
           count={isDailyFilter ? displayedInProgress.length : visibleInProgressCount}
           grad="linear-gradient(135deg,#38BDF8,#A78BFA)" onClick={() => setInProgressOpen(o => !o)} isOpen={inProgressOpen}
-          unreadCount={groupsUnreadCount} />
+          unreadCount={inProgressGroupsUnreadCount} />
         {inProgressOpen && (
           <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
             {inProgressSeriesEntries.length > 0 && (

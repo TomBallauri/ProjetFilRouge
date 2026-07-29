@@ -35,8 +35,13 @@ type UserChallenge = {
   };
 };
 
-// Sous-ensemble de GET /api/challenges/by-series/:name — seul `daysUntilUnlock` nous intéresse ici.
-type SeriesChallengeLock = { id: number; daysUntilUnlock?: number | null };
+// Sous-ensemble de GET /api/challenges/by-series/:name. Les deux champs comptent : juste après un
+// démarrage groupé (ensureSeriesChallengesStarted / "Tout démarrer"), le jour précédent n'a pas
+// encore de tentative du tout, donc `daysUntilUnlock` vaut `null` (pas de compte à rebours) alors
+// que `previousDayIncomplete` est `true` — ignorer ce second champ traitait `null` comme "non
+// verrouillé" et affichait un jour non complétable comme faisable aujourd'hui (voir ChallengePage.tsx
+// SeriesDropdown, qui vérifie déjà correctement les deux).
+type SeriesChallengeLock = { id: number; daysUntilUnlock?: number | null; previousDayIncomplete?: boolean };
 
 type PublicChallenge = {
   id: number; title: string; description: string;
@@ -105,7 +110,7 @@ const PODIUM_SLOTS = [
   { rank: 1, idx: 0 },
   { rank: 3, idx: 2 },
 ];
-const PODIUM_BAR_H: Record<number, number> = { 1: 68, 2: 50, 3: 40 };
+const PODIUM_BAR_H: Record<number, number> = { 1: 88, 2: 66, 3: 52 };
 const PODIUM_MEDAL: Record<number, { bg: string; border: string; color: string }> = {
   1: { bg: '#fff', border: '#FACC15', color: '#92400E' },
   2: { bg: '#fff', border: '#A78BFA', color: '#7C3AED' },
@@ -163,7 +168,7 @@ const IconTile: React.FC<IconTileProps> = ({ cat, size = 50 }) => {
 const UQuail: React.FC = () => {
   const { t, i18n } = useTranslation();
   usePageTitle(t('uquail.pageTitle'));
-  const { user, notifData, notifCount, setNotifCount, openGroupChat } = useStore();
+  const { user, notifData, notifCount, openGroupChat } = useStore();
   const navigate = useNavigate();
   const [challenges, setChallenges] = useState<UserChallenge[]>([]);
   const [homeCosmetics, setHomeCosmetics] = useState<EquippedCosmetic[]>([]);
@@ -326,8 +331,8 @@ const UQuail: React.FC = () => {
     .filter(c => {
       const seriesName = c.challenge.seriesName;
       if (!seriesName) return true;
-      const locked = seriesLocks[seriesName]?.find(l => l.id === c.challengeId)?.daysUntilUnlock;
-      return !locked;
+      const lock = seriesLocks[seriesName]?.find(l => l.id === c.challengeId);
+      return !(lock?.previousDayIncomplete || !!lock?.daysUntilUnlock);
     })
     .sort(compareBySeriesDayNumber);
   const levelTitle = t(getLevelTitleKey(user.level ?? 1));
@@ -463,22 +468,18 @@ const UQuail: React.FC = () => {
                 const seenKey = `notif_seen_${user.id}`;
                 // Read once, use twice
                 const currentSeen = JSON.parse(localStorage.getItem(seenKey) ?? '{}');
-                // Snapshot unread groups BEFORE marking as seen so the panel can display them
+                // Un simple coup d'œil au panneau ne marque PLUS les messages comme lus — avant,
+                // toute la liste `notifData.groups` était marquée vue dès l'ouverture de la cloche,
+                // avant même d'avoir cliqué sur quoi que ce soit : la pastille d'un groupe pouvait
+                // alors disparaître de la page défis sans que son message ait jamais été lu. Seule
+                // l'ouverture réelle du tchat (via openGroupChat ci-dessous, sur clic d'un item du
+                // panneau) marque désormais un groupe comme vu (voir GroupChatModal.markSeen).
                 setPanelUnreadGroups(
                   notifData.groups.filter(g =>
                     g.latestMessageId && g.latestMessageUserId !== user?.id &&
                     g.latestMessageId > ((currentSeen.groups?.[String(g.groupId)]) ?? 0)
                   )
                 );
-                // Mark group messages as seen — friend/invite counts persist until acted on.
-                // Merge into the existing per-group map (don't replace it wholesale): a group
-                // absent from this particular poll must keep its previously-seen id, otherwise
-                // its "seen" record gets wiped and the same old message reappears as unread later.
-                const seenGroups: Record<string, number> = { ...currentSeen.groups };
-                notifData.groups.forEach(g => { seenGroups[String(g.groupId)] = g.latestMessageId ?? 0; });
-                localStorage.setItem(seenKey, JSON.stringify({ ...currentSeen, groups: seenGroups }));
-                // Immediate badge update — next poll will reconfirm
-                setNotifCount(notifData.pendingFriendRequests + notifData.pendingSeriesInvites);
               }
             }} style={{
               width: 40, height: 40, borderRadius: 20, flexShrink: 0,
@@ -786,7 +787,10 @@ const UQuail: React.FC = () => {
           </Link>
         </div>
         <Link to="/leaderboard"
-          className="block rounded-3xl p-4 relative overflow-hidden hover:opacity-95 transition-opacity"
+          // `p-7` (28px) plutôt que `p-4` (16px) : `rounded-3xl` (24px de rayon) + `overflow-hidden`
+          // mordait sinon sur la zone du 2e/3e avatar (le plus proche d'un coin), coupant une
+          // partie de son cadre cosmétique — voir la même correction dans LeaderboardPage.tsx.
+          className="block rounded-3xl p-7 relative overflow-hidden hover:opacity-95 transition-opacity"
           style={{ background: GRAD.butter, boxShadow: `0 14px 32px -10px ${GLOW.butter}` }}>
           <div className="absolute right-[-28px] bottom-[-30px] w-32 h-32 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }} />
           <div className="absolute right-8 top-[-20px] w-16 h-16 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
@@ -800,25 +804,25 @@ const UQuail: React.FC = () => {
                   <div key={u.id} className="flex-1 flex flex-col items-center min-w-0">
                     <div className="relative inline-flex mb-1.5">
                       <UserAvatar avatar={u.avatar} username={u.username} cosmetics={u.cosmetics ?? []}
-                        size={rank === 1 ? 'md' : 'sm'}
+                        size="xl"
                         className={rank === 1 ? 'ring-4 ring-white/60' : 'ring-2 ring-white/40'} />
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
                         style={{ background: medal.bg, color: medal.color, border: `2px solid ${medal.border}`,
-                          fontSize: 10, fontWeight: 800, fontFamily: 'var(--q-display)' }}>
+                          fontSize: 12, fontWeight: 800, fontFamily: 'var(--q-display)' }}>
                         {rank}
                       </div>
                     </div>
-                    <div className="text-xs font-bold text-white truncate max-w-full" style={{ opacity: rank === 1 ? 1 : 0.85 }}>
+                    <div className="text-sm font-bold text-white truncate max-w-full" style={{ opacity: rank === 1 ? 1 : 0.85 }}>
                       {u.username}
                     </div>
-                    <div className="text-[10px] mb-2 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--q-mono)' }}>
-                      <Flame size={9} aria-hidden="true" /> {t('common.daysAbbrev', { count: u.currentStreak })}
+                    <div className="text-xs mb-2 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--q-mono)' }}>
+                      <Flame size={11} aria-hidden="true" /> {t('common.daysAbbrev', { count: u.currentStreak })}
                     </div>
                     <div className="w-full flex items-center justify-center font-black"
                       style={{ height: PODIUM_BAR_H[rank], background: 'rgba(255,255,255,0.25)',
                         borderRadius: '16px 16px 4px 4px',
                         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -3px 0 rgba(0,0,0,0.08)',
-                        fontFamily: 'var(--q-display)', fontSize: rank === 1 ? 24 : 18, color: 'rgba(255,255,255,0.9)' }}>
+                        fontFamily: 'var(--q-display)', fontSize: rank === 1 ? 30 : 24, color: 'rgba(255,255,255,0.9)' }}>
                       {rank}
                     </div>
                   </div>

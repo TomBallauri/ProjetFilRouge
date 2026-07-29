@@ -310,7 +310,12 @@ router.get('/api/series-groups/:id', authMiddleware, async (req, res) => {
           },
           messages: {
             include: { user: { select: USER_MINI_SELECT } },
-            orderBy: { createdAt: 'asc' },
+            // `desc` + `take: 100` pour prendre les 100 PLUS RÉCENTS (un `asc` avec take mais
+            // sans skip renvoie au contraire les 100 plus anciens) — sans quoi un groupe passé
+            // cette barre n'affichait plus jamais ses nouveaux messages, et le "dernier vu" côté
+            // client (voir markSeen dans GroupChatModal.tsx) restait bloqué sur un id trop bas,
+            // la pastille non-lu ne pouvant alors plus jamais retomber à zéro.
+            orderBy: { createdAt: 'desc' },
             take: 100,
           },
         },
@@ -318,6 +323,7 @@ router.get('/api/series-groups/:id', authMiddleware, async (req, res) => {
     ]);
     if (!member) return res.status(403).json({ error: 'Non membre' });
     if (!group) return res.status(404).json({ error: 'Groupe introuvable' });
+    group.messages.reverse();
     res.json(group);
   } catch { res.status(500).json({ error: 'Erreur' }); }
 });
@@ -332,12 +338,14 @@ router.get('/api/series-groups/:id/messages', authMiddleware, async (req, res) =
       prisma.seriesGroupMessage.findMany({
         where: { groupId },
         include: { user: { select: USER_MINI_SELECT } },
-        orderBy: { createdAt: 'asc' },
+        // Voir la note dans GET /api/series-groups/:id ci-dessus : `desc` pour prendre les 100
+        // plus récents, pas les 100 plus anciens.
+        orderBy: { createdAt: 'desc' },
         take: 100,
       })
     ]);
     if (!member) return res.status(403).json({ error: 'Non membre' });
-    res.json(messages);
+    res.json(messages.reverse());
   } catch { res.status(500).json({ error: 'Erreur' }); }
 });
 

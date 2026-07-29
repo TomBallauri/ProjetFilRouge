@@ -186,7 +186,9 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
           <div
             className={`absolute rounded-full overflow-hidden ${equippedFrame?.cosmetic.imageUrl ? '' : frameClass}`}
             style={{
-              inset: equippedFrame?.cosmetic.imageUrl ? '6px' : '0',
+              // 6px ne dégageait pas assez le décor de cadre placé près d'un coin de son canevas
+              // 288×288 (zone qu'un cercle exclut) — il flottait encore à moitié hors de la photo.
+              inset: equippedFrame?.cosmetic.imageUrl ? '13px' : '0',
               border: '5px solid var(--q-bg-flat)',
               boxShadow: '0 8px 24px rgba(251,146,60,0.35)',
             }}
