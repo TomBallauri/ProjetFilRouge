@@ -50,11 +50,7 @@ const UserAvatar: React.FC<Props> = ({
 
   return (
     <div className={`relative flex-shrink-0 ${box} rounded-full ${ringClass} ${className}`}>
-      <div
-        className={`absolute rounded-full overflow-hidden bg-gray-300 ${hasImageFrame ? 'inset-[12.5%]' : 'inset-0'}`}
-      >
-        {/* Cadre image = décor 288×288 carré plaqué sur une photo au masque circulaire.
-            Même inset (12.5%) que ProfilePage.tsx/ShopPage.tsx pour une taille de décor cohérente partout. */}
+      <div className="absolute inset-0 rounded-full overflow-hidden bg-gray-300">
         {avatarUrl
           ? <img src={avatarUrl} alt={username} className="w-full h-full object-cover" />
           : <div className={`w-full h-full flex items-center justify-center font-bold ${text} text-gray-600`}>
