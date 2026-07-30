@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { seriesDayNumber, compareBySeriesDayNumber } from './challengeSort';
+import { seriesDayNumber, compareBySeriesDayNumber, resolveSeriesDisplayName } from './challengeSort';
 
 describe('seriesDayNumber', () => {
   it('extracts the day number from a French title', () => {
@@ -50,5 +50,42 @@ describe('compareBySeriesDayNumber', () => {
     const items = [item('Défi B', null), item('Défi A', null)];
     const sorted = [...items].sort(compareBySeriesDayNumber);
     expect(sorted.map(i => i.challenge.title)).toEqual(['Défi B', 'Défi A']);
+  });
+});
+
+describe('resolveSeriesDisplayName', () => {
+  it('returns undefined when the UI language already matches the series original language', () => {
+    const challenges = [{ originalLang: 'fr', seriesNameEn: 'Cooking', seriesNameFr: null }];
+    expect(resolveSeriesDisplayName(challenges, 'fr')).toBeUndefined();
+  });
+
+  it('returns the cached translation when the UI language differs from the original', () => {
+    const challenges = [{ originalLang: 'fr', seriesNameEn: 'Cooking', seriesNameFr: null }];
+    expect(resolveSeriesDisplayName(challenges, 'en')).toBe('Cooking');
+  });
+
+  it('picks the original language by majority vote, not the first challenge in the list', () => {
+    // Regression test: a single challenge edited under a different UI language changes its own
+    // originalLang without the series name itself having changed language — voting across all
+    // challenges (not just challenges[0]) prevents that one outlier from flipping the whole series.
+    const challenges = [
+      { originalLang: 'en', seriesNameEn: null, seriesNameFr: 'Cuisine' },
+      { originalLang: 'en', seriesNameEn: null, seriesNameFr: 'Cuisine' },
+      { originalLang: 'en', seriesNameEn: null, seriesNameFr: 'Cuisine' },
+      { originalLang: 'fr', seriesNameEn: null, seriesNameFr: 'Cuisine' },
+    ];
+    // Original language is 'en' (majority) so requesting 'en' should fall back to `undefined`
+    // (seriesName is already in the right language), not read the first challenge's originalLang.
+    expect(resolveSeriesDisplayName(challenges, 'en')).toBeUndefined();
+  });
+
+  it('treats a missing originalLang as fr', () => {
+    const challenges = [{ originalLang: undefined, seriesNameEn: 'Reading', seriesNameFr: null }];
+    expect(resolveSeriesDisplayName(challenges, 'en')).toBe('Reading');
+  });
+
+  it('falls back to undefined when the cached translation is missing', () => {
+    const challenges = [{ originalLang: 'fr', seriesNameEn: null, seriesNameFr: null }];
+    expect(resolveSeriesDisplayName(challenges, 'en')).toBeUndefined();
   });
 });

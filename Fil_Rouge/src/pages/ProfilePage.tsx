@@ -222,9 +222,12 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
 
         <div style={{ marginTop: 10 }}>
           {isEditing ? (
-            <input type="text" name="username" value={formData.username} onChange={handleInputChange}
-              aria-label={t('auth.username')}
-              style={{ fontSize: 22, fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--q-accent)', textAlign: 'center', outline: 'none', width: '100%', maxWidth: 280 }} />
+            <>
+              <input type="text" name="username" value={formData.username} onChange={handleInputChange}
+                aria-label={t('auth.username')} maxLength={30}
+                style={{ fontSize: 22, fontFamily: 'var(--q-display)', letterSpacing: -0.3, color: 'var(--q-text)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--q-accent)', textAlign: 'center', outline: 'none', width: '100%', maxWidth: 280 }} />
+              <p style={{ fontSize: 11, color: 'var(--q-text3)', marginTop: 3 }}>{formData.username.length}/30</p>
+            </>
           ) : (
             <div style={{ fontSize: 24, fontFamily: 'var(--q-display)', color: 'var(--q-text)', letterSpacing: -0.3 }}>
               {user.username}

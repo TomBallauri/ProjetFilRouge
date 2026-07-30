@@ -13,7 +13,7 @@ import PageLoader from '../components/PageLoader';
 import EditChallengeModal from '../components/EditChallengeModal';
 import type { EquippedCosmetic } from '../lib/cosmetics';
 import { startOfWeek, startOfDay, sameDay } from '../lib/completedChallengesStats';
-import { seriesDayNumber } from '../lib/challengeSort';
+import { seriesDayNumber, resolveSeriesDisplayName } from '../lib/challengeSort';
 
 type Challenge = {
   id: number;
@@ -476,7 +476,10 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
                 </span>
               )}
             </div>
-            <h3 className="font-bold text-sm leading-snug truncate" style={{ color: 'var(--q-text)' }}>{challenge.title}</h3>
+            {/* `overflowWrap: 'anywhere'` — un texte SANS espace (ex: un titre au maximum des 80
+                caractères autorisés, ou un spam d'un seul "mot" continu) ne trouve aucun point de
+                coupure normal et débordait de la carte au lieu de simplement passer à la ligne. */}
+            <h3 className="font-bold text-sm leading-snug" style={{ color: 'var(--q-text)', overflowWrap: 'anywhere' }}>{challenge.title}</h3>
           </div>
         </button>
         {/* Repliée, seule la bascule d'ouverture reste dans cette rangée — le statut et les
@@ -493,7 +496,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
       {open && (
         <div className="flex flex-col gap-3 px-4 pb-4">
           <div className="text-xs leading-relaxed" style={{ color: 'var(--q-text2)' }}>
-            <p className={expanded ? '' : 'line-clamp-2'}>{challenge.description}</p>
+            <p className={expanded ? '' : 'line-clamp-2'} style={{ overflowWrap: 'anywhere' }}>{challenge.description}</p>
             {hasLongDescription && (
               <button type="button" onClick={() => setExpanded(e => !e)}
                 className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-500 hover:text-sky-400 transition-colors">
@@ -1296,8 +1299,13 @@ const SeriesDropdown: React.FC<{
         ) : (
           <Sparkles size={15} color="var(--q-accent)" aria-hidden="true" style={{ flexShrink: 0 }} />
         )}
+        {/* `whiteSpace: normal` plutôt que `nowrap` + ellipsis : un nom de série assez long
+            ("I want to learn how to play as...") se retrouvait tronqué sans aucun moyen de lire
+            la suite, contrairement à la description d'un défi qui a son bouton "voir plus". Pas
+            besoin d'un bouton ici — l'en-tête grandit simplement de quelques px pour montrer le
+            nom en entier sur 2 lignes au lieu d'une. */}
         <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ minWidth: 0, fontSize: 13, fontWeight: 700, color: 'var(--q-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ minWidth: 0, fontSize: 13, fontWeight: 700, color: 'var(--q-text)', lineHeight: 1.3, overflowWrap: 'anywhere' }}>
             {label}
           </span>
           {hasUnreadMessage && (
@@ -1445,23 +1453,6 @@ function buildChallengesQueryParams(skip: number, filters: { category: string; d
   params.set('limit', '10');
   if (filters.lang !== 'fr') params.set('lang', filters.lang);
   return params;
-}
-
-// Résout le nom de série à afficher selon la langue courante de l'interface, en tenant compte de
-// la langue d'origine du NOM DE SÉRIE (déduite par vote majoritaire des `originalLang` de ses
-// défis, pas seulement du 1er de la liste — un défi édité individuellement sous une autre langue
-// d'interface a son propre originalLang qui diffère alors du reste de la série sans que le nom de
-// série lui-même ait changé de langue ; voir la même logique côté backend dans
-// ensureSeriesNamesTranslated, translateContent.js). Si la langue cible correspond déjà à cette
-// langue d'origine, `seriesName` (déjà dans la bonne langue) est utilisé tel quel via `undefined`
-// (SeriesDropdown retombe alors sur `name`) ; sinon on prend la traduction mise en cache dans le
-// sens correspondant (seriesNameEn ou seriesNameFr).
-function resolveSeriesDisplayName(seriesChallenges: { seriesNameEn?: string | null; seriesNameFr?: string | null; originalLang?: string }[], uiLang: string): string | undefined {
-  const target = uiLang === 'en' ? 'en' : 'fr';
-  const enCount = seriesChallenges.filter(c => (c.originalLang ?? 'fr') === 'en').length;
-  const original = enCount > seriesChallenges.length - enCount ? 'en' : 'fr';
-  if (target === original) return undefined;
-  return (target === 'en' ? seriesChallenges[0]?.seriesNameEn : seriesChallenges[0]?.seriesNameFr) ?? undefined;
 }
 
 const ChallengePage: React.FC = () => {
@@ -1700,6 +1691,26 @@ const ChallengePage: React.FC = () => {
     // carte ouverte via son propre `isDaily`, voir ChallengeCard).
     if (params.has('daily')) { setIsDailyFilter(true); setAvailableOpen(true); }
   }, [location.search]);
+
+  // Déplie "En cours" et "Disponible" dès qu'un filtre (recherche/catégorie/difficulté) devient
+  // actif — sinon les résultats existaient bien mais restaient invisibles derrière deux sections
+  // repliées par défaut, obligeant à cliquer puis scroller pour les trouver. Replie "À faire" en
+  // même temps : cette section n'est PAS filtrée (volontairement — voir son propre commentaire,
+  // elle reste "quoi faire aujourd'hui" même hors résultat de recherche) et son contenu non filtré
+  // ne fait que gêner la lecture des résultats juste en dessous pendant une recherche active. Ne se
+  // déclenche qu'au passage inactif → actif (via le ref), pas à chaque frappe : si l'utilisateur
+  // rouvre "À faire" ou replie "En cours"/"Disponible" à la main pendant qu'il tape, la frappe
+  // suivante ne doit pas annuler son choix.
+  const hadActiveFilterRef = useRef(false);
+  useEffect(() => {
+    const active = !!(search.trim() || selectedCategory || selectedDifficulty);
+    if (active && !hadActiveFilterRef.current) {
+      setTodayOpen(false);
+      setInProgressOpen(true);
+      setAvailableOpen(true);
+    }
+    hadActiveFilterRef.current = active;
+  }, [search, selectedCategory, selectedDifficulty]);
 
   useEffect(() => {
     if (!user || !token) { setCompletedDates([]); return; }
@@ -2250,13 +2261,43 @@ const ChallengePage: React.FC = () => {
 
   const inProgressSeriesEntries = Array.from(inProgressSeriesMap.entries());
 
+  // "En cours" vient de userChallenges (tout ce que l'utilisateur a déjà démarré), pas de la liste
+  // paginée /api/challenges — la recherche/catégorie/difficulté ne l'atteignaient donc jamais :
+  // taper un nom de série dans la barre de recherche ne changeait rien à ce qui s'affichait ici,
+  // même quand cette série était déjà en cours. Filtré ici côté client avec les mêmes critères que
+  // le backend (titre/description/nom de série, catégorie, difficulté — voir GET /api/challenges).
+  const hasActiveFilters = !!search.trim() || !!selectedCategory || !!selectedDifficulty;
+  // `c.title`/`c.description` reflètent déjà la langue d'interface courante (traduits côté
+  // backend au moment du fetch, voir withTranslatedChallenge) — mais `seriesNameForGroup` est la
+  // clé stable du groupe, TOUJOURS dans sa langue d'origine (voir le commentaire sur `name` dans
+  // SeriesDropdown) : chercher un nom de série dans l'autre langue ne matchait donc jamais rien
+  // pour une série d'origine différente. Complété avec seriesNameEn/seriesNameFr (même cache de
+  // traduction que resolveSeriesDisplayName) pour couvrir les deux sens.
+  const matchesActiveFilters = (c: Challenge, seriesNameForGroup: string | null): boolean => {
+    if (selectedCategory && c.category !== selectedCategory) return false;
+    if (selectedDifficulty && c.difficulty !== selectedDifficulty) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return c.title.toLowerCase().includes(q)
+      || c.description.toLowerCase().includes(q)
+      || (seriesNameForGroup ?? '').toLowerCase().includes(q)
+      || (c.seriesNameEn ?? '').toLowerCase().includes(q)
+      || (c.seriesNameFr ?? '').toLowerCase().includes(q);
+  };
+  const filteredInProgressSeriesEntries = hasActiveFilters
+    ? inProgressSeriesEntries.filter(([name, chs]) => chs.some(c => matchesActiveFilters(c, name)))
+    : inProgressSeriesEntries;
+  const filteredSoloInProgress = hasActiveFilters
+    ? soloInProgress.filter(uc => matchesActiveFilters(uc.challenge, null))
+    : soloInProgress;
+
   // Une série au groupe non validé peut être injectée dans inProgressSeriesMap même quand
   // displayedInProgress est vide (l'utilisateur a fini tous ses défis perso) : les sections
   // "En cours"/"Terminés" doivent donc se baser sur ces listes dérivées, pas sur les compteurs bruts.
-  const hasInProgressContent = soloInProgress.length > 0 || inProgressSeriesEntries.length > 0;
+  const hasInProgressContent = filteredSoloInProgress.length > 0 || filteredInProgressSeriesEntries.length > 0;
   // Compteur d'en-tête basé sur ce qui est réellement affiché (et non sur les totaux bruts du
   // backend, qui ne savent pas qu'une série au groupe non validé est déplacée vers "En cours").
-  const visibleInProgressCount = soloInProgress.length + inProgressSeriesEntries.reduce((sum, [, chs]) => sum + chs.length, 0);
+  const visibleInProgressCount = filteredSoloInProgress.length + filteredInProgressSeriesEntries.reduce((sum, [, chs]) => sum + chs.length, 0);
 
   // Groupe actif par défi solo (voir ChallengeCard.activeGroup) — un défi n'a jamais qu'un seul
   // ChallengeGroup à la fois (contrainte créée par POST /api/groups), donc une simple Map suffit.
@@ -3152,9 +3193,9 @@ const ChallengePage: React.FC = () => {
           unreadCount={inProgressGroupsUnreadCount} />
         {inProgressOpen && (
           <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--q-line)', paddingTop: 12 }}>
-            {inProgressSeriesEntries.length > 0 && (
+            {filteredInProgressSeriesEntries.length > 0 && (
               <div className="flex flex-col gap-2 mb-3">
-                {inProgressSeriesEntries.map(([name, seriesChallenges]) => (
+                {filteredInProgressSeriesEntries.map(([name, seriesChallenges]) => (
                   <SeriesDropdown key={name} name={name} displayName={resolveSeriesDisplayName(seriesChallenges, i18n.language)} challenges={seriesChallenges}
                     actionLoading={actionLoading} getUserStatus={getUserStatus}
                     onStart={handleStart} onComplete={handleComplete} user={user}
@@ -3167,9 +3208,9 @@ const ChallengePage: React.FC = () => {
                 ))}
               </div>
             )}
-            {soloInProgress.length > 0 && (
+            {filteredSoloInProgress.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                {soloInProgress.map(uc => (
+                {filteredSoloInProgress.map(uc => (
                   <div key={uc.id} data-challenge-id={uc.challenge.id}
                     className={uc.challenge.id === focusChallengeId ? 'q-focus-flash' : undefined}>
                     <ChallengeCard challenge={uc.challenge} status="IN_PROGRESS" isLoading={actionLoading === uc.challenge.id}

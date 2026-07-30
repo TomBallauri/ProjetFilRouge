@@ -4,6 +4,7 @@ import { authMiddleware } from '../lib/auth.js';
 import { streakService } from '../lib/streak.js';
 import { isInviteExpired, expireStaleInvites, GROUP_LIST_INCLUDE, GROUP_INCLUDE } from '../lib/groupHelpers.js';
 import { USER_MINI_SELECT } from '../lib/userUtils.js';
+import { CHAT_MESSAGE_MAX } from '../lib/textLimits.js';
 
 const MSG_USER_SELECT = { select: USER_MINI_SELECT };
 
@@ -167,6 +168,7 @@ router.post('/api/groups/:id/messages', authMiddleware, async (req, res) => {
   const groupId = Number(req.params.id);
   const { content } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Message vide' });
+  if (content.length > CHAT_MESSAGE_MAX) return res.status(400).json({ error: `Message trop long (max ${CHAT_MESSAGE_MAX} caractères)` });
   try {
     const member = await prisma.challengeGroupMember.findUnique({
       where: { groupId_userId: { groupId, userId: req.userId } }

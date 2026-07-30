@@ -248,20 +248,24 @@ const GroupChatPage: React.FC = () => {
           display: 'flex', alignItems: 'flex-end', gap: 8,
           padding: '10px 0', borderTop: '1px solid var(--q-line)', flexShrink: 0,
         }}>
-          <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder={t('groupChat.sendMessagePlaceholder')}
-            rows={1}
-            aria-label={t('groupChat.messageLabel')}
-            style={{
-              flex: 1, resize: 'none', border: '1.5px solid var(--q-line)',
-              borderRadius: 16, padding: '10px 14px', fontSize: 14, lineHeight: 1.5,
-              background: 'var(--q-chrome)', color: 'var(--q-text)', fontFamily: 'inherit',
-              outline: 'none', maxHeight: 120, overflowY: 'auto',
-            }}
-          />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <textarea
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder={t('groupChat.sendMessagePlaceholder')}
+              rows={1}
+              maxLength={500}
+              aria-label={t('groupChat.messageLabel')}
+              style={{
+                resize: 'none', border: '1.5px solid var(--q-line)',
+                borderRadius: 16, padding: '10px 14px', fontSize: 14, lineHeight: 1.5,
+                background: 'var(--q-chrome)', color: 'var(--q-text)', fontFamily: 'inherit',
+                outline: 'none', maxHeight: 120, overflowY: 'auto',
+              }}
+            />
+            <p style={{ fontSize: 10, color: 'var(--q-text3)', textAlign: 'right', marginTop: 2 }}>{input.length}/500</p>
+          </div>
           <button
             onClick={handleSend}
             disabled={!canSend}

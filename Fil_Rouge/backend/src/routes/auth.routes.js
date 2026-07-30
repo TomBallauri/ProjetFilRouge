@@ -10,6 +10,7 @@ import { isStrongPassword, PASSWORD_REQUIREMENTS_TEXT } from '../lib/password.js
 import { hashToken } from '../lib/tokens.js';
 import { FRONTEND_URL, DEFAULT_AVATAR } from '../lib/config.js';
 import { loginLimiter, registerLimiter, forgotPasswordLimiter } from '../lib/rateLimiters.js';
+import { USERNAME_MAX, lengthError } from '../lib/textLimits.js';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
 
@@ -23,6 +24,8 @@ router.post('/api/auth/register', registerLimiter, async (req, res) => {
   const { username, email, password, avatar } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis.' });
   if (!isStrongPassword(password)) return res.status(400).json({ error: `Mot de passe trop faible : ${PASSWORD_REQUIREMENTS_TEXT}` });
+  const lenErr = lengthError(username, USERNAME_MAX, 'Pseudo');
+  if (lenErr) return res.status(400).json({ error: lenErr });
   try {
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({

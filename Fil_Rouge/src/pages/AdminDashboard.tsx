@@ -627,12 +627,18 @@ const AdminDashboard: React.FC = () => {
         <Modal title={editingChallenge.id == null ? t('admin.createChallenge') : t('admin.editChallenge')} onClose={() => setEditingChallenge(null)}>
           <div className="flex flex-col gap-3">
             <Field label={t('createChallenge.titleLabel')}>{id => (
-              <input id={id} required className={inputCls} style={inputStyle} value={editingChallenge.title ?? ''}
-                onChange={e => setEditingChallenge(c => ({ ...c, title: e.target.value }))} />
+              <>
+                <input id={id} required maxLength={80} className={inputCls} style={inputStyle} value={editingChallenge.title ?? ''}
+                  onChange={e => setEditingChallenge(c => ({ ...c, title: e.target.value }))} />
+                <p className="text-right text-[10px] mt-0.5" style={{ color: 'var(--q-text3)' }}>{(editingChallenge.title ?? '').length}/80</p>
+              </>
             )}</Field>
             <Field label={t('createChallenge.descriptionLabel')}>{id => (
-              <textarea id={id} required rows={3} className={inputCls} style={inputStyle} value={editingChallenge.description ?? ''}
-                onChange={e => setEditingChallenge(c => ({ ...c, description: e.target.value }))} />
+              <>
+                <textarea id={id} required rows={3} maxLength={500} className={inputCls} style={inputStyle} value={editingChallenge.description ?? ''}
+                  onChange={e => setEditingChallenge(c => ({ ...c, description: e.target.value }))} />
+                <p className="text-right text-[10px] mt-0.5" style={{ color: 'var(--q-text3)' }}>{(editingChallenge.description ?? '').length}/500</p>
+              </>
             )}</Field>
             <div className="flex flex-col sm:flex-row gap-3">
               <Field label={t('createChallenge.categoryLabel')}>{id => (
@@ -655,8 +661,11 @@ const AdminDashboard: React.FC = () => {
               )}</Field>
             </div>
             <Field label={t('admin.seriesNameLabel')}>{id => (
-              <input id={id} className={inputCls} style={inputStyle} value={editingChallenge.seriesName ?? ''}
-                onChange={e => setEditingChallenge(c => ({ ...c, seriesName: e.target.value }))} />
+              <>
+                <input id={id} maxLength={80} className={inputCls} style={inputStyle} value={editingChallenge.seriesName ?? ''}
+                  onChange={e => setEditingChallenge(c => ({ ...c, seriesName: e.target.value }))} />
+                <p className="text-right text-[10px] mt-0.5" style={{ color: 'var(--q-text3)' }}>{(editingChallenge.seriesName ?? '').length}/80</p>
+              </>
             )}</Field>
             <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--q-text)' }}>
               <input type="checkbox" checked={editingChallenge.isPublic !== false}
@@ -680,12 +689,18 @@ const AdminDashboard: React.FC = () => {
         <Modal title={editingCosmetic.id == null ? t('admin.createCosmetic') : t('admin.editCosmetic')} onClose={() => setEditingCosmetic(null)}>
           <div className="flex flex-col gap-3">
             <Field label={t('admin.nameLabel')}>{id => (
-              <input id={id} required className={inputCls} style={inputStyle} value={editingCosmetic.name ?? ''}
-                onChange={e => setEditingCosmetic(c => ({ ...c, name: e.target.value }))} />
+              <>
+                <input id={id} required maxLength={80} className={inputCls} style={inputStyle} value={editingCosmetic.name ?? ''}
+                  onChange={e => setEditingCosmetic(c => ({ ...c, name: e.target.value }))} />
+                <p className="text-right text-[10px] mt-0.5" style={{ color: 'var(--q-text3)' }}>{(editingCosmetic.name ?? '').length}/80</p>
+              </>
             )}</Field>
             <Field label={t('createChallenge.descriptionLabel')}>{id => (
-              <textarea id={id} required rows={2} className={inputCls} style={inputStyle} value={editingCosmetic.description ?? ''}
-                onChange={e => setEditingCosmetic(c => ({ ...c, description: e.target.value }))} />
+              <>
+                <textarea id={id} required rows={2} maxLength={500} className={inputCls} style={inputStyle} value={editingCosmetic.description ?? ''}
+                  onChange={e => setEditingCosmetic(c => ({ ...c, description: e.target.value }))} />
+                <p className="text-right text-[10px] mt-0.5" style={{ color: 'var(--q-text3)' }}>{(editingCosmetic.description ?? '').length}/500</p>
+              </>
             )}</Field>
             <div className="flex flex-col sm:flex-row gap-3">
               <Field label={t('shop.typeLabel')}>{id => (

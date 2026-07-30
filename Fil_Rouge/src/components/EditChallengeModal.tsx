@@ -96,12 +96,14 @@ const EditChallengeModal: React.FC<Props> = ({ challenge, onClose, onSaved, show
           <span className="text-xs font-bold" style={{ color: 'var(--q-text2)' }}>{t('editChallenge.titleLabel')}</span>
           <input value={title} onChange={e => setTitle(e.target.value)} maxLength={80} required
             className="w-full mt-1 px-3 py-2 rounded-xl text-sm" style={inputStyle} />
+          <p className="text-right text-[10px] mt-0.5" style={{ color: 'var(--q-text3)' }}>{title.length}/80</p>
         </label>
 
         <label className="block mb-3">
           <span className="text-xs font-bold" style={{ color: 'var(--q-text2)' }}>{t('editChallenge.descriptionLabel')}</span>
           <textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={500} required rows={3}
             className="w-full mt-1 px-3 py-2 rounded-xl text-sm resize-none" style={inputStyle} />
+          <p className="text-right text-[10px] mt-0.5" style={{ color: 'var(--q-text3)' }}>{description.length}/500</p>
         </label>
 
         <div className="grid grid-cols-2 gap-3 mb-3">

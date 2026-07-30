@@ -19,3 +19,20 @@ export function compareBySeriesDayNumber<T extends { challenge: { title: string;
   }
   return 0;
 }
+
+// Résout le nom de série à afficher selon la langue courante de l'interface, en tenant compte de
+// la langue d'origine du NOM DE SÉRIE (déduite par vote majoritaire des `originalLang` de ses
+// défis, pas seulement du 1er de la liste — un défi édité individuellement sous une autre langue
+// d'interface a son propre originalLang qui diffère alors du reste de la série sans que le nom de
+// série lui-même ait changé de langue ; voir la même logique côté backend dans
+// computeSeriesOriginalLangs, seriesVote.js). Si la langue cible correspond déjà à cette langue
+// d'origine, `seriesName` (déjà dans la bonne langue) est utilisé tel quel via `undefined`
+// (SeriesDropdown retombe alors sur `name`) ; sinon on prend la traduction mise en cache dans le
+// sens correspondant (seriesNameEn ou seriesNameFr).
+export function resolveSeriesDisplayName(seriesChallenges: { seriesNameEn?: string | null; seriesNameFr?: string | null; originalLang?: string }[], uiLang: string): string | undefined {
+  const target = uiLang === 'en' ? 'en' : 'fr';
+  const enCount = seriesChallenges.filter(c => (c.originalLang ?? 'fr') === 'en').length;
+  const original = enCount > seriesChallenges.length - enCount ? 'en' : 'fr';
+  if (target === original) return undefined;
+  return (target === 'en' ? seriesChallenges[0]?.seriesNameEn : seriesChallenges[0]?.seriesNameFr) ?? undefined;
+}

@@ -15,6 +15,8 @@ import {
 import { planGroups, paginateKeys, orderRowsByKeys } from '../lib/seriesPagination.js';
 import { aiGenerateLimiter } from '../lib/rateLimiters.js';
 import { withTranslatedChallenge, withTranslatedChallenges, withTranslatedUserChallenges } from '../lib/translateContent.js';
+import { TITLE_MAX, DESCRIPTION_MAX, SERIES_NAME_MAX, CHAT_MESSAGE_MAX, lengthError } from '../lib/textLimits.js';
+import { seriesDayNumber, seriesLockInfo } from '../lib/seriesLock.js';
 
 const DAILY_BONUS_MULTIPLIER = 1.5;
 
@@ -44,21 +46,6 @@ async function getDailyChallenge(userId) {
   return rows[0] ?? null;
 }
 
-// Déverrouillage progressif d'une série "Jour N" : le jour N ne devient complétable que N-1
-// jours (fuseau UTC) après le début de la série POUR CET utilisateur — jour 1 dispo tout de
-// suite, jour 2 le lendemain, etc. Rattrapage naturel : rien n'empêche de valider plusieurs
-// jours déjà débloqués le même jour si l'utilisateur a pris du retard, seul le fait d'aller
-// PLUS VITE que le calendrier est bloqué (voir bulk-save / ensureSeriesChallengesStarted, qui
-// inscrivent tous les jours en IN_PROGRESS d'un coup dès la création/l'inscription — sans ce
-// verrou, rien n'empêchait de tout valider en une seule fois).
-// Partagée avec GET /api/challenges/by-series/:seriesName (indique au front l'état de chaque
-// défi) et POST /api/challenges/:id/complete (fait respecter la règle), pour ne jamais faire
-// diverger le calcul entre affichage et application réelle.
-function seriesDayNumber(title) {
-  const m = /\d+/.exec(title);
-  return m ? Number.parseInt(m[0], 10) : null;
-}
-
 // Progression de CET utilisateur pour chaque jour numéroté d'une série, en une seule requête —
 // partagée par seriesLockInfo ci-dessous (affichage ET application), pour ne jamais refaire une
 // requête par défi.
@@ -79,36 +66,6 @@ async function getSeriesProgressByDayNumber(userId, seriesName) {
   return map;
 }
 
-function daysElapsedSince(startDate) {
-  const startUTC = new Date(startDate);
-  startUTC.setUTCHours(0, 0, 0, 0);
-  const todayUTC = new Date();
-  todayUTC.setUTCHours(0, 0, 0, 0);
-  return Math.round((todayUTC - startUTC) / 86_400_000);
-}
-
-// Renvoie null si le défi n'est pas verrouillé, sinon des infos sur son verrou. `dayNumber` sans
-// numéro identifiable (ex: les 5 défis variés générés sans durée précisée, voir le prompt système
-// IA) n'est jamais verrouillé — l'ordre n'a alors aucun sens à imposer. Jour 1 jamais verrouillé
-// non plus (rien à attendre avant de commencer).
-//
-// Ancré sur la DERNIÈRE VALIDATION (jour N-1) plutôt que sur la date de début de la série : le
-// jour N ne devient complétable qu'un jour (fuseau UTC) après que l'utilisateur a validé le jour
-// N-1, quelle que soit la date à laquelle il a rejoint la série. Une série mise de côté pendant des
-// semaines ne se retrouve donc plus intégralement débloquée au retour (l'ancien calcul, basé sur le
-// temps écoulé depuis le début de la série, permettait ça) — seul le jour qui suit le dernier
-// vraiment complété continue de compter, tout le reste reste bloqué tant que ce jour précédent
-// n'est pas fait.
-function seriesLockInfo(dayNumber, progressByDayNumber) {
-  if (dayNumber === null || dayNumber <= 1) return null;
-  const prev = progressByDayNumber.get(dayNumber - 1);
-  if (!prev || prev.status !== 'COMPLETED' || !prev.completedAt) {
-    return { previousDayIncomplete: true, daysUntilUnlock: null };
-  }
-  const daysUntilUnlock = 1 - daysElapsedSince(prev.completedAt);
-  return daysUntilUnlock > 0 ? { previousDayIncomplete: false, daysUntilUnlock } : null;
-}
-
 const router = Router();
 
 router.get('/api/challenges', async (req, res) => {
@@ -125,11 +82,34 @@ router.get('/api/challenges', async (req, res) => {
       ? { OR: [{ isPublic: true }, { createdBy: currentUserId }] }
       : { isPublic: true };
 
+    // `AND` de conditions plutôt qu'un simple spread d'objets : `visibilityClause` porte déjà sa
+    // propre clé `OR` (voir plus haut) — lui ajouter une seconde clé `OR` pour la recherche via
+    // spread aurait silencieusement écrasé la première (une même clé d'objet ne peut valoir
+    // qu'une chose), désactivant le filtre de visibilité dès qu'un texte de recherche était tapé.
     const where = {
-      ...visibilityClause,
-      ...(category   ? { category }                       : {}),
-      ...(difficulty ? { difficulty }                     : {}),
-      ...(search     ? { title: { contains: search, mode: 'insensitive' } } : {}),
+      AND: [
+        visibilityClause,
+        ...(category   ? [{ category }]   : []),
+        ...(difficulty ? [{ difficulty }] : []),
+        // Cherche aussi dans le nom de série (le thème du groupe, ex. "Apprendre à cuisiner") et
+        // la description — se limiter au titre du défi ne matchait jamais une recherche sur le nom
+        // du groupe, puisque chaque jour a son propre titre ("Jour 1: Salade") qui ne contient pas
+        // le nom de la série. Et dans les DEUX langues (titre/description/nom de série ET leurs
+        // caches traduits *En/*Fr, voir withTranslatedChallenge) — un défi créé en français reste
+        // stocké en français même quand l'utilisateur le voit traduit en anglais à l'écran ; sans
+        // chercher aussi dans le cache traduit, un mot anglais ne matchait jamais rien pour ce défi.
+        ...(search ? [{ OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { titleEn: { contains: search, mode: 'insensitive' } },
+          { titleFr: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { descriptionEn: { contains: search, mode: 'insensitive' } },
+          { descriptionFr: { contains: search, mode: 'insensitive' } },
+          { seriesName: { contains: search, mode: 'insensitive' } },
+          { seriesNameEn: { contains: search, mode: 'insensitive' } },
+          { seriesNameFr: { contains: search, mode: 'insensitive' } },
+        ] }] : []),
+      ],
     };
 
     // Phase 1 (légère) : juste de quoi déterminer l'ordre et le regroupement par série,
@@ -271,6 +251,8 @@ router.post('/api/challenges', async (req, res) => {
     if (!title || !description || !difficulty || !category) {
       return res.status(400).json({ error: "Champs requis manquants" });
     }
+    const lenErr = lengthError(title, TITLE_MAX, 'Titre') || lengthError(description, DESCRIPTION_MAX, 'Description');
+    if (lenErr) return res.status(400).json({ error: lenErr });
     const rewards = { EASY: { coins: 50, xp: 100 }, MEDIUM: { coins: 150, xp: 300 }, HARD: { coins: 350, xp: 700 }, EXPERT: { coins: 700, xp: 1500 } };
     const r = rewards[difficulty] || rewards.EASY;
     // `title`/`description` sont écrits dans la langue de l'interface du créateur au moment de
@@ -307,6 +289,8 @@ router.put('/api/challenges/:id', async (req, res) => {
     if (!title || !description || !difficulty || !category) {
       return res.status(400).json({ error: 'Champs requis manquants' });
     }
+    const lenErr = lengthError(title, TITLE_MAX, 'Titre') || lengthError(description, DESCRIPTION_MAX, 'Description');
+    if (lenErr) return res.status(400).json({ error: lenErr });
     const rewards = { EASY: { coins: 50, xp: 100 }, MEDIUM: { coins: 150, xp: 300 }, HARD: { coins: 350, xp: 700 }, EXPERT: { coins: 700, xp: 1500 } };
     const r = rewards[difficulty] || rewards.EASY;
     const updated = await prisma.challenge.update({
@@ -390,13 +374,15 @@ router.post('/api/admin/challenges', isAdmin, async (req, res) => {
   if (!title || !description || !difficulty || !category) {
     return res.status(400).json({ error: "Champs requis manquants" });
   }
+  const lenErr = lengthError(title, TITLE_MAX, 'Titre') || lengthError(description, DESCRIPTION_MAX, 'Description');
+  if (lenErr) return res.status(400).json({ error: lenErr });
   try {
     const created = await prisma.challenge.create({
       data: {
         title, description, difficulty, category,
         coinReward: coinReward ?? 50, xpReward: xpReward ?? 100,
         isPublic: isPublic !== false, isDefault: !!isDefault,
-        seriesName: seriesName || null,
+        seriesName: seriesName ? seriesName.trim().slice(0, SERIES_NAME_MAX) : null,
         createdBy: req.user.id,
       },
     });
@@ -408,12 +394,14 @@ router.post('/api/admin/challenges', isAdmin, async (req, res) => {
 
 router.put('/api/admin/challenges/:id', isAdmin, async (req, res) => {
   const { title, description, difficulty, category, coinReward, xpReward, isPublic, isDefault, seriesName } = req.body;
+  const lenErr = lengthError(title, TITLE_MAX, 'Titre') || lengthError(description, DESCRIPTION_MAX, 'Description');
+  if (lenErr) return res.status(400).json({ error: lenErr });
   try {
     const updated = await prisma.challenge.update({
       where: { id: Number(req.params.id) },
       data: {
         title, description, difficulty, category, coinReward, xpReward,
-        isPublic, isDefault, seriesName: seriesName || null,
+        isPublic, isDefault, seriesName: seriesName ? seriesName.trim().slice(0, SERIES_NAME_MAX) : null,
       },
     });
     res.json(updated);
@@ -776,6 +764,19 @@ router.post('/api/challenges/ai-generate', authMiddleware, aiGenerateLimiter, as
   if (!history || !Array.isArray(history) || history.length === 0) {
     return res.status(400).json({ error: 'Historique de conversation requis' });
   }
+  // Chaque message du chat IA était envoyé tel quel à l'API Groq sans aucune limite — un message
+  // de plusieurs milliers de caractères (aucune limite côté frontend non plus avant ce correctif)
+  // faisait échouer l'appel à Groq (l'IA renvoyait alors une erreur générique, sans indiquer la
+  // vraie cause). Même plafond que les autres messages de tchat de l'app (voir textLimits.js).
+  // Le nombre de messages est aussi plafonné : sans ça, un historique forgé de milliers d'entrées
+  // gonflerait le prompt envoyé à Groq de la même façon.
+  if (history.length > 50) {
+    return res.status(400).json({ error: 'Conversation trop longue.' });
+  }
+  for (const m of history) {
+    const lenErr = lengthError(m?.content, CHAT_MESSAGE_MAX, 'Message');
+    if (lenErr) return res.status(400).json({ error: lenErr });
+  }
   try {
     const response = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
@@ -821,6 +822,13 @@ router.post('/api/challenges/bulk-save', async (req, res) => {
   // pourrait déclencher des milliers de créations concurrentes en un seul appel.
   if (challenges.length > 50) {
     return res.status(400).json({ error: 'Trop de défis en une seule fois (50 maximum).' });
+  }
+  // Chaque défi du lot passe par le même garde-fou que la création manuelle (voir POST
+  // /api/challenges) — sans ça, ce endpoint (alimenté par un plan généré par IA, donc du texte
+  // moins contrôlé) laissait passer un titre/description de n'importe quelle longueur.
+  for (const c of challenges) {
+    const lenErr = lengthError(c?.title, TITLE_MAX, 'Titre') || lengthError(c?.description, DESCRIPTION_MAX, 'Description');
+    if (lenErr) return res.status(400).json({ error: lenErr });
   }
   try {
     const decoded = jwt.verify(token, SECRET);

@@ -150,6 +150,7 @@ function ChallengeCard({
           onChange={e => onChange({ ...data, title: e.target.value })}
           placeholder={total > 1 ? t('createChallenge.titlePlaceholderMulti', { number: index + 1 }) : t('createChallenge.titlePlaceholderSingle')}
           className={inputClass} />
+        <p className="text-right text-[10px] mt-0.5 opacity-40">{data.title.length}/80</p>
       </div>
 
       {/* Description */}
@@ -336,7 +337,10 @@ const CreateChallenge: React.FC = () => {
                 placeholder={t('createChallenge.seriesNamePlaceholder')}
                 className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm transition-colors ${THEME.input}`}
               />
-              <p className="text-xs mt-1 opacity-40">{t('createChallenge.seriesNameHint')}</p>
+              <div className="flex items-center justify-between mt-1">
+                <p className="text-xs opacity-40">{t('createChallenge.seriesNameHint')}</p>
+                <p className="text-[10px] opacity-40 flex-shrink-0 ml-2">{seriesName.length}/80</p>
+              </div>
             </div>
           )}
 

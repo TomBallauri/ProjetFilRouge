@@ -391,7 +391,9 @@ function ChallengeCard({ challenge, index, darkMode, isSelected, isExpanded, t, 
           {editing ? (
             <div className="pt-2 space-y-1.5" onClick={e => e.stopPropagation()}>
               <input value={titleDraft} onChange={e => setTitleDraft(e.target.value)} maxLength={80} className={inputClass} />
+              <p className={`text-right text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{titleDraft.length}/80</p>
               <textarea value={descDraft} onChange={e => setDescDraft(e.target.value)} maxLength={500} rows={3} className={`${inputClass} resize-none`} />
+              <p className={`text-right text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{descDraft.length}/500</p>
               <div className="flex gap-2 pt-0.5">
                 <button onClick={() => setEditing(false)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
                   {t('common.cancel')}
@@ -503,6 +505,7 @@ function SelectionPanel({
           <input id="ai-series-name" value={seriesNameValue} onChange={e => onChangeSeriesName(e.target.value)}
             maxLength={80} placeholder={t('aiGenerator.seriesNamePlaceholder')}
             className={`w-full px-3 py-2 rounded-xl text-sm border ${darkMode ? 'bg-gray-900/60 border-gray-600 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`} />
+          <p className={`text-right text-[10px] mt-0.5 ${theme.textMuted}`}>{seriesNameValue.length}/80</p>
         </div>
       )}
 
@@ -556,20 +559,24 @@ function InputBar({ darkMode, theme, phase, error, input, setInput, inputRef, on
     <div className={`px-3 py-2.5 border-t ${theme.borderColor} ${darkMode ? theme.bg : 'bg-gray-50'}`}>
       {error && phase === 'chat' && <p className="text-red-500 text-xs text-center mb-1.5">{error}</p>}
       <div className={`flex gap-2 items-end px-3 py-2 rounded-2xl border shadow-sm ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-        <textarea
-          ref={inputRef}
-          rows={1}
-          value={input}
-          onChange={e => {
-            setInput(e.target.value);
-            e.target.style.height = 'auto';
-            e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
-          }}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } }}
-          placeholder={phase === 'selection' ? t('aiGenerator.placeholderSelection') : t('aiGenerator.placeholderChat')}
-          className={`flex-1 bg-transparent outline-none text-sm resize-none leading-relaxed py-1 ${darkMode ? 'text-white placeholder-gray-500' : 'text-gray-900 placeholder-gray-400'}`}
-          style={{ minHeight: 32, maxHeight: 100 }}
-        />
+        <div className="flex-1 flex flex-col min-w-0">
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={input}
+            maxLength={500}
+            onChange={e => {
+              setInput(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
+            }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } }}
+            placeholder={phase === 'selection' ? t('aiGenerator.placeholderSelection') : t('aiGenerator.placeholderChat')}
+            className={`bg-transparent outline-none text-sm resize-none leading-relaxed py-1 ${darkMode ? 'text-white placeholder-gray-500' : 'text-gray-900 placeholder-gray-400'}`}
+            style={{ minHeight: 32, maxHeight: 100 }}
+          />
+          <p className={`text-right text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{input.length}/500</p>
+        </div>
         <button onClick={onSend} disabled={loading || !input.trim()}
           className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center hover:bg-blue-700 transition-colors disabled:opacity-40 shrink-0 active:scale-95">
           <Send size={14} className="text-white" />

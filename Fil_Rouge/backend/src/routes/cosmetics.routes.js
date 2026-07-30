@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { SECRET, authMiddleware, isAdmin } from '../lib/auth.js';
 import { sanitizeUser } from '../lib/userUtils.js';
 import { withTranslatedCosmetics, withTranslatedUserChallenges, withTranslatedUserCosmetics } from '../lib/translateContent.js';
+import { TITLE_MAX, DESCRIPTION_MAX, lengthError } from '../lib/textLimits.js';
 
 const router = Router();
 
@@ -24,6 +25,8 @@ router.post('/api/admin/cosmetics', isAdmin, async (req, res) => {
   if (!name || !description || !type || price == null || !rarity) {
     return res.status(400).json({ error: "Champs requis manquants" });
   }
+  const lenErr = lengthError(name, TITLE_MAX, 'Nom') || lengthError(description, DESCRIPTION_MAX, 'Description');
+  if (lenErr) return res.status(400).json({ error: lenErr });
   try {
     const created = await prisma.cosmetic.create({
       data: { name, description, type, imageUrl: imageUrl || null, price: Number(price), rarity },
@@ -36,6 +39,8 @@ router.post('/api/admin/cosmetics', isAdmin, async (req, res) => {
 
 router.put('/api/admin/cosmetics/:id', isAdmin, async (req, res) => {
   const { name, description, type, imageUrl, price, rarity } = req.body;
+  const lenErr = lengthError(name, TITLE_MAX, 'Nom') || lengthError(description, DESCRIPTION_MAX, 'Description');
+  if (lenErr) return res.status(400).json({ error: lenErr });
   try {
     const updated = await prisma.cosmetic.update({
       where: { id: Number(req.params.id) },

@@ -8,6 +8,7 @@ import {
   expireStaleInvites,
 } from '../lib/groupHelpers.js';
 import { USER_MINI_SELECT } from '../lib/userUtils.js';
+import { CHAT_MESSAGE_MAX, SERIES_NAME_MAX } from '../lib/textLimits.js';
 
 const SERIES_GROUP_INCLUDE = {
   creator: { select: USER_MINI_SELECT },
@@ -46,6 +47,9 @@ router.post('/api/series-groups', authMiddleware, async (req, res) => {
   if (!seriesGroupReady()) return res.status(503).json({ error: 'Migration en attente — relance le serveur.' });
   const { seriesName, friendIds } = req.body;
   if (!seriesName) return res.status(400).json({ error: 'seriesName requis' });
+  if (typeof seriesName !== 'string' || seriesName.length > SERIES_NAME_MAX) {
+    return res.status(400).json({ error: `seriesName trop long (max ${SERIES_NAME_MAX} caractères)` });
+  }
   const inviteList = Array.isArray(friendIds) ? friendIds.map(Number).filter(Boolean) : [];
   if (inviteList.length > 3) return res.status(400).json({ error: 'Maximum 3 amis invités.' });
   try {
@@ -122,6 +126,17 @@ router.post('/api/series-groups/:id/join', authMiddleware, async (req, res) => {
     if (isInviteExpired(member.invitedAt) || group.completedAt) {
       await prisma.seriesGroupMember.delete({ where: { groupId_userId: { groupId, userId: req.userId } } });
       return res.status(410).json({ error: 'Invitation expirée' });
+    }
+    // Même règle qu'à la création (voir POST /api/series-groups ci-dessus) — sans elle, accepter
+    // une invitation à un NOUVEAU groupe pour une série où on a déjà son propre groupe créait un
+    // doublon silencieux : deux `SeriesGroup` pour le même `seriesName`, dont un seul recevait
+    // vraiment les messages/notifications de l'utilisateur (voir le bug de badge non-lu bloqué,
+    // dû à `SeriesDropdown` qui ne trouvait que le premier des deux via `.find()`).
+    const existingOther = await prisma.seriesGroup.findFirst({
+      where: { seriesName: group.seriesName, id: { not: groupId }, members: { some: { userId: req.userId } } },
+    });
+    if (existingOther) {
+      return res.status(400).json({ error: 'Tu as déjà un groupe pour cette série.' });
     }
     await prisma.seriesGroupMember.update({
       where: { groupId_userId: { groupId, userId: req.userId } },
@@ -355,6 +370,7 @@ router.post('/api/series-groups/:id/messages', authMiddleware, async (req, res) 
   const groupId = Number(req.params.id);
   const { content } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Message vide' });
+  if (content.length > CHAT_MESSAGE_MAX) return res.status(400).json({ error: `Message trop long (max ${CHAT_MESSAGE_MAX} caractères)` });
   try {
     const member = await prisma.seriesGroupMember.findUnique({
       where: { groupId_userId: { groupId, userId: req.userId } }

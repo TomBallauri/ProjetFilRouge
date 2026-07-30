@@ -1,5 +1,6 @@
 import { prisma } from './prisma.js';
 import { translateTexts } from './translate.js';
+import { computeSeriesOriginalLangs } from './seriesVote.js';
 
 // DeepL ajoute parfois des guillemets décoratifs autour de noms courts
 // (ex. "Cadre Foudre Ardente" → `"Blazing Lightning" Frame`) — indésirable pour
@@ -68,25 +69,17 @@ async function ensureSeriesNamesTranslated(challenges, lang) {
   const target = targetLangOf(lang);
   const seriesNameKey = target === 'en' ? 'seriesNameEn' : 'seriesNameFr';
 
-  // La langue d'origine du NOM DE SÉRIE est déduite par vote majoritaire des `originalLang` de
-  // ses défis, plutôt que du premier défi rencontré dans `challenges` (dont l'ordre est
-  // arbitraire) : un défi modifié individuellement sous une autre langue d'interface (voir PUT
-  // /api/challenges/:id) change SON originalLang sans que le nom de série ait changé de langue —
-  // sans ce vote, cet unique défi pouvait faire échouer la traduction de toute la série selon
-  // l'ordre de la liste.
-  const langCountsBySeriesName = new Map();
-  for (const c of challenges) {
-    if (!c.seriesName) continue;
-    const counts = langCountsBySeriesName.get(c.seriesName) ?? { fr: 0, en: 0 };
-    counts[c.originalLang ?? 'fr']++;
-    langCountsBySeriesName.set(c.seriesName, counts);
-  }
+  // Langue d'origine par nom de série, déduite par vote majoritaire (voir computeSeriesOriginalLangs) —
+  // un défi modifié individuellement sous une autre langue d'interface (voir PUT /api/challenges/:id)
+  // change SON originalLang sans que le nom de série ait changé de langue ; sans ce vote, cet
+  // unique défi pouvait faire échouer/mal orienter la traduction de toute la série selon l'ordre
+  // de la liste.
+  const originalLangBySeriesName = computeSeriesOriginalLangs(challenges);
 
   const originalBySeriesName = new Map();
   for (const c of challenges) {
     if (!c.seriesName || c[seriesNameKey]) continue;
-    const counts = langCountsBySeriesName.get(c.seriesName);
-    const original = counts.en > counts.fr ? 'en' : 'fr';
+    const original = originalLangBySeriesName.get(c.seriesName);
     if (original === target) continue;
     if (!originalBySeriesName.has(c.seriesName)) originalBySeriesName.set(c.seriesName, original);
   }

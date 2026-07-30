@@ -167,11 +167,12 @@ const AuthPage: React.FC<{ mode: AuthMode }> = ({ mode }) => {
                   <User size={15} aria-hidden="true" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: iconColor, pointerEvents: 'none' }} />
                   <input
                     id="name" type="text" value={name} onChange={e => setName(e.target.value)}
-                    placeholder={t('auth.usernamePlaceholder')} style={inputStyle}
+                    placeholder={t('auth.usernamePlaceholder')} style={inputStyle} maxLength={30}
                     onFocus={e => e.currentTarget.style.borderColor = '#A78BFA'}
                     onBlur={e => e.currentTarget.style.borderColor = inputBorder}
                   />
                 </div>
+                <p style={{ fontSize: 11, color: labelColor, marginTop: 3, textAlign: 'right' }}>{name.length}/30</p>
               </div>
             )}
 

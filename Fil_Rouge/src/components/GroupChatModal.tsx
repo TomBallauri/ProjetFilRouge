@@ -234,20 +234,24 @@ const GroupChatModal: React.FC = () => {
             {myStatus === 'JOINED' ? (
               <div style={{ padding: '12px 18px', borderTop: '1px solid var(--q-line)', display: 'flex', gap: 8, flexShrink: 0 }}>
                 <label htmlFor="group-chat-modal-input" className="sr-only">{t('groupChat.messageLabel')}</label>
-                <input
-                  id="group-chat-modal-input"
-                  type="text"
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  placeholder={t('groupChat.sendMessagePlaceholder')}
-                  autoFocus
-                  style={{
-                    flex: 1, padding: '11px 14px', borderRadius: 14,
-                    border: '1px solid var(--q-line)', background: 'var(--q-bg-flat)',
-                    color: 'var(--q-text)', fontSize: 14, outline: 'none',
-                  }}
-                />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <input
+                    id="group-chat-modal-input"
+                    type="text"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                    placeholder={t('groupChat.sendMessagePlaceholder')}
+                    maxLength={500}
+                    autoFocus
+                    style={{
+                      padding: '11px 14px', borderRadius: 14,
+                      border: '1px solid var(--q-line)', background: 'var(--q-bg-flat)',
+                      color: 'var(--q-text)', fontSize: 14, outline: 'none', width: '100%',
+                    }}
+                  />
+                  <p style={{ fontSize: 10, color: 'var(--q-text3)', textAlign: 'right', marginTop: 2 }}>{input.length}/500</p>
+                </div>
                 <button type="button" onClick={handleSend} disabled={sending || !input.trim()} aria-label={t('groupChat.send')} style={{
                   width: 44, height: 44, borderRadius: 14, border: 'none', flexShrink: 0,
                   background: input.trim() ? 'var(--q-accent)' : 'var(--q-line)',

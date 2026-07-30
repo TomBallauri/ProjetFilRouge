@@ -11,6 +11,7 @@ import { hashToken } from '../lib/tokens.js';
 import { FRONTEND_URL } from '../lib/config.js';
 import { emailChangeLimiter } from '../lib/rateLimiters.js';
 import { StreakService } from '../../services/StreakService.js';
+import { BIO_MAX, USERNAME_MAX, lengthError } from '../lib/textLimits.js';
 
 const EMAIL_CHANGE_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,6 +56,8 @@ router.put('/api/users/me', async (req, res) => {
     const decoded = jwt.verify(token, SECRET);
     const userId = decoded.userId;
     const { username, bio, avatar, banner } = req.body;
+    const lenErr = lengthError(username, USERNAME_MAX, 'Pseudo') || lengthError(bio, BIO_MAX, 'Bio');
+    if (lenErr) return res.status(400).json({ error: lenErr });
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { username, bio, avatar, banner }
@@ -163,6 +166,8 @@ router.put('/api/users/:id', isAdmin, async (req, res) => {
   if (targetId === req.user.id && makeAdmin === false) {
     return res.status(400).json({ error: 'Tu ne peux pas retirer ton propre rôle admin.' });
   }
+  const lenErr = lengthError(username, USERNAME_MAX, 'Pseudo') || lengthError(bio, BIO_MAX, 'Bio');
+  if (lenErr) return res.status(400).json({ error: lenErr });
   try {
     const updatedUser = await prisma.user.update({
       where: { id: targetId },
