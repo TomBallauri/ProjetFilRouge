@@ -13,7 +13,7 @@ import {
   GROUP_LIST_INCLUDE,
 } from '../lib/groupHelpers.js';
 import { planGroups, paginateKeys, orderRowsByKeys } from '../lib/seriesPagination.js';
-import { aiGenerateLimiter } from '../lib/rateLimiters.js';
+import { aiGenerateLimiter, publicReadLimiter } from '../lib/rateLimiters.js';
 import { withTranslatedChallenge, withTranslatedChallenges, withTranslatedUserChallenges } from '../lib/translateContent.js';
 import { TITLE_MAX, DESCRIPTION_MAX, SERIES_NAME_MAX, CHAT_MESSAGE_MAX, lengthError } from '../lib/textLimits.js';
 import { seriesDayNumber, seriesLockInfo } from '../lib/seriesLock.js';
@@ -68,7 +68,7 @@ async function getSeriesProgressByDayNumber(userId, seriesName) {
 
 const router = Router();
 
-router.get('/api/challenges', async (req, res) => {
+router.get('/api/challenges', publicReadLimiter, async (req, res) => {
   try {
     const { category, difficulty, search } = req.query;
     const skip  = Math.max(0, parseInt(req.query.skip)  || 0);
@@ -165,7 +165,7 @@ router.get('/api/challenges', async (req, res) => {
 
 // Tous les défis d'une série en un seul appel (non paginé) — utilisé par le frontend pour afficher
 // une série de façon cohérente sans dépendre de la pagination des listes "en cours"/"terminés".
-router.get('/api/challenges/by-series/:seriesName', async (req, res) => {
+router.get('/api/challenges/by-series/:seriesName', publicReadLimiter, async (req, res) => {
   try {
     const seriesName = decodeURIComponent(req.params.seriesName);
     const authHeader = req.headers.authorization;
@@ -203,7 +203,7 @@ router.get('/api/challenges/by-series/:seriesName', async (req, res) => {
   }
 });
 
-router.get('/api/challenges/daily-suggestion', async (req, res) => {
+router.get('/api/challenges/daily-suggestion', publicReadLimiter, async (req, res) => {
   try {
     // Optionnel : un visiteur non connecté (ou au token invalide) reçoit la suggestion globale
     // du jour sans exclusion — seule une session valide permet d'écarter ses défis déjà complétés.
@@ -225,7 +225,7 @@ router.get('/api/challenges/daily-suggestion', async (req, res) => {
   }
 });
 
-router.get('/api/challenges/:id', async (req, res) => {
+router.get('/api/challenges/:id', publicReadLimiter, async (req, res) => {
   try {
     const challenge = await prisma.challenge.findUnique({
       where: { id: Number(req.params.id) },

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authMiddleware } from '../lib/auth.js';
+import { publicReadLimiter } from '../lib/rateLimiters.js';
 import { StreakService } from '../../services/StreakService.js';
 
 const LEADERBOARD_SELECT = {
@@ -25,7 +26,7 @@ const withEffectiveStreak = (users) => users
 
 const router = Router();
 
-router.get('/api/leaderboard', async (req, res) => {
+router.get('/api/leaderboard', publicReadLimiter, async (req, res) => {
   try {
     const users = await prisma.user.findMany({ select: LEADERBOARD_SELECT });
     res.json(withEffectiveStreak(users).slice(0, 50));

@@ -285,6 +285,7 @@
     "daysBeforeBonus_other": "{{count}} jours avant +0.05×",
     "xpOutOf1000": "{{xp}} / 1000 XP",
     "myInfo": "Mes informations",
+    "editMyInfo": "Modifier mes informations",
     "administrator": "Administrateur",
     "changeEmail": "Changer d'email",
     "emailChangeSentMessage": "Un email de confirmation a été envoyé à <strong>{{email}}</strong>. Clique sur le lien qu'il contient pour valider le changement.",

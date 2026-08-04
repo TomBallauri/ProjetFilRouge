@@ -318,6 +318,8 @@ type InfoSectionProps = {
   isEditing: boolean;
   isOpen: boolean;
   onToggle: () => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
   emailChangeSent: boolean;
   newEmailInput: string;
   setNewEmailInput: (v: string) => void;
@@ -331,7 +333,7 @@ type InfoSectionProps = {
 };
 
 const InfoSection: React.FC<InfoSectionProps> = ({
-  t, user, profileStats, isEditing, isOpen, onToggle,
+  t, user, profileStats, isEditing, isOpen, onToggle, onStartEdit, onCancelEdit,
   emailChangeSent, newEmailInput, setNewEmailInput, emailChangeError, setEmailChangeError, emailChangeSending,
   handleRequestEmailChange, passwordData, handlePasswordChange, handlePasswordSave,
 }) => (
@@ -370,6 +372,12 @@ const InfoSection: React.FC<InfoSectionProps> = ({
               <span className="text-sm" style={{ color: 'var(--q-text2)' }}>{t('userProfile.memberSince', { date: profileStats.memberSince })}</span>
             </div>
           </div>
+          {!isEditing && (
+            <button onClick={onStartEdit} className="q-press"
+              style={{ height: 34, padding: '0 14px', borderRadius: 17, border: 'none', background: 'var(--q-accent-soft)', color: 'var(--q-accent-deep)', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Edit size={14} aria-hidden="true" /> {t('profile.editMyInfo')}
+            </button>
+          )}
           {isEditing && (
             <div>
               <p className="text-sm font-semibold mb-2" style={{ color: 'var(--q-text)' }}>{t('profile.changeEmail')}</p>
@@ -426,6 +434,12 @@ const InfoSection: React.FC<InfoSectionProps> = ({
                 </button>
               </div>
             </div>
+          )}
+          {isEditing && (
+            <button onClick={onCancelEdit} className="q-press"
+              style={{ height: 34, padding: '0 14px', borderRadius: 17, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#EF4444', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <X size={14} aria-hidden="true" /> {t('common.cancel')}
+            </button>
           )}
         </div>
       )}
@@ -873,6 +887,7 @@ const EditProfile: React.FC = () => {
     openTour,
   } = useStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const navigate = useNavigate();
 
@@ -1079,10 +1094,17 @@ const EditProfile: React.FC = () => {
       }
       showNotif(t('profile.passwordUpdated'), 'success');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setIsEditing(false);
+      setIsEditingInfo(false);
     } catch {
       showNotif(t('profile.passwordNetworkError'), 'error');
     }
+  };
+
+  const handleCancelEditInfo = () => {
+    setIsEditingInfo(false);
+    setNewEmailInput('');
+    setEmailChangeError('');
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
   };
 
   const handleRequestEmailChange = async () => {
@@ -1357,9 +1379,11 @@ const EditProfile: React.FC = () => {
         t={t}
         user={user}
         profileStats={profileStats}
-        isEditing={isEditing}
+        isEditing={isEditingInfo}
         isOpen={openProfileSections.info}
         onToggle={() => toggleProfileSection('info')}
+        onStartEdit={() => setIsEditingInfo(true)}
+        onCancelEdit={handleCancelEditInfo}
         emailChangeSent={emailChangeSent}
         newEmailInput={newEmailInput}
         setNewEmailInput={setNewEmailInput}

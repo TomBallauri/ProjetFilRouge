@@ -6,6 +6,8 @@ dist/
 dist-ssr/
 .next/
 
+docs/
+
 # Environment variables
 .env
 .env.*

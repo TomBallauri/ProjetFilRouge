@@ -5,10 +5,11 @@ import { SECRET, authMiddleware, isAdmin } from '../lib/auth.js';
 import { sanitizeUser } from '../lib/userUtils.js';
 import { withTranslatedCosmetics, withTranslatedUserChallenges, withTranslatedUserCosmetics } from '../lib/translateContent.js';
 import { TITLE_MAX, DESCRIPTION_MAX, lengthError } from '../lib/textLimits.js';
+import { publicReadLimiter } from '../lib/rateLimiters.js';
 
 const router = Router();
 
-router.get('/api/cosmetics', async (req, res) => {
+router.get('/api/cosmetics', publicReadLimiter, async (req, res) => {
   try {
     const rows = await prisma.cosmetic.findMany({ orderBy: { price: 'asc' } });
     const cosmetics = await withTranslatedCosmetics(rows, req.query.lang);

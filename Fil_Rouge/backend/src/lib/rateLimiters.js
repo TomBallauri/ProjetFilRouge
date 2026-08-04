@@ -61,3 +61,18 @@ export const uploadLimiter = perUserLimiter({
   limit: 30,
   message: 'Trop de fichiers envoyés. Réessaie plus tard.',
 });
+
+// Catalogue public (défis, classement, boutique) : accessible sans authentification par design
+// (navigation avant inscription), mais jusqu'ici sans aucun frein — contrairement aux autres
+// routes de ce fichier. Un même visiteur anonyme n'a pas besoin de plus de quelques appels par
+// minute pour naviguer normalement ; au-delà, c'est du scraping ou un abus qu'il faut freiner
+// (risque P4 de docs/analyse-des-risques.md, jusque-là seulement couvert pour les routes
+// coûteuses type IA/upload, pas pour la simple lecture).
+export const publicReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: { error: 'Trop de requêtes. Réessaie dans quelques instants.' },
+});
