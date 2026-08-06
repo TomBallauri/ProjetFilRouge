@@ -14,6 +14,7 @@ const AuthPage = lazy(() => import('./pages/AuthPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const ConfirmEmailChangePage = lazy(() => import('./pages/ConfirmEmailChangePage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const ChallengePage = lazy(() => import('./pages/ChallengePage'));
 const CreateChallenge = lazy(() => import('./pages/CreateChallenge'));
 const AIChallengeGenerator = lazy(() => import('./pages/AIChallengeGenerator'));
@@ -70,6 +71,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<UQuail />} />
