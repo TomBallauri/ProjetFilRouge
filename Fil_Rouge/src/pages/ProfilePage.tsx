@@ -178,6 +178,7 @@ const ProfileHeaderSection: React.FC<ProfileHeaderSectionProps> = ({
       {/* ── Avatar + Identity ── */}
       <div style={{ padding: '0 18px', marginTop: -54, textAlign: 'center' }}>
         <button type="button" disabled={!isEditing} aria-label={t('profile.changeAvatar')}
+          className="q-press"
           style={{ display: 'inline-block', position: 'relative', width: 104, height: 104,
             cursor: isEditing ? 'pointer' : 'default', background: 'none', border: 'none', padding: 0 }}
           onClick={() => isEditing && avatarInputRef.current?.click()}

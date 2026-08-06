@@ -154,7 +154,7 @@ const Navbar: React.FC = () => {
                     <div className="mx-3 my-1 h-px" style={{ background: 'var(--q-line)' }} />
                     <button
                       onClick={() => { setUser(null); localStorage.removeItem('token'); setDropdownOpen(false); globalThis.location.reload(); }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                      className="q-press w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                       <LogOut size={15} aria-hidden="true" /> {t('navbar.logout')}
                     </button>
                   </>

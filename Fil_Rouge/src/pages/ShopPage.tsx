@@ -147,7 +147,7 @@ const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, can
       </div>
     );
     if (!user) return (
-      <button onClick={onLogin} className="w-full py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors active:scale-95">
+      <button onClick={onLogin} className="q-press w-full py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors active:scale-95">
         {t('shop.login')}
       </button>
     );
@@ -155,7 +155,7 @@ const CosmeticCard: React.FC<CosmeticCardProps> = ({ cosmetic, alreadyOwned, can
     const buyLabel = canAfford ? t('shop.buy') : t('shop.insufficient');
     return (
       <button onClick={() => onBuy(cosmetic)} disabled={!canAfford || isLoading}
-        className={`w-full py-1.5 rounded-lg text-white text-xs font-bold transition-all active:scale-95 ${btnColor} disabled:opacity-60`}>
+        className={`q-press w-full py-1.5 rounded-lg text-white text-xs font-bold transition-all active:scale-95 ${btnColor} disabled:opacity-60`}>
         {isLoading ? '...' : buyLabel}
       </button>
     );
@@ -253,7 +253,10 @@ const ShopPage: React.FC = () => {
   const filtered = applyFilters(cosmetics, search, filterType, filterRarity);
 
   const activeFilters = [filterType, filterRarity].filter(Boolean).length;
-  const card = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
+  // Utilise les tokens de design de l'app (--q-chrome/--q-line) au lieu du gris Tailwind brut
+  // utilisé auparavant : celui-ci ne correspondait pas à la teinte violette du reste des cartes
+  // (--q-chrome), ce qui créait un rectangle visuellement décalé.
+  const card = 'bg-[var(--q-chrome)] border-[var(--q-line)]';
   const filterBtnInactive = darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600';
   const filterBtnClass = filtersOpen || activeFilters > 0 ? 'bg-pink-600 text-white' : filterBtnInactive;
   // Style des puces de filtre inactives (type et rareté) — un seul calcul réutilisé
@@ -320,12 +323,12 @@ const ShopPage: React.FC = () => {
               {t('shop.confirmBuyBody', { name: confirmBuyTarget.name, price: confirmBuyTarget.price })}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button type="button" onClick={() => setConfirmBuyTarget(null)} disabled={buyLoading !== null} style={{
+              <button type="button" onClick={() => setConfirmBuyTarget(null)} disabled={buyLoading !== null} className="q-press" style={{
                 flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
                 background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                 opacity: buyLoading !== null ? 0.6 : 1,
               }}>{t('common.cancel')}</button>
-              <button type="button" onClick={confirmBuy} disabled={buyLoading !== null} style={{
+              <button type="button" onClick={confirmBuy} disabled={buyLoading !== null} className="q-press" style={{
                 flex: 1, padding: '12px', borderRadius: 12, border: 'none',
                 background: 'linear-gradient(135deg,#FACC15,#FB923C)',
                 color: '#1F2937', fontSize: 14, fontWeight: 700, cursor: 'pointer',
@@ -365,7 +368,7 @@ const ShopPage: React.FC = () => {
         </div>
 
         {/* Barre recherche + filtres */}
-        <div className={`${card} border rounded-xl p-3 mb-3 flex gap-2`}>
+        <div className={`${card} border rounded-xl p-3 mb-3 flex gap-2`} style={{ boxShadow: 'var(--q-shadow)' }}>
           <div className="flex items-center gap-2 flex-1">
             <Search size={16} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
             <input
@@ -376,14 +379,14 @@ const ShopPage: React.FC = () => {
               className={`flex-1 bg-transparent text-sm outline-none min-w-0 ${darkMode ? 'placeholder-gray-500' : 'placeholder-gray-400'}`}
             />
             {search && (
-              <button onClick={() => setSearch('')} aria-label={t('shop.clearSearch')} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setSearch('')} aria-label={t('shop.clearSearch')} className="q-press text-gray-400 hover:text-gray-600">
                 <X size={14} aria-hidden="true" />
               </button>
             )}
           </div>
           <button
             onClick={() => setFiltersOpen(o => !o)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold flex-shrink-0 transition-colors ${filterBtnClass}`}
+            className={`q-press flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold flex-shrink-0 transition-colors ${filterBtnClass}`}
           >
             <SlidersHorizontal size={14} aria-hidden="true" />
             {t('shop.filters')}{activeFilters > 0 && ` (${activeFilters})`}
@@ -393,19 +396,19 @@ const ShopPage: React.FC = () => {
 
       {/* Filtres dépliables */}
       {filtersOpen && (
-        <div className={`${card} border rounded-xl p-3 mb-3 space-y-3`}>
+        <div className={`${card} border rounded-xl p-3 mb-3 space-y-3`} style={{ boxShadow: 'var(--q-shadow)' }}>
           <div>
             <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">{t('shop.typeLabel')}</p>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setFilterType('')}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterType ? 'bg-pink-600 text-white' : inactiveChipClass}`}>
+                className={`q-press px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterType ? 'bg-pink-600 text-white' : inactiveChipClass}`}>
                 {t('shop.allTypes')}
               </button>
               {TYPES.map(ty => {
                 const TypeIcon = TYPE[ty]?.icon ?? Package;
                 return (
                   <button key={ty} onClick={() => setFilterType(ty === filterType ? '' : ty)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterType === ty ? 'bg-pink-600 text-white' : inactiveChipClass}`}>
+                    className={`q-press flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterType === ty ? 'bg-pink-600 text-white' : inactiveChipClass}`}>
                     <TypeIcon size={13} aria-hidden="true" /> {t(`shop.type.${ty}`)}
                   </button>
                 );
@@ -416,14 +419,14 @@ const ShopPage: React.FC = () => {
             <p className="text-xs font-bold uppercase tracking-wide mb-2 text-gray-400">{t('shop.rarityLabel')}</p>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setFilterRarity('')}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterRarity ? 'bg-pink-600 text-white' : inactiveChipClass}`}>
+                className={`q-press px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${!filterRarity ? 'bg-pink-600 text-white' : inactiveChipClass}`}>
                 {t('shop.allRarities')}
               </button>
               {RARITIES.map(r => {
                 const cfg = RARITY[r];
                 return (
                   <button key={r} onClick={() => setFilterRarity(r === filterRarity ? '' : r)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterRarity === r ? `${cfg.bg} ${cfg.color} border ${cfg.border}` : inactiveChipClass}`}>
+                    className={`q-press px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${filterRarity === r ? `${cfg.bg} ${cfg.color} border ${cfg.border}` : inactiveChipClass}`}>
                     {t(`common.rarity.${r}`)}
                   </button>
                 );

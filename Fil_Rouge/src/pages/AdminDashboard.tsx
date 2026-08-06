@@ -120,7 +120,7 @@ function Select({ id, value, onChange, options, labelFor }: Readonly<{ id: strin
         onKeyDown={(e) => { if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } }}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`${inputCls} flex items-center justify-between gap-2`}
+        className={`q-press ${inputCls} flex items-center justify-between gap-2`}
         style={inputStyle}
       >
         <span className="truncate">{label(value)}</span>
@@ -145,7 +145,7 @@ function Select({ id, value, onChange, options, labelFor }: Readonly<{ id: strin
                   aria-selected={selected}
                   onClick={() => { onChange(opt); setOpen(false); triggerRef.current?.focus(); }}
                   onKeyDown={(e) => onOptionKeyDown(e, idx)}
-                  className="w-full text-left px-3 py-2.5 text-sm"
+                  className="q-press w-full text-left px-3 py-2.5 text-sm"
                   style={{ background: selected ? 'var(--q-accent)' : 'transparent', color: selected ? '#fff' : 'var(--q-text)' }}
                 >
                   {label(opt)}
@@ -210,7 +210,7 @@ function Modal({ title, onClose, children }: Readonly<{ title: string; onClose: 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
       <button type="button" aria-label={t('common.close')} onClick={onClose}
-        className="absolute inset-0 w-full h-full cursor-default border-none bg-transparent" />
+        className="q-press absolute inset-0 w-full h-full cursor-default border-none bg-transparent" />
       <div
         ref={panelRef}
         role="dialog"
@@ -756,7 +756,7 @@ const AdminDashboard: React.FC = () => {
                   />
                   {editingCosmetic.imageUrl && (
                     <button type="button" onClick={() => setEditingCosmetic(c => ({ ...c, imageUrl: '' }))}
-                      className="text-xs font-semibold self-start underline" style={{ color: 'var(--q-text3)' }}>
+                      className="q-press text-xs font-semibold self-start underline" style={{ color: 'var(--q-text3)' }}>
                       {t('admin.removeImage')}
                     </button>
                   )}
@@ -806,12 +806,12 @@ const AdminDashboard: React.FC = () => {
           <p className="text-sm" style={{ color: 'var(--q-text)' }}>{confirmAction.message}</p>
           <div className="flex gap-3 mt-5">
             <button onClick={() => setConfirmAction(null)} autoFocus
-              className="flex-1 py-2.5 rounded-2xl font-bold text-sm"
+              className="q-press flex-1 py-2.5 rounded-2xl font-bold text-sm"
               style={{ border: '1.5px solid var(--q-line)', background: 'transparent', color: 'var(--q-text2)', cursor: 'pointer' }}>
               {t('common.cancel')}
             </button>
             <button onClick={() => { const action = confirmAction; setConfirmAction(null); action.onConfirm(); }}
-              className="flex-1 py-2.5 rounded-2xl font-bold text-sm text-white"
+              className="q-press flex-1 py-2.5 rounded-2xl font-bold text-sm text-white"
               style={{ border: 'none', background: '#EF4444', cursor: 'pointer' }}>
               {t('admin.delete')}
             </button>

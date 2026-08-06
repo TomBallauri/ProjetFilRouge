@@ -512,12 +512,13 @@ const UQuail: React.FC = () => {
               }}>
                 <div style={{ padding: '12px 14px 8px', borderBottom: '1px solid var(--q-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--q-text)' }}>{t('common.notifications')}</span>
-                  <button onClick={() => setNotifPanelOpen(false)} aria-label={t('common.close')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', padding: 0, fontSize: 16, lineHeight: 1 }}>✕</button>
+                  <button onClick={() => setNotifPanelOpen(false)} aria-label={t('common.close')} className="q-press" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', padding: 0, fontSize: 16, lineHeight: 1 }}>✕</button>
                 </div>
 
                 {/* Streak at risk */}
                 {notifData?.streakAtRisk && (
                   <button onClick={() => { setNotifPanelOpen(false); navigate('/challenges'); }}
+                    className="q-press"
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(251,146,60,0.08)', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
                     <Flame size={16} color="#FB923C" aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -530,6 +531,7 @@ const UQuail: React.FC = () => {
                 {/* Unread group messages — snapshot taken at panel open */}
                 {panelUnreadGroups.map(g => (
                   <button key={g.groupId} onClick={() => { setNotifPanelOpen(false); openGroupChat(g.groupId); }}
+                    className="q-press"
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
                     <MessageSquare size={15} color="var(--q-accent)" aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -542,6 +544,7 @@ const UQuail: React.FC = () => {
                 {/* Pending friend requests */}
                 {(notifData?.pendingFriendRequests ?? 0) > 0 && (
                   <button onClick={() => { setNotifPanelOpen(false); navigate('/friends'); }}
+                    className="q-press"
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
                     <Users size={15} color="var(--q-accent)" aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -554,6 +557,7 @@ const UQuail: React.FC = () => {
                 {/* Pending series invites */}
                 {(notifData?.pendingSeriesInvites ?? 0) > 0 && (
                   <button onClick={() => { setNotifPanelOpen(false); navigate('/challenges'); }}
+                    className="q-press"
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid var(--q-line)', textAlign: 'left' }}>
                     <Trophy size={15} color="var(--q-accent)" aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>

@@ -186,7 +186,7 @@ const FriendsPage: React.FC = () => {
       <p style={{ fontWeight: 600, color: 'var(--q-text2)', marginBottom: 6 }}>{t('friends.noFriendsYet')}</p>
       <p style={{ fontSize: 13 }}>
         <Trans i18nKey="friends.noFriendsHint" components={{
-          btn: <button onClick={() => setTab('search')} aria-label={t('friends.searchTab')}
+          btn: <button onClick={() => setTab('search')} aria-label={t('friends.searchTab')} className="q-press"
             style={{ background: 'none', border: 'none', cursor: 'pointer',
               color: 'var(--q-accent)', fontWeight: 700, fontSize: 13 }} />
         }} />
@@ -200,7 +200,7 @@ const FriendsPage: React.FC = () => {
           borderRadius: 20, background: 'var(--q-chrome)',
           border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
         }}>
-          <button onClick={() => navigate(`/user/${f.id}`)}
+          <button onClick={() => navigate(`/user/${f.id}`)} className="q-press"
             style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
               background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
             <UserAvatar avatar={f.avatar} username={f.username} cosmetics={f.cosmetics ?? []} size="sm" />
@@ -219,6 +219,7 @@ const FriendsPage: React.FC = () => {
           </button>
           <button onClick={() => removeFriend(friendshipId, f.username)}
             aria-label={t('friends.removeFromFriends', { username: f.username })}
+            className="q-press"
             style={{ background: 'none', border: 'none', cursor: 'pointer',
               color: 'var(--q-text3)', padding: 6, borderRadius: 10,
               transition: 'color 0.15s' }}
@@ -244,7 +245,7 @@ const FriendsPage: React.FC = () => {
           borderRadius: 20, background: 'var(--q-chrome)',
           border: '1px solid var(--q-accent)', boxShadow: '0 0 0 2px rgba(167,139,250,0.15)',
         }}>
-          <button onClick={() => navigate(`/user/${req.sender.id}`)}
+          <button onClick={() => navigate(`/user/${req.sender.id}`)} className="q-press"
             style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
               background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
             <UserAvatar avatar={req.sender.avatar} username={req.sender.username} cosmetics={req.sender.cosmetics ?? []} size="sm" />
@@ -257,6 +258,7 @@ const FriendsPage: React.FC = () => {
           </button>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button onClick={() => acceptRequest(req.id)}
+              className="q-press"
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px',
                 borderRadius: 999, background: 'var(--q-accent)', color: '#fff',
                 fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
@@ -265,6 +267,7 @@ const FriendsPage: React.FC = () => {
             </button>
             <button onClick={() => declineOrRemove(req.id)}
               aria-label={t('friends.declineRequest')}
+              className="q-press"
               style={{ padding: 8, borderRadius: 10, background: 'var(--q-line)',
                 border: 'none', cursor: 'pointer', color: 'var(--q-text3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -308,6 +311,7 @@ const FriendsPage: React.FC = () => {
               <button key={id} onClick={() => setTab(id)}
                 data-tour={tourId}
                 aria-pressed={on}
+                className="q-press"
                 style={{ flex: 1, height: 36, border: 'none', borderRadius: 14,
                   background: on ? 'var(--q-accent)' : 'transparent',
                   color: on ? '#fff' : 'var(--q-text2)',
@@ -337,12 +341,11 @@ const FriendsPage: React.FC = () => {
               value={query}
               onChange={e => handleQueryChange(e.target.value)}
               placeholder={t('friends.searchPlaceholder')}
-              autoFocus
               style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none',
                 fontSize: 14, color: 'var(--q-text)', fontFamily: 'inherit' }}
             />
             {query && (
-              <button onClick={() => { setQuery(''); setSearchResults([]); }} aria-label={t('common.clear')}
+              <button onClick={() => { setQuery(''); setSearchResults([]); }} aria-label={t('common.clear')} className="q-press"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', padding: 2 }}>
                 <X size={14} aria-hidden="true" />
               </button>
@@ -384,7 +387,7 @@ const FriendsPage: React.FC = () => {
                     borderRadius: 20, background: 'var(--q-chrome)',
                     border: '1px solid var(--q-line)', boxShadow: 'var(--q-shadow)',
                   }}>
-                    <button onClick={() => navigate(`/user/${u.id}`)}
+                    <button onClick={() => navigate(`/user/${u.id}`)} className="q-press"
                       style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0,
                         background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
                       <UserAvatar avatar={u.avatar} username={u.username} cosmetics={u.cosmetics ?? []} size="sm" />
@@ -421,6 +424,7 @@ const FriendsPage: React.FC = () => {
                     )}
                     {u.friendStatus === 'PENDING' && !u.isSender && (
                       <button onClick={() => acceptFromSearch(u)}
+                        className="q-press"
                         style={{ fontSize: 11, fontWeight: 700, color: '#fff', padding: '6px 12px',
                           borderRadius: 999, background: 'var(--q-accent)', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                         {t('userProfile.accept')}
@@ -429,6 +433,7 @@ const FriendsPage: React.FC = () => {
                     {u.friendStatus === 'NONE' && (
                       <button onClick={() => sendRequest(u.id)} disabled={isLoading}
                         aria-label={t('friends.addAsFriend', { username: u.username })}
+                        className="q-press"
                         style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700,
                           color: '#fff', padding: '7px 13px', borderRadius: 999, flexShrink: 0,
                           background: isLoading ? 'var(--q-line)' : 'linear-gradient(135deg,#A78BFA,#EC4899)',
@@ -486,12 +491,12 @@ const FriendsPage: React.FC = () => {
               {t('friends.confirmRemove', { username: confirmRemove.username })}
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setConfirmRemove(null)} autoFocus
+              <button onClick={() => setConfirmRemove(null)} autoFocus className="q-press"
                 style={{ flex: 1, padding: '11px', borderRadius: 14, border: '1.5px solid var(--q-line)',
                   background: 'transparent', color: 'var(--q-text2)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 {t('common.cancel')}
               </button>
-              <button onClick={confirmRemoveFriend}
+              <button onClick={confirmRemoveFriend} className="q-press"
                 style={{ flex: 1, padding: '11px', borderRadius: 14, border: 'none',
                   background: '#EF4444', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 {t('friends.confirmRemoveButton')}

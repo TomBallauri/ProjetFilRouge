@@ -25,7 +25,14 @@ const CompletedChallengesChart: React.FC = () => {
   const [items, setItems] = useState<CompletedEntry[] | null>(null);
   const [mode, setMode] = useState<RangeMode>('week');
   const [offset, setOffset] = useState(0);
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  // Séparé en deux états : hoverIdx (aperçu transitoire, souris/clavier) et pinnedIdx
+  // (sélection persistante par tap/clic). Sur mobile, taper une barre déclenche à la fois
+  // onFocus et onClick sur le même élément — s'ils partageaient un seul état, le focus
+  // modifierait la valeur juste avant que le clic ne la lise pour son toggle, annulant la
+  // sélection à chaque tap.
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [pinnedIdx, setPinnedIdx] = useState<number | null>(null);
+  const activeIdx = pinnedIdx ?? hoverIdx;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -50,7 +57,7 @@ const CompletedChallengesChart: React.FC = () => {
   // toujours vide.
   const prevDisabled = oldestDate !== null && periodStart <= oldestDate;
 
-  const switchMode = (next: RangeMode) => { setMode(next); setOffset(0); setActiveIdx(null); };
+  const switchMode = (next: RangeMode) => { setMode(next); setOffset(0); setPinnedIdx(null); setHoverIdx(null); };
 
   // Vue mois : défile jusqu'aux jours les plus récents à l'ouverture plutôt que de laisser
   // l'utilisateur sur le 1er du mois — c'est la fin de la période qui est la plus pertinente.
@@ -89,6 +96,7 @@ const CompletedChallengesChart: React.FC = () => {
           {TABS.map(tab => (
             <button key={tab.mode} type="button" role="tab" aria-selected={mode === tab.mode}
               onClick={() => switchMode(tab.mode)}
+              className="q-press"
               style={{
                 padding: '4px 10px', borderRadius: 999, border: 'none', cursor: 'pointer',
                 fontSize: 11, fontWeight: 700,
@@ -103,8 +111,9 @@ const CompletedChallengesChart: React.FC = () => {
       </div>
 
       <div className="flex items-center justify-between mb-1">
-        <button type="button" onClick={() => { setOffset(o => o + 1); setActiveIdx(null); }} disabled={prevDisabled}
+        <button type="button" onClick={() => { setOffset(o => o + 1); setPinnedIdx(null); setHoverIdx(null); }} disabled={prevDisabled}
           aria-label={t('uquail.completedChart.prevPeriod')}
+          className="q-press"
           style={{
             width: 26, height: 26, borderRadius: 8, border: 'none', flexShrink: 0,
             background: 'var(--q-bg-flat)', color: prevDisabled ? 'var(--q-line)' : 'var(--q-text2)',
@@ -116,6 +125,7 @@ const CompletedChallengesChart: React.FC = () => {
         <span className="text-xs font-bold" style={{ color: 'var(--q-text)' }}>{periodLabel}</span>
         <button type="button" onClick={() => setOffset(o => Math.max(0, o - 1))} disabled={offset === 0}
           aria-label={t('uquail.completedChart.nextPeriod')}
+          className="q-press"
           style={{
             width: 26, height: 26, borderRadius: 8, border: 'none', flexShrink: 0,
             background: 'var(--q-bg-flat)', color: offset === 0 ? 'var(--q-line)' : 'var(--q-text2)',
@@ -153,14 +163,17 @@ const CompletedChallengesChart: React.FC = () => {
           }}>
             {buckets.map((b, i) => (
               <button key={i} type="button"
-                onClick={() => setActiveIdx(prev => prev === i ? null : i)}
-                onMouseEnter={() => setActiveIdx(i)}
-                onMouseLeave={() => setActiveIdx(prev => prev === i ? null : prev)}
-                onFocus={() => setActiveIdx(i)}
-                onBlur={() => setActiveIdx(prev => prev === i ? null : prev)}
+                onClick={() => setPinnedIdx(prev => {
+                  if (prev === i) { setHoverIdx(null); return null; }
+                  return i;
+                })}
+                onMouseEnter={() => setHoverIdx(i)}
+                onMouseLeave={() => setHoverIdx(prev => prev === i ? null : prev)}
+                onFocus={() => setHoverIdx(i)}
+                onBlur={() => setHoverIdx(prev => prev === i ? null : prev)}
                 aria-label={t('uquail.completedChart.barAriaLabel', { label: b.fullLabel, count: b.value })}
-                aria-pressed={activeIdx === i}
-                className={mode === 'month' ? 'flex flex-col items-center justify-end h-full' : 'flex-1 flex flex-col items-center justify-end h-full'}
+                aria-pressed={pinnedIdx === i}
+                className={mode === 'month' ? 'q-press flex flex-col items-center justify-end h-full' : 'q-press flex-1 flex flex-col items-center justify-end h-full'}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer', padding: 0, minWidth: 0,
                   width: mode === 'month' ? 20 : undefined, flexShrink: mode === 'month' ? 0 : undefined,

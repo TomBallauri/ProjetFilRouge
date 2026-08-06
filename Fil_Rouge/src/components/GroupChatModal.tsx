@@ -177,7 +177,7 @@ const GroupChatModal: React.FC = () => {
             </div>
             <div style={{ fontSize: 11, color: 'var(--q-text3)' }}>{t('groupChat.memberCount', { count: joinedCount })}</div>
           </div>
-          <button type="button" onClick={closeGroupChat} aria-label={t('groupChat.closeAriaLabel')} style={{
+          <button type="button" onClick={closeGroupChat} aria-label={t('groupChat.closeAriaLabel')} className="q-press" style={{
             width: 32, height: 32, borderRadius: '50%', border: 'none',
             background: 'var(--q-line)', color: 'var(--q-text2)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
@@ -252,7 +252,7 @@ const GroupChatModal: React.FC = () => {
                   />
                   <p style={{ fontSize: 10, color: 'var(--q-text3)', textAlign: 'right', marginTop: 2 }}>{input.length}/500</p>
                 </div>
-                <button type="button" onClick={handleSend} disabled={sending || !input.trim()} aria-label={t('groupChat.send')} style={{
+                <button type="button" onClick={handleSend} disabled={sending || !input.trim()} aria-label={t('groupChat.send')} className="q-press" style={{
                   width: 44, height: 44, borderRadius: 14, border: 'none', flexShrink: 0,
                   background: input.trim() ? 'var(--q-accent)' : 'var(--q-line)',
                   color: '#fff', cursor: input.trim() ? 'pointer' : 'default',

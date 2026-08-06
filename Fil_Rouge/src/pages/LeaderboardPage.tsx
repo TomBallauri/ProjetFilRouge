@@ -141,7 +141,7 @@ const LeaderboardPage: React.FC = () => {
           ] as const).map(({ id, label, Icon }) => {
             const on = scope === id;
             return (
-              <button key={id} onClick={() => setScope(id)} aria-pressed={on}
+              <button key={id} onClick={() => setScope(id)} aria-pressed={on} className="q-press"
                 style={{
                   flex: 1, height: 38, border: 'none', borderRadius: 16,
                   background: on ? 'var(--q-accent)' : 'transparent',
@@ -207,6 +207,7 @@ const LeaderboardPage: React.FC = () => {
                     return (
                       <button key={u.id} onClick={() => goToProfile(u)}
                         aria-label={t('leaderboard.profileRankLabel', { username: u.username, rank })}
+                        className="q-press"
                         style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0, gap: 0 }}>
 
                         {/* Avatar + rank badge */}
@@ -291,6 +292,7 @@ const LeaderboardPage: React.FC = () => {
                         aria-label={isMe
                           ? t('leaderboard.rowLabelMe', { username: u.username, rank })
                           : t('leaderboard.rowLabel', { username: u.username, rank })}
+                        className="q-press"
                         style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 12,
                           padding: '12px 14px',

@@ -80,7 +80,7 @@ function CatTile({ value, selected, onClick }: { value: string; selected: boolea
   const Icon = meta.Icon;
   return (
     <button type="button" onClick={onClick}
-      className="flex flex-col items-center gap-1.5 transition-all duration-200 active:scale-95 focus:outline-none">
+      className="q-press flex flex-col items-center gap-1.5 transition-all duration-200 active:scale-95 focus:outline-none">
       {/* Icon container */}
       <div className="relative">
         <div
@@ -137,7 +137,7 @@ function ChallengeCard({
         </span>
         {total > 1 && (
           <button type="button" onClick={onRemove}
-            className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+            className="q-press p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
             <Trash2 size={14} />
           </button>
         )}
@@ -181,7 +181,7 @@ function ChallengeCard({
           {DIFFICULTIES.map(d => (
             <button key={d.value} type="button"
               onClick={() => onChange({ ...data, difficulty: d.value })}
-              className={`py-2 rounded-xl border-2 text-center transition-all active:scale-95 text-xs font-bold
+              className={`q-press py-2 rounded-xl border-2 text-center transition-all active:scale-95 text-xs font-bold
                 ${data.difficulty === d.value ? `${d.border} ${d.bg} ${d.text}` : inactiveDifficultyClass}`}>
               {t(`common.difficulty.${d.value.toLowerCase()}`)}
             </button>
@@ -294,7 +294,7 @@ const CreateChallenge: React.FC = () => {
     <div className={`px-3 py-4 md:p-6 ${THEME.text}`}>
 
       <button onClick={() => navigate('/challenges')}
-        className={`flex items-center gap-1.5 mb-5 text-sm font-medium ${THEME.backLink} transition-colors`}>
+        className={`q-press flex items-center gap-1.5 mb-5 text-sm font-medium ${THEME.backLink} transition-colors`}>
         <ArrowLeft size={16} /> {t('createChallenge.backToChallenges')}
       </button>
 
@@ -307,7 +307,7 @@ const CreateChallenge: React.FC = () => {
           </h1>
           <button onClick={() => navigate('/challenges/ai-create')}
             data-tour="create-ai"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 transition-opacity">
+            className="q-press flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90 transition-opacity">
             <Sparkles size={13} /> {t('createChallenge.aiButton')}
           </button>
         </div>
@@ -346,14 +346,14 @@ const CreateChallenge: React.FC = () => {
 
           {/* Bouton ajouter un défi */}
           <button type="button" onClick={addChallenge}
-            className={`w-full py-3 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 text-sm font-semibold transition-all hover:scale-[1.01] active:scale-[0.99]
+            className={`q-press w-full py-3 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 text-sm font-semibold transition-all hover:scale-[1.01] active:scale-[0.99]
               ${THEME.addChallengeBtn}`}>
             <Plus size={16} /> {t('createChallenge.addChallenge')}
           </button>
 
           {/* Visibilité */}
           <button type="button" onClick={() => setIsPublic(p => !p)}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${visibilityBorderClass}`}>
+            className={`q-press w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${visibilityBorderClass}`}>
             <div className="flex items-center gap-3">
               {visibilityContent.icon}
               <div className="text-left">
@@ -371,7 +371,7 @@ const CreateChallenge: React.FC = () => {
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
           <button type="submit" disabled={loading}
-            className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 text-sm active:scale-95">
+            className="q-press w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 text-sm active:scale-95">
             {loading ? t('createChallenge.creating') : submitButtonContent}
           </button>
         </form>
@@ -397,11 +397,11 @@ const CreateChallenge: React.FC = () => {
               {challenges.length > 1 ? t('createChallenge.confirmBodyMultiple', { count: challenges.length }) : t('createChallenge.confirmBodySingle')}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button type="button" onClick={() => setShowConfirm(false)} style={{
+              <button type="button" onClick={() => setShowConfirm(false)} className="q-press" style={{
                 flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
                 background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
               }}>{t('common.cancel')}</button>
-              <button type="button" onClick={confirmSubmit} disabled={loading} style={{
+              <button type="button" onClick={confirmSubmit} disabled={loading} className="q-press" style={{
                 flex: 1, padding: '12px', borderRadius: 12, border: 'none',
                 background: 'var(--q-accent)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                 opacity: loading ? 0.6 : 1,

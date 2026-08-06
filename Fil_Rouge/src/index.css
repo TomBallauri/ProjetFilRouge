@@ -72,6 +72,11 @@
 body {
   font-family: var(--q-font);
   -webkit-font-smoothing: antialiased;
+  /* Toujours présent, même quand une page lazy-loaded démonte pendant un changement de
+     route — sinon le blanc par défaut du navigateur apparaît sous le spinner de Suspense
+     (PageLoader n'a pas de fond propre) le temps que le chunk suivant se charge. */
+  background: var(--q-bg);
+  min-height: 100vh;
 }
 
 /* ── Utility classes ─────────────────────────────────────────── */

@@ -56,6 +56,7 @@ const NotifToastContainer: React.FC = () => {
         <button
           key={toast.id}
           type="button"
+          className="q-press"
           onClick={() => {
             dismiss(toast.id);
             const groupMatch = toast.link?.match(GROUP_LINK_RE);

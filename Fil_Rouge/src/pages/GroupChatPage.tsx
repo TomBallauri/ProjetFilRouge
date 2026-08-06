@@ -150,7 +150,7 @@ const GroupChatPage: React.FC = () => {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--q-text3)', fontFamily: 'var(--q-font)' }}>
         <p style={{ marginBottom: 16 }}>{error || t('groupChat.notFound')}</p>
-        <button onClick={() => navigate(-1)} style={{ background: 'var(--q-accent)', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 20px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+        <button onClick={() => navigate(-1)} className="q-press" style={{ background: 'var(--q-accent)', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 20px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
           {t('common.back')}
         </button>
       </div>
@@ -166,7 +166,7 @@ const GroupChatPage: React.FC = () => {
         padding: '12px 0 12px', borderBottom: '1px solid var(--q-line)',
         flexShrink: 0,
       }}>
-        <button onClick={() => navigate(-1)} aria-label={t('common.back')} style={{
+        <button onClick={() => navigate(-1)} aria-label={t('common.back')} className="q-press" style={{
           background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 12,
           color: 'var(--q-text2)', display: 'flex', alignItems: 'center',
         }}>
@@ -270,6 +270,7 @@ const GroupChatPage: React.FC = () => {
             onClick={handleSend}
             disabled={!canSend}
             aria-label={t('groupChat.send')}
+            className="q-press"
             style={getSendButtonStyle(canSend)}
           >
             <Send size={17} aria-hidden="true" />

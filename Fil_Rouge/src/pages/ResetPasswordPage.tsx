@@ -81,7 +81,7 @@ const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
             onFocus={e => e.currentTarget.style.borderColor = '#A78BFA'}
             onBlur={e => e.currentTarget.style.borderColor = inputBorder}
           />
-          <button type="button" onClick={() => setShowPassword(p => !p)}
+          <button type="button" onClick={() => setShowPassword(p => !p)} className="q-press"
             aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
             style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
               background: 'none', border: 'none', cursor: 'pointer', color: iconColor, padding: 2, display: 'flex' }}>
@@ -116,7 +116,7 @@ const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
         </div>
       )}
 
-      <button type="submit" disabled={loading} aria-busy={loading}
+      <button type="submit" disabled={loading} aria-busy={loading} className="q-press"
         style={{
           width: '100%', height: 48, borderRadius: 16, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
           background: 'linear-gradient(135deg, #00DDFF 0%, #067DBA 35%, #2B1FD0 65%, #B71AEB 100%)',

@@ -86,7 +86,7 @@ const EditChallengeModal: React.FC<Props> = ({ challenge, onClose, onSaved, show
           <h2 className="font-bold text-base" style={{ color: 'var(--q-text)', fontFamily: 'var(--q-display)' }}>
             {t('editChallenge.title')}
           </h2>
-          <button type="button" onClick={onClose} aria-label={t('common.close')}
+          <button type="button" onClick={onClose} aria-label={t('common.close')} className="q-press"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--q-text3)', padding: 4 }}>
             <X size={18} aria-hidden="true" />
           </button>

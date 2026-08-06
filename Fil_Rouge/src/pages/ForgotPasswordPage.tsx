@@ -160,7 +160,7 @@ const ForgotPasswordPage: React.FC = () => {
                 </div>
               )}
 
-              <button type="submit" disabled={loading} aria-busy={loading}
+              <button type="submit" disabled={loading} aria-busy={loading} className="q-press"
                 style={{
                   width: '100%', height: 48, borderRadius: 16, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
                   background: 'linear-gradient(135deg, #00DDFF 0%, #067DBA 35%, #2B1FD0 65%, #B71AEB 100%)',

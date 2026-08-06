@@ -455,7 +455,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
       }}>
 
       <div className="flex items-start gap-3 p-4">
-        <button type="button" onClick={() => setOpen(o => !o)} className="flex items-start gap-3 flex-1 min-w-0 text-left">
+        <button type="button" onClick={() => setOpen(o => !o)} className="q-press flex items-start gap-3 flex-1 min-w-0 text-left">
           <IconTile cat={challenge.category} />
           <div className="flex-1 min-w-0">
             {/* `flex-nowrap` + défilement horizontal plutôt que `flex-wrap` : sur une carte étroite
@@ -488,7 +488,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
             Elles rejoignent maintenant la rangée coins/XP, visible seulement une fois dépliée
             (voir plus bas), où il y a la place de les aligner proprement à droite. */}
         <button type="button" onClick={() => setOpen(o => !o)} aria-label={open ? t('challengePage.card.seeLess') : t('challengePage.card.seeMore')}
-          className="flex-shrink-0" style={{ color: 'var(--q-text3)', display: 'flex', alignItems: 'center' }}>
+          className="q-press flex-shrink-0" style={{ color: 'var(--q-text3)', display: 'flex', alignItems: 'center' }}>
           {open ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
         </button>
       </div>
@@ -499,7 +499,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge, status, isLoad
             <p className={expanded ? '' : 'line-clamp-2'} style={{ overflowWrap: 'anywhere' }}>{challenge.description}</p>
             {hasLongDescription && (
               <button type="button" onClick={() => setExpanded(e => !e)}
-                className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-500 hover:text-sky-400 transition-colors">
+                className="q-press mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-500 hover:text-sky-400 transition-colors">
                 {expanded ? t('challengePage.card.seeLess') : t('challengePage.card.seeMore')}
               </button>
             )}
@@ -959,7 +959,7 @@ const SeriesDropdown: React.FC<{
     }
     if (myDone) {
       return (
-        <button type="button" onClick={handleCompleteSeries} disabled={saving} style={{
+        <button type="button" onClick={handleCompleteSeries} disabled={saving} className="q-press" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           width: '100%', padding: '10px', borderRadius: 12, border: 'none', marginTop: 12,
           background: 'linear-gradient(135deg,#34D399,#38BDF8)', color: '#fff',
@@ -995,11 +995,11 @@ const SeriesDropdown: React.FC<{
             <Trans i18nKey="challengePage.series.leaveConfirmBody" values={{ name: label }} components={{ strong: <strong style={{ color: 'var(--q-text)' }} /> }} />
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" onClick={() => setConfirmLeave(false)} style={{
+            <button type="button" onClick={() => setConfirmLeave(false)} className="q-press" style={{
               flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
               background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
             }}>{t('common.cancel')}</button>
-            <button type="button" onClick={() => { setConfirmLeave(false); handleLeave(); }} disabled={saving} style={{
+            <button type="button" onClick={() => { setConfirmLeave(false); handleLeave(); }} disabled={saving} className="q-press" style={{
               flex: 1, padding: '12px', borderRadius: 12, border: 'none',
               background: 'linear-gradient(135deg,#EF4444,#DC2626)',
               color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
@@ -1035,11 +1035,11 @@ const SeriesDropdown: React.FC<{
             {t('challengePage.series.excludeConfirm', { username: confirmKick.username })}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" onClick={() => setConfirmKick(null)} style={{
+            <button type="button" onClick={() => setConfirmKick(null)} className="q-press" style={{
               flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
               background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
             }}>{t('common.cancel')}</button>
-            <button type="button" onClick={() => { const userId = confirmKick.userId; setConfirmKick(null); handleKick(userId); }} disabled={kickLoading === confirmKick.userId} style={{
+            <button type="button" onClick={() => { const userId = confirmKick.userId; setConfirmKick(null); handleKick(userId); }} disabled={kickLoading === confirmKick.userId} className="q-press" style={{
               flex: 1, padding: '12px', borderRadius: 12, border: 'none',
               background: 'linear-gradient(135deg,#EF4444,#DC2626)',
               color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
@@ -1063,7 +1063,7 @@ const SeriesDropdown: React.FC<{
             {t('challengePage.series.membersCount', { count: group.members.filter(m => m.status === 'JOINED').length })}
           </span>
           {!group.completedAt && (
-            <button type="button" onClick={() => { setShowInvite(p => !p); setSelectedFriends([]); }} style={{
+            <button type="button" onClick={() => { setShowInvite(p => !p); setSelectedFriends([]); }} className="q-press" style={{
               display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
               fontSize: 11, color: 'var(--q-accent)', cursor: 'pointer', fontWeight: 700,
             }}><UserPlus size={12} aria-hidden="true" /> {t('challengePage.series.invite')}</button>
@@ -1082,7 +1082,7 @@ const SeriesDropdown: React.FC<{
                 .map(f => {
                   const sel = selectedFriends.includes(f.user.id);
                   return (
-                    <button key={f.user.id} type="button" onClick={() => toggleFriend(f.user.id)} style={{
+                    <button key={f.user.id} type="button" onClick={() => toggleFriend(f.user.id)} className="q-press" style={{
                       display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 10,
                       border: `1.5px solid ${sel ? 'var(--q-accent)' : 'var(--q-line)'}`,
                       background: sel ? 'var(--q-accent-soft)' : 'transparent',
@@ -1096,11 +1096,11 @@ const SeriesDropdown: React.FC<{
                 })}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" onClick={() => { setShowInvite(false); setSelectedFriends([]); }} style={{
+              <button type="button" onClick={() => { setShowInvite(false); setSelectedFriends([]); }} className="q-press" style={{
                 flex: 1, padding: '7px', borderRadius: 10, border: '1px solid var(--q-line)',
                 background: 'transparent', color: 'var(--q-text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
               }}>{t('common.cancel')}</button>
-              <button type="button" onClick={handleInvite} disabled={saving || !selectedFriends.length} style={{
+              <button type="button" onClick={handleInvite} disabled={saving || !selectedFriends.length} className="q-press" style={{
                 flex: 2, padding: '7px', borderRadius: 10, border: 'none',
                 background: selectedFriends.length ? 'var(--q-accent)' : 'var(--q-line)',
                 color: '#fff', fontSize: 12, fontWeight: 700, cursor: selectedFriends.length ? 'pointer' : 'default',
@@ -1146,6 +1146,7 @@ const SeriesDropdown: React.FC<{
                     onClick={() => setConfirmKick({ userId: m.userId, username: m.user.username })}
                     disabled={kickLoading === m.userId}
                     title={t('challengePage.series.excludeTitle', { username: m.user.username })}
+                    className="q-press"
                     style={{
                       width: 26, height: 26, borderRadius: '50%', border: 'none', flexShrink: 0,
                       background: 'rgba(239,68,68,0.12)', color: '#EF4444',
@@ -1169,7 +1170,7 @@ const SeriesDropdown: React.FC<{
         {/* ── Boutons d'action (masqués une fois la série terminée en groupe) ── */}
         {!group.completedAt && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button type="button" onClick={() => { openGroupChat(group.id); markSeriesSeen(); }} style={{
+            <button type="button" onClick={() => { openGroupChat(group.id); markSeriesSeen(); }} className="q-press" style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '10px', borderRadius: 12, border: 'none',
               background: 'var(--q-accent)', color: '#fff',
@@ -1187,7 +1188,7 @@ const SeriesDropdown: React.FC<{
                 </span>
               )}
             </button>
-            <button type="button" onClick={() => setConfirmLeave(true)} style={{
+            <button type="button" onClick={() => setConfirmLeave(true)} className="q-press" style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '10px', borderRadius: 12,
               border: '1.5px solid rgba(239,68,68,0.35)',
@@ -1210,7 +1211,7 @@ const SeriesDropdown: React.FC<{
         {group === undefined && <div style={{ fontSize: 12, color: 'var(--q-text3)' }}>{t('challengePage.series.loading')}</div>}
 
         {group === null && !showCreate && (
-          <button type="button" onClick={() => setShowCreate(true)} style={{
+          <button type="button" onClick={() => setShowCreate(true)} className="q-press" style={{
             display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none',
             color: 'var(--q-accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: 0,
           }}>
@@ -1226,7 +1227,7 @@ const SeriesDropdown: React.FC<{
               {friends.slice(0, 3).map(f => {
                 const sel = selectedFriends.includes(f.user.id);
                 return (
-                  <button key={f.user.id} type="button" onClick={() => toggleFriend(f.user.id)} style={{
+                  <button key={f.user.id} type="button" onClick={() => toggleFriend(f.user.id)} className="q-press" style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 10,
                     border: `1.5px solid ${sel ? 'var(--q-accent)' : 'var(--q-line)'}`,
                     background: sel ? 'var(--q-accent-soft)' : 'transparent',
@@ -1240,11 +1241,11 @@ const SeriesDropdown: React.FC<{
               })}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" onClick={() => setShowCreate(false)} style={{
+              <button type="button" onClick={() => setShowCreate(false)} className="q-press" style={{
                 flex: 1, padding: '7px', borderRadius: 10, border: '1px solid var(--q-line)',
                 background: 'transparent', color: 'var(--q-text2)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
               }}>{t('common.cancel')}</button>
-              <button type="button" onClick={handleCreate} disabled={saving} style={{
+              <button type="button" onClick={handleCreate} disabled={saving} className="q-press" style={{
                 flex: 2, padding: '7px', borderRadius: 10, border: 'none',
                 background: 'var(--q-accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 opacity: saving ? 0.6 : 1,
@@ -1256,7 +1257,7 @@ const SeriesDropdown: React.FC<{
         {group && myMembership?.status === 'INVITED' && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <span style={{ fontSize: 12, color: 'var(--q-text2)' }}>{t('challengePage.series.invitedToJoin')}</span>
-            <button type="button" onClick={handleJoin} disabled={saving} style={{
+            <button type="button" onClick={handleJoin} disabled={saving} className="q-press" style={{
               padding: '5px 12px', borderRadius: 999, border: 'none',
               background: 'var(--q-accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
             }}>{saving ? '…' : t('challengePage.join')}</button>
@@ -1290,7 +1291,7 @@ const SeriesDropdown: React.FC<{
       overflow: 'hidden',
     }}>
       {/* Header */}
-      <button type="button" onClick={() => setOpen(prev => !prev)} style={{
+      <button type="button" onClick={() => setOpen(prev => !prev)} className="q-press" style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 10,
         padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
       }}>
@@ -1328,7 +1329,7 @@ const SeriesDropdown: React.FC<{
 
           {user && startableCount > 1 && (
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--q-line)' }}>
-              <button type="button" onClick={handleStartAll} disabled={startingAll} style={{
+              <button type="button" onClick={handleStartAll} disabled={startingAll} className="q-press" style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 width: '100%', padding: '9px', borderRadius: 12, border: 'none',
                 background: 'var(--q-vibrant-lavender)', color: '#fff',
@@ -1423,7 +1424,7 @@ const SeriesDropdown: React.FC<{
                       : t('challengePage.series.unlocksIn', { count: c.daysUntilUnlock })}
                   </div>
                 ) : (
-                  <button type="button" disabled={actionLoading === c.id} onClick={() => inProgress ? handleCompleteAndRefresh(c.id) : onStart(c.id)} style={{
+                  <button type="button" disabled={actionLoading === c.id} onClick={() => inProgress ? handleCompleteAndRefresh(c.id) : onStart(c.id)} className="q-press" style={{
                     width: '100%', padding: '9px', borderRadius: 12, border: 'none',
                     background: inProgress ? 'linear-gradient(135deg,#34D399,#38BDF8)' : 'var(--q-vibrant-lavender)',
                     color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -2552,7 +2553,7 @@ const ChallengePage: React.FC = () => {
                     <button
                       onClick={() => msg.user.id === user?.id ? navigate('/profile') : navigate(`/user/${msg.user.id}`)}
                       aria-label={t('challengePage.chatModal.viewProfileAriaLabel', { username: msg.user.username })}
-                      className="flex-shrink-0 self-end"
+                      className="q-press flex-shrink-0 self-end"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       <UserAvatar
                         avatar={msg.user.avatar}
@@ -2566,7 +2567,7 @@ const ChallengePage: React.FC = () => {
                         <div className="flex items-center gap-2 mb-1" style={{ paddingLeft: 2 }}>
                           <button
                             onClick={() => navigate(`/user/${msg.user.id}`)}
-                            className="font-semibold text-xs hover:underline"
+                            className="q-press font-semibold text-xs hover:underline"
                             style={{ color: 'var(--q-accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                             {msg.user.username}
                           </button>
@@ -2623,7 +2624,7 @@ const ChallengePage: React.FC = () => {
             />
             <button onClick={sendChatMessage} disabled={!chatInput.trim() || chatSending || chatInput.length > 500}
               aria-label={t('challengePage.chatModal.sendAriaLabel')}
-              className={`p-2 rounded-full ${chatInput.trim() ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'}`}>
+              className={`q-press p-2 rounded-full ${chatInput.trim() ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'}`}>
               <Send size={18} aria-hidden="true" />
             </button>
           </div>
@@ -2654,7 +2655,7 @@ const ChallengePage: React.FC = () => {
                 setSelectedFriends(prev => sel ? prev.filter(id => id !== f.user.id) : [...prev, f.user.id]);
               }}
               disabled={maxReached}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all disabled:opacity-40"
+              className="q-press w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all disabled:opacity-40"
               style={{
                 background: sel ? 'var(--q-accent-soft)' : 'var(--q-bg)',
                 border: `1px solid ${sel ? 'var(--q-accent)' : 'var(--q-line)'}`,
@@ -2744,7 +2745,7 @@ const ChallengePage: React.FC = () => {
                 setInviteExistingFriends(prev => sel ? prev.filter(id => id !== f.user.id) : [...prev, f.user.id]);
               }}
               disabled={maxReached}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all disabled:opacity-40"
+              className="q-press w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all disabled:opacity-40"
               style={{
                 background: sel ? 'var(--q-accent-soft)' : 'var(--q-bg)',
                 border: `1px solid ${sel ? 'var(--q-accent)' : 'var(--q-line)'}`,
@@ -2855,6 +2856,7 @@ const ChallengePage: React.FC = () => {
                   <button
                     onClick={() => handleDeclineSeriesInvite(invite.id)}
                     disabled={seriesInviteLoading === invite.id}
+                    className="q-press"
                     style={{
                       padding: '7px 12px', borderRadius: 10,
                       border: '1px solid var(--q-line)', background: 'transparent',
@@ -2864,6 +2866,7 @@ const ChallengePage: React.FC = () => {
                   <button
                     onClick={() => handleJoinSeriesInvite(invite.id)}
                     disabled={seriesInviteLoading === invite.id}
+                    className="q-press"
                     style={{
                       padding: '7px 14px', borderRadius: 10, border: 'none',
                       background: 'linear-gradient(135deg,#A78BFA,#EC4899)',
@@ -3342,12 +3345,12 @@ const ChallengePage: React.FC = () => {
               {t('editChallenge.deleteConfirmBody', { title: confirmDeleteChallenge.title })}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button type="button" onClick={() => setConfirmDeleteChallenge(null)} disabled={deletingChallenge} style={{
+              <button type="button" onClick={() => setConfirmDeleteChallenge(null)} disabled={deletingChallenge} className="q-press" style={{
                 flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--q-line)',
                 background: 'transparent', color: 'var(--q-text2)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                 opacity: deletingChallenge ? 0.6 : 1,
               }}>{t('common.cancel')}</button>
-              <button type="button" onClick={handleDeleteChallenge} disabled={deletingChallenge} style={{
+              <button type="button" onClick={handleDeleteChallenge} disabled={deletingChallenge} className="q-press" style={{
                 flex: 1, padding: '12px', borderRadius: 12, border: 'none',
                 background: 'linear-gradient(135deg,#EF4444,#DC2626)',
                 color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
@@ -3437,7 +3440,7 @@ const ChallengePage: React.FC = () => {
             className="flex-1 bg-transparent text-sm outline-none min-w-0"
             style={{ color: 'var(--q-text)', fontFamily: 'var(--q-font)' }} />
           {search && (
-            <button onClick={() => setSearch('')} aria-label={t('challengePage.clearSearchAriaLabel')} style={{ color: 'var(--q-text3)' }}>
+            <button onClick={() => setSearch('')} aria-label={t('challengePage.clearSearchAriaLabel')} className="q-press" style={{ color: 'var(--q-text3)' }}>
               <X size={14} aria-hidden="true" />
             </button>
           )}
@@ -3467,7 +3470,7 @@ const ChallengePage: React.FC = () => {
           <Trophy size={44} className="mx-auto mb-3 opacity-30" />
           <p>{isDailyFilter ? t('challengePage.dailyNotAvailable') : t('challengePage.noChallengesFound')}</p>
           <button onClick={() => { setSearch(''); setSelectedCategory(''); setSelectedDifficulty(''); setIsDailyFilter(false); }}
-            className="mt-3 text-sm font-semibold hover:opacity-70 transition-opacity" style={{ color: 'var(--q-accent)' }}>
+            className="q-press mt-3 text-sm font-semibold hover:opacity-70 transition-opacity" style={{ color: 'var(--q-accent)' }}>
             {t('challengePage.resetFilters')}
           </button>
         </div>

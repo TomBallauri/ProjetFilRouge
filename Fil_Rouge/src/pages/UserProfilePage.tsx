@@ -117,7 +117,7 @@ const UserProfilePage: React.FC = () => {
   if (notFound || !profile) return (
     <div style={{ textAlign: 'center', padding: '60px 24px', fontFamily: 'var(--q-font)' }}>
       <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--q-text)', marginBottom: 8 }}>{t('userProfile.notFound')}</p>
-      <button onClick={() => navigate(-1)} style={{ fontSize: 14, color: 'var(--q-accent)', background: 'none', border: 'none', cursor: 'pointer' }}>{t('common.back')}</button>
+      <button onClick={() => navigate(-1)} className="q-press" style={{ fontSize: 14, color: 'var(--q-accent)', background: 'none', border: 'none', cursor: 'pointer' }}>{t('common.back')}</button>
     </div>
   );
 
@@ -201,7 +201,7 @@ const UserProfilePage: React.FC = () => {
           {!isOwnProfile && currentUser && (
             <div style={{ marginTop: 14 }}>
               {friendStatus.status === 'NONE' && (
-                <button onClick={sendFriendRequest} disabled={friendLoading}
+                <button onClick={sendFriendRequest} disabled={friendLoading} className="q-press"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px',
                     borderRadius: 999, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
                     background: 'linear-gradient(135deg,#A78BFA,#3B82F6)', color: '#fff',
@@ -211,7 +211,7 @@ const UserProfilePage: React.FC = () => {
                 </button>
               )}
               {friendStatus.status === 'PENDING' && friendStatus.isSender && (
-                <button onClick={removeFriend} disabled={friendLoading}
+                <button onClick={removeFriend} disabled={friendLoading} className="q-press"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px',
                     borderRadius: 999, border: '2px solid rgba(148,163,184,0.4)', cursor: 'pointer',
                     fontWeight: 700, fontSize: 13, background: 'transparent',
@@ -221,14 +221,14 @@ const UserProfilePage: React.FC = () => {
               )}
               {friendStatus.status === 'PENDING' && !friendStatus.isSender && (
                 <div style={{ display: 'inline-flex', gap: 8 }}>
-                  <button onClick={acceptFriendRequest} disabled={friendLoading}
+                  <button onClick={acceptFriendRequest} disabled={friendLoading} className="q-press"
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px',
                       borderRadius: 999, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
                       background: 'linear-gradient(135deg,#34D399,#3B82F6)', color: '#fff',
                       opacity: friendLoading ? 0.6 : 1 }}>
                     <UserCheck size={16} aria-hidden="true" /> {t('userProfile.accept')}
                   </button>
-                  <button onClick={removeFriend} disabled={friendLoading}
+                  <button onClick={removeFriend} disabled={friendLoading} className="q-press"
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px',
                       borderRadius: 999, border: '2px solid rgba(239,68,68,0.4)', cursor: 'pointer',
                       fontWeight: 700, fontSize: 13, background: 'transparent',
@@ -238,7 +238,7 @@ const UserProfilePage: React.FC = () => {
                 </div>
               )}
               {friendStatus.status === 'ACCEPTED' && (
-                <button onClick={removeFriend} disabled={friendLoading}
+                <button onClick={removeFriend} disabled={friendLoading} className="q-press"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px',
                     borderRadius: 999, border: '2px solid rgba(52,211,153,0.5)', cursor: 'pointer',
                     fontWeight: 700, fontSize: 13, background: 'rgba(52,211,153,0.1)',
