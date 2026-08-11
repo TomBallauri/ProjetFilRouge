@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstraps a full local development environment for ChallengeHub
+# Bootstraps a full local development environment for U-Quail
 # (frontend + backend + database schema), from a fresh clone.
 set -euo pipefail
 
@@ -23,7 +23,7 @@ log "Vérification du fichier backend/.env"
 ENV_FILE="$BACKEND_DIR/.env"
 if [ ! -f "$ENV_FILE" ]; then
   cat > "$ENV_FILE" <<'EOF'
-DATABASE_URL="postgresql://user:password@localhost:5432/challengehub?schema=public"
+DATABASE_URL="postgresql://user:password@localhost:5432/u-quail?schema=public"
 JWT_SECRET="change-me-in-local-dev"
 GROQ_API_KEY=""
 EOF

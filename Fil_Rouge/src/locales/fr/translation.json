@@ -41,7 +41,7 @@
     }
   },
   "layout": {
-    "footer": "© {{year}} ChallengeHub — Tous droits réservés.",
+    "footer": "© {{year}} U-Quail — Tous droits réservés.",
     "mainContent": "Contenu principal",
     "skipToContent": "Aller au contenu principal"
   },

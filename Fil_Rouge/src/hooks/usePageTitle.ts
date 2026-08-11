@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const BASE = 'ChallengeHub';
+const BASE = 'U-Quail';
 
 export function usePageTitle(page?: string) {
   useEffect(() => {
