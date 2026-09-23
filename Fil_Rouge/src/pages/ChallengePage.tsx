@@ -707,6 +707,17 @@ const SeriesDropdown: React.FC<{
   };
   const [unreadHeaderCount, setUnreadHeaderCount] = useState(0);
   const [open, setOpen] = useState(false);
+  // Même seuil que ChallengeCard (voir plus haut) — les défis de série ont les mêmes 500
+  // caractères max de description, ils méritaient le même bouton "voir plus" au lieu d'un
+  // troncage à 2 lignes sans échappatoire pour lire la suite.
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set());
+  const toggleDescriptionExpanded = (challengeId: number) => {
+    setExpandedDescriptions(prev => {
+      const next = new Set(prev);
+      if (next.has(challengeId)) next.delete(challengeId); else next.add(challengeId);
+      return next;
+    });
+  };
   const [group, setGroup] = useState<SeriesGroupData | null | undefined>(undefined); // undefined=loading, null=none
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -1394,8 +1405,20 @@ const SeriesDropdown: React.FC<{
                   )}
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--q-text)', marginBottom: 4 }}>{c.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--q-text2)', marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {c.description}
+                <div style={{ fontSize: 12, color: 'var(--q-text2)', marginBottom: 10 }}>
+                  <div style={expandedDescriptions.has(c.id) ? undefined : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {c.description}
+                  </div>
+                  {c.description.length > 120 && (
+                    <button type="button" onClick={() => toggleDescriptionExpanded(c.id)}
+                      style={{
+                        marginTop: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                        fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em',
+                        color: 'var(--q-accent)',
+                      }}>
+                      {expandedDescriptions.has(c.id) ? t('challengePage.card.seeLess') : t('challengePage.card.seeMore')}
+                    </button>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, fontSize: 12, fontWeight: 700 }}>
                   <span style={{ color: '#FB923C' }}>{c.coinReward} {t('challengePage.card.coins')}</span>
