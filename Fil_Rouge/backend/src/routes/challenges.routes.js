@@ -32,18 +32,32 @@ async function getDailyChallenge(userId) {
     isPublic: true,
     ...(userId ? { participants: { none: { userId, status: 'COMPLETED' } } } : {}),
   };
-  const count = await prisma.challenge.count({ where });
-  if (count === 0) return null;
-  const today = new Date();
-  const seed = today.getUTCFullYear() * 10000 + (today.getUTCMonth() + 1) * 100 + today.getUTCDate();
-  const idx = seed % count;
-  const rows = await prisma.challenge.findMany({
+  let candidates = await prisma.challenge.findMany({
     where,
     orderBy: { id: 'asc' },
-    skip: idx,
-    take: 1,
+    select: { id: true, title: true, seriesName: true },
   });
-  return rows[0] ?? null;
+  // Un jour de série encore verrouillé pour CET utilisateur (jour précédent pas fini) ne doit
+  // jamais être proposé comme défi du jour — sinon la suggestion renvoie un défi que l'utilisateur
+  // ne peut pas valider (voir seriesLockInfo). Sans userId (visiteur non connecté), aucune
+  // progression n'existe donc rien à filtrer.
+  if (userId) {
+    const seriesNames = [...new Set(candidates.filter(c => c.seriesName).map(c => c.seriesName))];
+    const progressBySeriesName = new Map();
+    for (const name of seriesNames) {
+      progressBySeriesName.set(name, await getSeriesProgressByDayNumber(userId, name));
+    }
+    candidates = candidates.filter(c => {
+      if (!c.seriesName) return true;
+      const lock = seriesLockInfo(seriesDayNumber(c.title), progressBySeriesName.get(c.seriesName));
+      return !lock;
+    });
+  }
+  if (candidates.length === 0) return null;
+  const today = new Date();
+  const seed = today.getUTCFullYear() * 10000 + (today.getUTCMonth() + 1) * 100 + today.getUTCDate();
+  const idx = seed % candidates.length;
+  return prisma.challenge.findUnique({ where: { id: candidates[idx].id } });
 }
 
 // Progression de CET utilisateur pour chaque jour numéroté d'une série, en une seule requête —
