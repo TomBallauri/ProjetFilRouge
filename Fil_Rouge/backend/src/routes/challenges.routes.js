@@ -779,7 +779,7 @@ router.post('/api/challenges/ai-generate', authMiddleware, aiGenerateLimiter, as
   }
   try {
     const response = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       max_tokens: 2048,
       messages: [
         { role: 'system', content: buildAiSystemPrompt(lang) },
