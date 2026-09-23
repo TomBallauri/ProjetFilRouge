@@ -20,17 +20,22 @@ import { seriesDayNumber, seriesLockInfo } from '../lib/seriesLock.js';
 
 const DAILY_BONUS_MULTIPLIER = 1.5;
 
-// `userId` optionnel : quand fourni, écarte les défis déjà complétés par CET utilisateur avant
-// de piocher — sinon la "suggestion du jour" (même calcul, voir la route daily-suggestion)
-// pouvait retomber sur un défi que l'utilisateur avait déjà terminé. Ne PAS passer userId lors
-// de l'appel utilisé pour le bonus de récompense (voir POST /api/challenges/:id/complete) : à cet
-// endroit le défi vient tout juste d'être marqué COMPLETED, donc le filtrer changerait l'index et
-// casserait la comparaison avec le défi du jour "officiel" — un défi ne peut de toute façon jamais
-// être complété deux fois (contrainte unique userId+challengeId), donc ce filtre n'y sert à rien.
+// `userId` optionnel : quand fourni, écarte les défis complétés par CET utilisateur AVANT
+// aujourd'hui (UTC) — sinon la "suggestion du jour" (même calcul, voir la route daily-suggestion)
+// pouvait retomber sur un défi déjà terminé depuis longtemps. Ne pas exclure les complétions du
+// jour même : sinon valider LE défi du jour puis rafraîchir la page changeait la composition du
+// pool et donc l'index tiré, ce qui remplaçait la suggestion par une autre au lieu de simplement
+// l'afficher comme "Terminé" pour le reste de la journée. Ne PAS passer userId lors de l'appel
+// utilisé pour le bonus de récompense (voir POST /api/challenges/:id/complete) : à cet endroit le
+// défi vient tout juste d'être marqué COMPLETED, donc le filtrer changerait l'index et casserait
+// la comparaison avec le défi du jour "officiel" — un défi ne peut de toute façon jamais être
+// complété deux fois (contrainte unique userId+challengeId), donc ce filtre n'y sert à rien.
 async function getDailyChallenge(userId) {
+  const todayStartUTC = new Date();
+  todayStartUTC.setUTCHours(0, 0, 0, 0);
   const where = {
     isPublic: true,
-    ...(userId ? { participants: { none: { userId, status: 'COMPLETED' } } } : {}),
+    ...(userId ? { participants: { none: { userId, status: 'COMPLETED', completedAt: { lt: todayStartUTC } } } } : {}),
   };
   let candidates = await prisma.challenge.findMany({
     where,
